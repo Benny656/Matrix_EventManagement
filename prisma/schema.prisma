@@ -23,6 +23,7 @@ enum EventStatus {
 enum RegistrationStatus {
   REGISTERED
   CANCELLED
+  WAITLISTED
 }
 
 enum AttendanceMethod {

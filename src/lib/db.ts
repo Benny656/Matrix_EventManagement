@@ -1,4 +1,4 @@
-import { PrismaClient } from '../generated/prisma';
+import { PrismaClient } from '../generated/prisma/client';
 import { PrismaPg } from '@prisma/adapter-pg';
 import pg from 'pg';
 
@@ -22,4 +22,5 @@ if (process.env.NODE_ENV === 'production') {
 }
 
 export const prisma = prismaInstance;
-export * from '../generated/prisma';
+export * from '../generated/prisma/client';
+

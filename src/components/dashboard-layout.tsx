@@ -60,9 +60,11 @@ export default function DashboardLayout({ user, children }: DashboardLayoutProps
 
   const handleSignOut = async () => {
     await signOut({
-      onSuccess: () => {
-        router.push("/login");
-        router.refresh();
+      fetchOptions: {
+        onSuccess: () => {
+          router.push("/login");
+          router.refresh();
+        },
       },
     });
   };

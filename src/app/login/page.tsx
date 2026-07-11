@@ -28,7 +28,7 @@ const registerSchema = z.object({
 type LoginFormValues = z.infer<typeof loginSchema>;
 type RegisterFormValues = z.infer<typeof registerSchema>;
 
-export default function LoginPage() {
+function LoginContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const { data: session, isPending: sessionLoading } = useSession();
@@ -111,7 +111,6 @@ export default function LoginPage() {
           email: data.email,
           password: data.password,
           name: data.name,
-          role: "STUDENT",
           phone: data.phone,
           rollNumber: data.rollNumber,
         },
@@ -386,5 +385,19 @@ export default function LoginPage() {
         </footer>
       </div>
     </div>
+  );
+}
+
+import { Suspense } from "react";
+
+export default function LoginPage() {
+  return (
+    <Suspense fallback={
+      <div className="flex items-center justify-center min-h-screen font-mono text-xs uppercase bg-background text-muted-foreground">
+        Loading Authentication Protocol...
+      </div>
+    }>
+      <LoginContent />
+    </Suspense>
   );
 }

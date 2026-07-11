@@ -26,7 +26,7 @@ export default async function Home() {
       <div className="fixed rounded-full filter blur-[80px] z-[-1] opacity-[0.08] pointer-events-none w-[400px] h-[400px] bg-outline bottom-[10%] left-[-50px] animate-[pulse_12s_ease-in-out_infinite_reverse]" />
 
       {/* Header */}
-      <header class="w-full top-0 sticky bg-background/80 backdrop-blur-sm border-b border-border z-50">
+      <header className="w-full top-0 sticky bg-background/80 backdrop-blur-sm border-b border-border z-50">
         <div className="flex justify-between items-center px-6 py-3 w-full max-w-7xl mx-auto min-h-[64px]">
           <div className="flex flex-col">
             <span className="font-heading text-2xl font-extrabold tracking-tighter text-foreground">MATRIX</span>
