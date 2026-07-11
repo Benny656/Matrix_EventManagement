@@ -1,0 +1,207 @@
+datasource db {
+  provider = "postgresql"
+}
+
+generator client {
+  provider = "prisma-client"
+  output   = "../src/generated/prisma"
+}
+
+enum Role {
+  ADMIN
+  VOLUNTEER
+  STUDENT
+}
+
+enum EventStatus {
+  UPCOMING
+  ONGOING
+  COMPLETED
+  ARCHIVED
+}
+
+enum RegistrationStatus {
+  REGISTERED
+  CANCELLED
+}
+
+enum AttendanceMethod {
+  SCANNED
+  MANUAL
+}
+
+enum UpdateScope {
+  EVENT
+  DEPARTMENT
+}
+
+enum NotificationType {
+  NEW_EVENT
+  UPDATE_POSTED
+  REGISTRATION_CONFIRMED
+  SESSION_STARTING_SOON
+}
+
+// --- Better Auth Models ---
+
+model User {
+  id            String    @id @default(uuid())
+  name          String
+  email         String    @unique
+  emailVerified Boolean   @default(false)
+  image         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  // Custom Fields
+  rollNumber    String?   @unique
+  phone         String?
+  role          Role      @default(STUDENT)
+
+  // Relations
+  sessions          UserSession[]
+  accounts          Account[]
+  createdEvents     Event[]          @relation("EventCreator")
+  registrations     Registration[]
+  attendances       Attendance[]     @relation("StudentAttendance")
+  markedAttendances Attendance[]     @relation("MarkedAttendance")
+  updates           Update[]
+  notifications     Notification[]
+}
+
+model UserSession {
+  id        String   @id @default(uuid())
+  expiresAt DateTime
+  token     String   @unique
+  createdAt DateTime
+  updatedAt DateTime
+  ipAddress String?
+  userAgent String?
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@map("session")
+}
+
+model Account {
+  id                    String    @id @default(uuid())
+  accountId             String
+  providerId            String
+  userId                String
+  user                  User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  accessToken           String?
+  refreshToken          String?
+  idToken               String?
+  accessTokenExpiresAt  DateTime?
+  refreshTokenExpiresAt DateTime?
+  scope                 String?
+  password              String?
+  createdAt             DateTime  @default(now())
+  updatedAt             DateTime  @updatedAt
+}
+
+model Verification {
+  id         String   @id @default(uuid())
+  identifier String
+  value      String
+  expiresAt  DateTime
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+}
+
+// --- Matrix Event Models ---
+
+model Event {
+  id                   String        @id @default(uuid())
+  title                String
+  description          String
+  posterUrl            String?
+  venue                String
+  date                 DateTime
+  registrationDeadline DateTime
+  maxParticipants      Int
+  category             String
+  coordinatorName      String
+  status               EventStatus   @default(UPCOMING)
+  archivedAt           DateTime?
+  
+  createdById          String
+  createdBy            User          @relation("EventCreator", fields: [createdById], references: [id])
+  
+  createdAt            DateTime      @default(now())
+  updatedAt            DateTime      @updatedAt
+
+  // Relations
+  sessions             Session[]
+  registrations        Registration[]
+  updates              Update[]
+}
+
+model Session {
+  id          String       @id @default(uuid())
+  eventId     String
+  event       Event        @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  title       String
+  venue       String
+  startTime   DateTime
+  endTime     DateTime
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+
+  // Relations
+  attendances Attendance[]
+}
+
+model Registration {
+  id        String             @id @default(uuid())
+  studentId String
+  student   User               @relation(fields: [studentId], references: [id], onDelete: Cascade)
+  eventId   String
+  event     Event              @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  status    RegistrationStatus @default(REGISTERED)
+  createdAt DateTime           @default(now())
+
+  @@unique([studentId, eventId])
+}
+
+model Attendance {
+  id            String           @id @default(uuid())
+  sessionId     String
+  session       Session          @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  studentId     String
+  student       User             @relation("StudentAttendance", fields: [studentId], references: [id], onDelete: Cascade)
+  checkInTime   DateTime         @default(now())
+  checkInMethod AttendanceMethod @default(SCANNED)
+  
+  markedById    String
+  markedBy      User             @relation("MarkedAttendance", fields: [markedById], references: [id])
+  
+  createdAt     DateTime         @default(now())
+
+  @@unique([sessionId, studentId])
+}
+
+model Update {
+  id             String      @id @default(uuid())
+  authorId       String
+  author         User        @relation(fields: [authorId], references: [id], onDelete: Cascade)
+  scope          UpdateScope @default(EVENT)
+  
+  eventId        String?
+  event          Event?      @relation(fields: [eventId], references: [id], onDelete: Cascade)
+  
+  content        String
+  attachmentUrls String[]
+  createdAt      DateTime    @default(now())
+}
+
+model Notification {
+  id        String           @id @default(uuid())
+  userId    String
+  user      User             @relation(fields: [userId], references: [id], onDelete: Cascade)
+  type      NotificationType
+  message   String
+  read      Boolean          @default(false)
+  linkUrl   String?
+  createdAt DateTime         @default(now())
+}
