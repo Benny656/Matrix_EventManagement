@@ -12,6 +12,7 @@ import {
 import LandingAnimations from "@/components/landing-animations";
 import MockTerminal from "@/components/mock-terminal";
 import ThemeToggle from "@/components/theme-toggle";
+import ShootingStarsGrid from "@/components/shooting-stars-grid";
 
 export default async function Home() {
   const session = await auth.api.getSession({
@@ -31,8 +32,17 @@ export default async function Home() {
 
   return (
     <div className="bg-gradient-to-b from-background via-surface-container-low to-background text-foreground font-sans min-h-screen flex flex-col relative overflow-hidden selection:bg-primary/20 selection:text-primary">
-      {/* Glowing background shapes (Clerk-style light theme) */}
-      <div className="absolute inset-0 light-tech-grid pointer-events-none z-0 opacity-80" />
+      {/* Glowing background shapes and animated shooting stars grid */}
+      <ShootingStarsGrid 
+        className="absolute inset-0 z-0 opacity-100 mix-blend-normal dark:mix-blend-screen" 
+        maskOuterStop={200}
+        gridLineOpacity={0.6}
+        maxActiveStars={35}
+        spawnRateMin={100}
+        spawnRateMax={400}
+        trailLength={250}
+        thickness={2}
+      />
       <div className="absolute top-[-10%] right-[-10%] w-[600px] h-[600px] rounded-full clerk-glow-1 blur-[120px] pointer-events-none z-0 animate-pulse-slow opacity-50 dark:opacity-30" />
       <div className="absolute top-[25%] left-[-10%] w-[500px] h-[500px] rounded-full clerk-glow-2 blur-[100px] pointer-events-none z-0 opacity-50 dark:opacity-30" />
       <div className="absolute bottom-[-10%] left-[20%] w-[700px] h-[700px] rounded-full clerk-glow-1 blur-[150px] pointer-events-none z-0 opacity-15 dark:opacity-10" />
@@ -43,7 +53,7 @@ export default async function Home() {
       <header className="w-full top-0 sticky bg-background/60 backdrop-blur-md border-b border-border z-50 transition-all">
         <div className="flex justify-between items-center px-6 py-3 w-full max-w-7xl mx-auto min-h-[64px]">
           <div className="flex items-center gap-3">
-            <img src="/logo.png" alt="Matrix Logo" className="h-8 w-8 object-contain opacity-95 hover:opacity-100 transition-all filter drop-shadow-[0_2px_4px_rgba(0,0,0,0.05)]" />
+            <img src="/logo.png" alt="Matrix Logo" className="h-8 w-8 object-contain opacity-95 hover:opacity-100 transition-all filter drop-shadow-[0_2px_4px_rgba(0,0,0,0.05)] dark:invert" />
             <div className="flex flex-col">
               <span className="font-heading text-lg font-bold tracking-tight text-foreground uppercase">MATRIX</span>
               <span className="font-mono text-[9px] uppercase tracking-widest text-muted-foreground -mt-0.5">AIML · Karunya University</span>

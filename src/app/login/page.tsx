@@ -149,7 +149,7 @@ function LoginContent() {
         {/* Brand */}
         <div className="text-center flex flex-col items-center gap-2">
           <Link href="/" className="inline-block">
-            <img src="/logo.png" alt="Matrix Logo" className="h-12 w-12 object-contain mx-auto mb-2" />
+            <img src="/logo.png" alt="Matrix Logo" className="h-12 w-12 object-contain mx-auto mb-2 dark:invert" />
             <h1 className="font-heading text-2xl font-bold tracking-tighter text-foreground uppercase hover:opacity-80 transition-opacity">
               Matrix
             </h1>
