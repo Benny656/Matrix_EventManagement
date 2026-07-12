@@ -22,7 +22,7 @@ interface EventWithSessions {
   description: string;
   venue: string;
   date: Date;
-  registrationDeadline: Date;
+  registrationDeadline: Date | null;
   maxParticipants: number;
   category: string;
   coordinatorName: string;

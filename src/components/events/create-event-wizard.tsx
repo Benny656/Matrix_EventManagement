@@ -19,7 +19,16 @@ const basicInfoSchema = z.object({
   category: z.string().min(1, "Please select a category"),
   venue: z.string().min(2, "Venue is required"),
   maxParticipants: z.coerce.number().min(1, "Capacity must be at least 1"),
-  registrationDeadline: z.string().min(1, "Registration cutoff date is required"),
+  noDeadline: z.boolean().default(false),
+  registrationDeadline: z.string().optional(),
+}).refine((data) => {
+  if (!data.noDeadline && (!data.registrationDeadline || data.registrationDeadline.trim() === "")) {
+    return false;
+  }
+  return true;
+}, {
+  message: "Registration cutoff date is required",
+  path: ["registrationDeadline"],
 });
 
 type BasicInfoValues = z.infer<typeof basicInfoSchema>;
@@ -50,11 +59,18 @@ export default function CreateEventWizard({ role }: { role: "ADMIN" | "VOLUNTEER
   const {
     register: registerBasic,
     handleSubmit: handleBasicSubmit,
+    watch: watchBasic,
     formState: { errors: basicErrors },
   } = useForm<BasicInfoValues>({
     resolver: zodResolver(basicInfoSchema) as any,
-    defaultValues: (basicInfo || {}) as any,
+    defaultValues: {
+      noDeadline: false,
+      registrationDeadline: "",
+      ...basicInfo,
+    } as any,
   });
+
+  const watchNoDeadline = watchBasic("noDeadline");
 
   const nextStepBasic = (data: BasicInfoValues) => {
     setBasicInfo(data);
@@ -106,7 +122,7 @@ export default function CreateEventWizard({ role }: { role: "ADMIN" | "VOLUNTEER
       const result = await createEventAction({
         ...basicInfo,
         date: earliestDate,
-        registrationDeadline: new Date(basicInfo.registrationDeadline),
+        registrationDeadline: basicInfo.noDeadline ? null : new Date(basicInfo.registrationDeadline!),
         posterUrl: null, // Scoped out for now
         coordinatorName: role === "ADMIN" ? "Admin Team" : "Volunteer Coordinator",
         sessions: sessions.map((s) => ({
@@ -251,12 +267,24 @@ export default function CreateEventWizard({ role }: { role: "ADMIN" | "VOLUNTEER
 
               {/* Deadline */}
               <div className="flex flex-col gap-1">
-                <Label className="font-mono text-[11px] text-muted-foreground uppercase tracking-wider" htmlFor="registrationDeadline">Registration Cutoff</Label>
+                <div className="flex items-center justify-between">
+                  <Label className="font-mono text-[11px] text-muted-foreground uppercase tracking-wider" htmlFor="registrationDeadline">Registration Cutoff</Label>
+                  <div className="flex items-center gap-2">
+                    <input
+                      type="checkbox"
+                      id="noDeadline"
+                      {...registerBasic("noDeadline")}
+                      className="h-4 w-4 border-border rounded-none text-primary bg-background focus:ring-primary"
+                    />
+                    <Label className="font-mono text-[11px] text-muted-foreground uppercase tracking-wider cursor-pointer" htmlFor="noDeadline">No Cutoff</Label>
+                  </div>
+                </div>
                 <Input
                   {...registerBasic("registrationDeadline")}
-                  className="w-full bg-background border border-border text-foreground px-3 py-6 font-mono text-sm focus-visible:ring-1 focus-visible:ring-primary rounded-none shadow-none"
+                  className="w-full bg-background border border-border text-foreground px-3 py-6 font-mono text-sm focus-visible:ring-1 focus-visible:ring-primary rounded-none shadow-none disabled:opacity-50"
                   id="registrationDeadline"
                   type="date"
+                  disabled={watchNoDeadline}
                 />
                 {basicErrors.registrationDeadline && (
                   <span className="font-mono text-[10px] text-destructive uppercase mt-1">{basicErrors.registrationDeadline.message}</span>
@@ -448,7 +476,9 @@ export default function CreateEventWizard({ role }: { role: "ADMIN" | "VOLUNTEER
                 </div>
                 <div>
                   <span className="text-muted-foreground block uppercase">Registration Deadline</span>
-                  <span className="font-semibold text-foreground">{basicInfo?.registrationDeadline}</span>
+                  <span className="font-semibold text-foreground">
+                    {basicInfo?.noDeadline ? "No Deadline" : basicInfo?.registrationDeadline}
+                  </span>
                 </div>
               </div>
             </div>

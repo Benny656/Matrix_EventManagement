@@ -51,7 +51,7 @@ export default async function StudentEventDetailsPage({ params }: PageProps) {
 
   const activeRegistrationsCount = event.registrations.filter((r) => r.status === "REGISTERED").length;
   const isFull = activeRegistrationsCount >= event.maxParticipants;
-  const isDeadlinePassed = new Date() > new Date(event.registrationDeadline);
+  const isDeadlinePassed = event.registrationDeadline ? new Date() > new Date(event.registrationDeadline) : false;
 
   const registrationStatus = userRegistration ? userRegistration.status : null;
 
@@ -76,7 +76,7 @@ export default async function StudentEventDetailsPage({ params }: PageProps) {
             {event.title}
           </h1>
           <p className="font-sans text-xs text-muted-foreground mt-1">
-            Venue: {event.venue} • Deadline: {new Date(event.registrationDeadline).toLocaleDateString()}
+            Venue: {event.venue} • Deadline: {event.registrationDeadline ? new Date(event.registrationDeadline).toLocaleDateString() : "No deadline"}
           </p>
         </div>
       </div>
@@ -153,7 +153,7 @@ export default async function StudentEventDetailsPage({ params }: PageProps) {
               </div>
               <div className="flex justify-between border-b border-border pb-2 border-dashed">
                 <span className="text-muted-foreground">Cutoff:</span>
-                <span className="text-foreground font-semibold">{new Date(event.registrationDeadline).toLocaleDateString()}</span>
+                <span className="text-foreground font-semibold">{event.registrationDeadline ? new Date(event.registrationDeadline).toLocaleDateString() : "No deadline"}</span>
               </div>
             </div>
 

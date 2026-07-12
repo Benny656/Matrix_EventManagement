@@ -122,7 +122,7 @@ model Event {
   posterUrl            String?
   venue                String
   date                 DateTime
-  registrationDeadline DateTime
+  registrationDeadline DateTime?
   maxParticipants      Int
   category             String
   coordinatorName      String

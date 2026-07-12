@@ -8,6 +8,7 @@ import { Download } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import AttendeeList from "@/components/events/attendee-list";
+import EditDeadlineForm from "@/components/events/edit-deadline-form";
 
 export const dynamic = "force-dynamic";
 
@@ -124,6 +125,8 @@ export default async function VolunteerEventDetailsPage({ params }: PageProps) {
 
         {/* Right Side: Timeline & Settings */}
         <div className="lg:col-span-4 space-y-6">
+          <EditDeadlineForm eventId={event.id} initialDeadline={event.registrationDeadline} />
+          
           <div className="border border-border p-6 bg-card space-y-6">
             <h3 className="font-mono text-xs uppercase tracking-widest text-muted-foreground border-b border-border pb-1 font-semibold">
               Event Sessions Timeline

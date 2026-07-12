@@ -17,7 +17,7 @@ interface EventWithCount {
   description: string;
   venue: string;
   date: Date;
-  registrationDeadline: Date;
+  registrationDeadline: Date | null;
   maxParticipants: number;
   category: string;
   status: "UPCOMING" | "ONGOING" | "COMPLETED" | "ARCHIVED";
@@ -82,7 +82,7 @@ export default function StudentEventList({ events }: { events: EventWithCount[] 
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filtered.map((event) => {
             const isFull = event._count.registrations >= event.maxParticipants;
-            const isDeadlinePassed = new Date() > new Date(event.registrationDeadline);
+            const isDeadlinePassed = event.registrationDeadline ? new Date() > new Date(event.registrationDeadline) : false;
             const dateStr = new Date(event.date).toLocaleDateString("en-US", {
               month: "short",
               day: "numeric",

@@ -72,8 +72,7 @@ export default function DashboardLayout({ user, children }: DashboardLayoutProps
         return [
           { label: "Overview", href: "/volunteer", icon: Home },
           { label: "Events", href: "/volunteer/events", icon: CalendarCheck },
-          { label: "QR Scanner", href: "/volunteer/scan", icon: ScanLine },
-          { label: "Manual Entry", href: "/volunteer/manual", icon: PenLine },
+          { label: "Attendance", href: "/volunteer/attendance", icon: ScanLine },
           { label: "Updates", href: "/volunteer/updates", icon: BellRing },
         ];
       case "STUDENT":

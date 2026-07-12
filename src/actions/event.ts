@@ -19,7 +19,10 @@ const eventSchema = z.object({
   posterUrl: z.string().optional().nullable(),
   venue: z.string().min(2, "Event venue is required"),
   date: z.string().or(z.date()).transform((val) => new Date(val)),
-  registrationDeadline: z.string().or(z.date()).transform((val) => new Date(val)),
+  registrationDeadline: z.preprocess(
+    (val) => (val === "" || val === undefined || val === null ? null : val),
+    z.union([z.string(), z.date()]).nullable().optional()
+  ).transform((val) => (val ? new Date(val) : null)),
   maxParticipants: z.number().min(1, "Capacity must be at least 1"),
   category: z.string().min(2, "Category is required"),
   coordinatorName: z.string().min(2, "Coordinator name is required"),
@@ -75,12 +78,16 @@ export async function createEventAction(input: EventInput) {
       },
     });
 
+    const deadlineStr = validated.registrationDeadline
+      ? ` Registration open until ${validated.registrationDeadline.toLocaleDateString()}.`
+      : " No registration deadline.";
+
     // Create a notification for department-wide updates
     await tx.notification.createMany({
       data: (await tx.user.findMany({ select: { id: true } })).map((u) => ({
         userId: u.id,
         type: "NEW_EVENT",
-        message: `New event published: ${validated.title}. Registration open until ${validated.registrationDeadline.toLocaleDateString()}.`,
+        message: `New event published: ${validated.title}.${deadlineStr}`,
         linkUrl: `/student/events/${newEvent.id}`,
       })),
     });
@@ -117,6 +124,24 @@ export async function updateEventAction(id: string, input: Omit<EventInput, "ses
 
   revalidatePath(`/student/events/${id}`);
   revalidatePath(`/volunteer/events/${id}`);
+  revalidatePath("/volunteer/events");
+  revalidatePath("/admin/events");
+  return { success: true };
+}
+
+export async function updateEventDeadlineAction(id: string, registrationDeadline: Date | null) {
+  await verifyAuth(["ADMIN", "VOLUNTEER"]);
+
+  await prisma.event.update({
+    where: { id },
+    data: {
+      registrationDeadline,
+    },
+  });
+
+  revalidatePath(`/student/events/${id}`);
+  revalidatePath(`/volunteer/events/${id}`);
+  revalidatePath(`/admin/events/${id}`);
   revalidatePath("/volunteer/events");
   revalidatePath("/admin/events");
   return { success: true };

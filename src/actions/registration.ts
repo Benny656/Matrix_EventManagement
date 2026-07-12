@@ -37,7 +37,7 @@ export async function registerForEventAction(eventId: string) {
       throw new Error("Cannot register for an archived event.");
     }
 
-    if (new Date() > new Date(event.registrationDeadline)) {
+    if (event.registrationDeadline && new Date() > new Date(event.registrationDeadline)) {
       throw new Error("Registration deadline has passed.");
     }
 
