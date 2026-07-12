@@ -2,7 +2,6 @@ import type { Metadata, Viewport } from "next";
 import { Inter, Geist, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import PWARegister from "@/components/pwa-register";
-import AppSplashGate from "@/components/AppSplashGate";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -57,9 +56,7 @@ export default function RootLayout({
     >
       <body className="min-h-full flex flex-col">
         <PWARegister />
-        <AppSplashGate>
-          {children}
-        </AppSplashGate>
+        {children}
       </body>
     </html>
   );
