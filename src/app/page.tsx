@@ -34,9 +34,12 @@ export default async function Home() {
       {/* Header */}
       <header className="w-full top-0 sticky glass-panel z-50">
         <div className="flex justify-between items-center px-6 py-3 w-full max-w-7xl mx-auto min-h-[60px]">
-          <div className="flex flex-col">
-            <span className="font-heading text-xl font-bold tracking-tighter text-foreground">MATRIX</span>
-            <span className="font-mono text-[9px] uppercase tracking-widest text-muted-foreground -mt-0.5">AIML · Karunya University</span>
+          <div className="flex items-center gap-3">
+            <img src="/logo.png" alt="Matrix Logo" className="h-8 w-8 object-contain" />
+            <div className="flex flex-col">
+              <span className="font-heading text-xl font-bold tracking-tighter text-foreground">MATRIX</span>
+              <span className="font-mono text-[9px] uppercase tracking-widest text-muted-foreground -mt-0.5">AIML · Karunya University</span>
+            </div>
           </div>
           <Link
             href="/login"

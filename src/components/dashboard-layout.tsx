@@ -114,13 +114,16 @@ export default function DashboardLayout({ user, children }: DashboardLayoutProps
       {/* Sidebar (Desktop) */}
       <nav className="hidden md:flex flex-col h-full py-5 px-3 bg-surface-container-low border-r border-border w-60 fixed left-0 top-0 z-40">
         {/* Brand */}
-        <div className="mb-7 px-3 pb-5 border-b border-border">
-          <span className="font-heading text-base font-bold text-foreground tracking-tighter uppercase">
-            Matrix
-          </span>
-          <p className="font-mono text-[9px] text-muted-foreground uppercase tracking-widest mt-0.5">
-            {roleLabel}
-          </p>
+        <div className="mb-7 px-3 pb-5 border-b border-border flex items-center gap-3">
+          <img src="/logo.png" alt="Matrix Logo" className="h-7 w-7 object-contain" />
+          <div>
+            <span className="font-heading text-base font-bold text-foreground tracking-tighter uppercase">
+              Matrix
+            </span>
+            <p className="font-mono text-[9px] text-muted-foreground uppercase tracking-widest mt-0.5">
+              {roleLabel}
+            </p>
+          </div>
         </div>
 
         {/* Nav items */}
@@ -244,9 +247,12 @@ export default function DashboardLayout({ user, children }: DashboardLayoutProps
                 onClick={(e) => e.stopPropagation()}
               >
                 <div className="mb-5 px-3 pb-5 border-b border-border flex justify-between items-center">
-                  <div>
-                    <span className="font-heading text-base font-bold text-foreground tracking-tighter uppercase">Matrix</span>
-                    <p className="font-mono text-[9px] text-muted-foreground uppercase tracking-widest mt-0.5">{roleLabel}</p>
+                  <div className="flex items-center gap-3">
+                    <img src="/logo.png" alt="Matrix Logo" className="h-7 w-7 object-contain" />
+                    <div>
+                      <span className="font-heading text-base font-bold text-foreground tracking-tighter uppercase">Matrix</span>
+                      <p className="font-mono text-[9px] text-muted-foreground uppercase tracking-widest mt-0.5">{roleLabel}</p>
+                    </div>
                   </div>
                   <button onClick={() => setMobileMenuOpen(false)} className="text-muted-foreground hover:text-foreground p-1">
                     <X size={16} />
