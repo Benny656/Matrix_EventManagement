@@ -29,7 +29,7 @@ export default async function Home() {
   }
 
   return (
-    <div className="theme-clerk bg-gradient-to-b from-white via-background to-white text-foreground font-sans min-h-screen flex flex-col relative overflow-hidden selection:bg-primary/20 selection:text-primary" style={{ "--primary": "#00F5D4" } as React.CSSProperties}>
+    <div className="theme-clerk bg-gradient-to-b from-white via-background to-white text-foreground font-sans min-h-screen flex flex-col relative overflow-hidden selection:bg-primary/20 selection:text-primary">
       {/* Glowing background shapes (Clerk-style light theme) */}
       <div className="absolute inset-0 light-tech-grid pointer-events-none z-0 opacity-80" />
       <div className="absolute top-[-10%] right-[-10%] w-[600px] h-[600px] rounded-full clerk-glow-1 blur-[120px] pointer-events-none z-0 animate-pulse-slow" />
