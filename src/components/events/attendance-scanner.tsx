@@ -1,7 +1,15 @@
 "use client";
 
 import React, { useEffect, useRef, useState, useTransition, useOptimistic } from "react";
-import { markAttendanceAction, overrideWaitlistAction } from "@/actions/attendance";
+import { useRouter } from "next/navigation";
+import {
+  markAttendanceAction,
+  overrideWaitlistAction,
+  markAttendanceByScan,
+  markAttendanceManual,
+  getRegisteredStudentsAction,
+  getSessionCheckInCountAction
+} from "@/actions/attendance";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -22,9 +30,33 @@ interface AttendanceScannerProps {
 }
 
 export default function AttendanceScanner({ sessions }: AttendanceScannerProps) {
+  const router = useRouter();
   const [selectedSessionId, setSelectedSessionId] = useState(sessions[0]?.id || "");
   const [manualRollNumber, setManualRollNumber] = useState("");
   const [isPending, startTransition] = useTransition();
+
+  // Checked-in count and registered students states
+  const [checkedInCount, setCheckedInCount] = useState(0);
+  const [registeredStudents, setRegisteredStudents] = useState<{ id: string; name: string; rollNumber: string | null }[]>([]);
+  const [searchQuery, setSearchQuery] = useState("");
+
+  // Fetch session data (checked-in count and registrations) when session ID changes
+  useEffect(() => {
+    if (!selectedSessionId) return;
+    const fetchSessionData = async () => {
+      try {
+        const [count, students] = await Promise.all([
+          getSessionCheckInCountAction(selectedSessionId),
+          getRegisteredStudentsAction(selectedSessionId)
+        ]);
+        setCheckedInCount(count);
+        setRegisteredStudents(students);
+      } catch (e) {
+        console.error("Failed to load session details", e);
+      }
+    };
+    fetchSessionData();
+  }, [selectedSessionId]);
 
   // Scan Alerts State
   const [scanResult, setScanResult] = useState<{
@@ -55,6 +87,11 @@ export default function AttendanceScanner({ sessions }: AttendanceScannerProps) 
           fps: 10,
           qrbox: { width: 250, height: 250 },
           rememberLastUsedCamera: true,
+          formatsToSupport: [
+            lib.Html5QrcodeSupportedFormats.QR_CODE,
+            lib.Html5QrcodeSupportedFormats.CODE_128,
+            lib.Html5QrcodeSupportedFormats.CODE_39,
+          ]
         },
         /* verbose= */ false
       );
@@ -63,7 +100,7 @@ export default function AttendanceScanner({ sessions }: AttendanceScannerProps) 
         // Stop scanning temporarily
         html5QrcodeScanner.clear().catch(console.error);
 
-        // Process QR code (usually contains the student's roll number)
+        // Process code (roll number or barcode)
         triggerCheckIn(decodedText, "SCANNED");
       };
 
@@ -90,25 +127,88 @@ export default function AttendanceScanner({ sessions }: AttendanceScannerProps) 
 
     startTransition(async () => {
       try {
-        const result = await markAttendanceAction({
-          sessionId: selectedSessionId,
-          rollNumber: rollNumber.trim(),
-          method,
-        });
+        const result = await markAttendanceByScan(selectedSessionId, rollNumber.trim());
 
-        if (result.success) {
+        if (result.status === "success") {
           setScanResult({
             type: "SUCCESS",
-            message: result.message,
-            studentName: result.studentName,
+            message: `${result.student.name} successfully checked in.`,
+            studentName: result.student.name,
           });
           setManualRollNumber("");
+          setCheckedInCount((c) => c + 1);
+          
+          // Re-fetch registered students list to update check-in possibilities
+          const updatedStudents = await getRegisteredStudentsAction(selectedSessionId);
+          setRegisteredStudents(updatedStudents);
+          
+          router.refresh();
+        } else if (result.status === "already_checked_in") {
+          setScanResult({
+            type: "SUCCESS",
+            message: `${result.student.name} is already checked in for this session.`,
+            studentName: result.student.name,
+          });
+        } else if (result.status === "not_registered") {
+          setScanResult({
+            type: "ERROR",
+            message: `No active registration found for student with roll number "${rollNumber}".`,
+          });
         } else {
           setScanResult({
-            type: result.error === "WAITLISTED" ? "WARNING" : "ERROR",
+            type: "ERROR",
             message: result.message || "An unknown error occurred.",
-            studentName: result.studentName,
-            studentId: result.studentId,
+          });
+        }
+      } catch (err: any) {
+        setScanResult({
+          type: "ERROR",
+          message: err.message || "Attendance system request failed.",
+        });
+      }
+    });
+  };
+
+  const triggerManualCheckIn = (studentId: string) => {
+    setScanResult(null);
+    if (!selectedSessionId) {
+      setScanResult({ type: "ERROR", message: "Please select an active session block first." });
+      return;
+    }
+
+    startTransition(async () => {
+      try {
+        const result = await markAttendanceManual(selectedSessionId, studentId);
+
+        if (result.status === "success") {
+          setScanResult({
+            type: "SUCCESS",
+            message: `${result.student.name} successfully checked in manually.`,
+            studentName: result.student.name,
+          });
+          setSearchQuery("");
+          setCheckedInCount((c) => c + 1);
+          
+          // Re-fetch registered students list
+          const updatedStudents = await getRegisteredStudentsAction(selectedSessionId);
+          setRegisteredStudents(updatedStudents);
+          
+          router.refresh();
+        } else if (result.status === "already_checked_in") {
+          setScanResult({
+            type: "SUCCESS",
+            message: `${result.student.name} is already checked in for this session.`,
+            studentName: result.student.name,
+          });
+        } else if (result.status === "not_registered") {
+          setScanResult({
+            type: "ERROR",
+            message: "Student is not registered for this event.",
+          });
+        } else {
+          setScanResult({
+            type: "ERROR",
+            message: result.message || "An unknown error occurred.",
           });
         }
       } catch (err: any) {
@@ -148,6 +248,12 @@ export default function AttendanceScanner({ sessions }: AttendanceScannerProps) 
             studentName: scanResult.studentName,
           });
           setManualRollNumber("");
+          setCheckedInCount((c) => c + 1);
+          
+          const updatedStudents = await getRegisteredStudentsAction(selectedSessionId);
+          setRegisteredStudents(updatedStudents);
+
+          router.refresh();
         }
       } catch (err: any) {
         setScanResult({
@@ -157,6 +263,15 @@ export default function AttendanceScanner({ sessions }: AttendanceScannerProps) 
       }
     });
   };
+
+  const filteredStudents = registeredStudents.filter((student) => {
+    const query = searchQuery.trim().toLowerCase();
+    if (!query) return false;
+    return (
+      student.name.toLowerCase().includes(query) ||
+      (student.rollNumber && student.rollNumber.toLowerCase().includes(query))
+    );
+  });
 
   return (
     <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 max-w-5xl mx-auto pb-12">
@@ -237,7 +352,7 @@ export default function AttendanceScanner({ sessions }: AttendanceScannerProps) 
         <div className="border border-border bg-card p-6 space-y-4">
           <div className="border-b border-border pb-3 bg-surface-container -mx-6 px-6 -mt-6 flex justify-between items-center">
             <span className="font-mono text-[11px] font-semibold text-muted-foreground uppercase tracking-widest">Camera Scanner</span>
-            <span className="font-mono text-[10px] text-muted-foreground uppercase">ID Scanner</span>
+            <span className="font-mono text-[10px] text-primary uppercase font-bold">Checked In: {checkedInCount}</span>
           </div>
 
           <div className="bg-surface-container-low border border-border p-4 flex flex-col items-center justify-center min-h-[300px]">
@@ -250,30 +365,70 @@ export default function AttendanceScanner({ sessions }: AttendanceScannerProps) 
 
         {/* Manual Fallback Form */}
         <div className="border border-border bg-card p-6 space-y-4">
-          <div className="border-b border-border pb-3 bg-surface-container -mx-6 px-6 -mt-6">
+          <div className="border-b border-border pb-3 bg-surface-container -mx-6 px-6 -mt-6 flex justify-between items-center">
             <span className="font-mono text-[11px] font-semibold text-muted-foreground uppercase tracking-widest">Manual Entry Fallback</span>
+            <span className="font-mono text-[10px] text-primary uppercase font-bold">Checked In: {checkedInCount}</span>
           </div>
 
-          <form onSubmit={handleManualSubmit} className="flex gap-4 items-end">
-            <div className="flex-1 flex flex-col gap-1">
-              <Label className="font-mono text-[10px] text-muted-foreground uppercase" htmlFor="roll-input">Student Roll Number</Label>
-              <Input
-                id="roll-input"
-                className="w-full bg-background border border-border text-foreground px-3 py-5 font-mono text-sm focus-visible:ring-1 focus-visible:ring-primary rounded-none shadow-none h-10"
-                placeholder="e.g. Kits1248"
-                value={manualRollNumber}
-                onChange={(e) => setManualRollNumber(e.target.value)}
-                disabled={isPending}
-              />
-            </div>
-            <Button
-              type="submit"
+          {/* Search Box */}
+          <div className="flex flex-col gap-1.5 pb-2">
+            <Label className="font-mono text-[10px] text-muted-foreground uppercase" htmlFor="search-input">Search Registered Student</Label>
+            <Input
+              id="search-input"
+              className="w-full bg-background border border-border text-foreground px-3 py-5 font-sans text-sm focus-visible:ring-1 focus-visible:ring-primary rounded-none shadow-none h-10"
+              placeholder="Search by student name or roll number..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
               disabled={isPending}
-              className="bg-secondary text-secondary-foreground font-mono text-xs uppercase tracking-widest py-5 px-6 hover:opacity-90 active:scale-95 transition-all h-10 rounded-none shadow-none"
-            >
-              Verify Check-in
-            </Button>
-          </form>
+            />
+
+            {searchQuery && (
+              <div className="mt-2 border border-border divide-y divide-border max-h-48 overflow-y-auto bg-background">
+                {filteredStudents.length === 0 ? (
+                  <div className="p-3 text-xs text-muted-foreground font-mono uppercase">No Matching Registrations Found</div>
+                ) : (
+                  filteredStudents.map((student) => (
+                    <div key={student.id} className="p-3 flex justify-between items-center bg-surface-container-low hover:bg-surface-container/45 transition-all">
+                      <div className="min-w-0">
+                        <span className="font-sans text-xs font-bold text-foreground block truncate">{student.name}</span>
+                        <span className="font-mono text-[10px] text-muted-foreground block">{student.rollNumber || "NO ROLL NUMBER"}</span>
+                      </div>
+                      <Button
+                        onClick={() => triggerManualCheckIn(student.id)}
+                        disabled={isPending}
+                        className="bg-primary text-primary-foreground font-mono text-[10px] uppercase py-1 px-3.5 h-8 rounded-none shadow-none"
+                      >
+                        Check In
+                      </Button>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
+          </div>
+
+          <div className="border-t border-dashed border-border pt-4">
+            <form onSubmit={handleManualSubmit} className="flex gap-4 items-end">
+              <div className="flex-1 flex flex-col gap-1">
+                <Label className="font-mono text-[10px] text-muted-foreground uppercase" htmlFor="roll-input">Quick Check-in by Roll Number</Label>
+                <Input
+                  id="roll-input"
+                  className="w-full bg-background border border-border text-foreground px-3 py-5 font-mono text-sm focus-visible:ring-1 focus-visible:ring-primary rounded-none shadow-none h-10"
+                  placeholder="e.g. Kits1248"
+                  value={manualRollNumber}
+                  onChange={(e) => setManualRollNumber(e.target.value)}
+                  disabled={isPending}
+                />
+              </div>
+              <Button
+                type="submit"
+                disabled={isPending}
+                className="bg-secondary text-secondary-foreground font-mono text-xs uppercase tracking-widest py-5 px-6 hover:opacity-90 active:scale-95 transition-all h-10 rounded-none shadow-none"
+              >
+                Verify
+              </Button>
+            </form>
+          </div>
         </div>
       </div>
     </div>

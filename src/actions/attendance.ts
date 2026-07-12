@@ -184,3 +184,183 @@ export async function getActiveSessionsAction() {
 
   return sessions;
 }
+
+export async function markAttendanceByScan(sessionId: string, rollNumber: string) {
+  const staff = await verifyStaff();
+
+  // 1. Fetch student and session in parallel (Step 1 of parallel queries)
+  const [student, session] = await Promise.all([
+    prisma.user.findFirst({
+      where: {
+        rollNumber: {
+          equals: rollNumber,
+          mode: "insensitive", // case insensitive matching
+        },
+        role: "STUDENT",
+      },
+    }),
+    prisma.session.findUnique({
+      where: { id: sessionId },
+    }),
+  ]);
+
+  if (!student) {
+    return { status: "error" as const, message: `No student found with roll number "${rollNumber}".` };
+  }
+
+  if (!session) {
+    return { status: "error" as const, message: "Session block not found." };
+  }
+
+  // 2. Fetch existing attendance and registration in parallel (Step 2 of parallel queries)
+  const [existingAttendance, registration] = await Promise.all([
+    prisma.attendance.findFirst({
+      where: {
+        sessionId,
+        studentId: student.id,
+      },
+    }),
+    prisma.registration.findUnique({
+      where: {
+        studentId_eventId: {
+          studentId: student.id,
+          eventId: session.eventId,
+        },
+      },
+    }),
+  ]);
+
+  if (existingAttendance) {
+    return { status: "already_checked_in" as const, student };
+  }
+
+  if (!registration || registration.status === "CANCELLED") {
+    return { status: "not_registered" as const };
+  }
+
+  if (registration.status === "WAITLISTED") {
+    return { status: "error" as const, message: `${student.name} is currently on the WAITLIST. Confirm override to check-in.` };
+  }
+
+  // 3. Create Attendance
+  await prisma.attendance.create({
+    data: {
+      sessionId,
+      studentId: student.id,
+      checkInMethod: "SCANNED",
+      markedById: staff.id,
+    },
+  });
+
+  revalidatePath(`/volunteer/events/${session.eventId}`);
+  revalidatePath(`/admin/events/${session.eventId}`);
+
+  return { status: "success" as const, student };
+}
+
+export async function markAttendanceManual(sessionId: string, studentId: string) {
+  const staff = await verifyStaff();
+
+  // 1. Fetch student and session in parallel (Step 1 of parallel queries)
+  const [student, session] = await Promise.all([
+    prisma.user.findUnique({
+      where: {
+        id: studentId,
+        role: "STUDENT",
+      },
+    }),
+    prisma.session.findUnique({
+      where: { id: sessionId },
+    }),
+  ]);
+
+  if (!student) {
+    return { status: "error" as const, message: "Student not found in database." };
+  }
+
+  if (!session) {
+    return { status: "error" as const, message: "Session block not found." };
+  }
+
+  // 2. Fetch existing attendance and registration in parallel (Step 2 of parallel queries)
+  const [existingAttendance, registration] = await Promise.all([
+    prisma.attendance.findFirst({
+      where: {
+        sessionId,
+        studentId: student.id,
+      },
+    }),
+    prisma.registration.findUnique({
+      where: {
+        studentId_eventId: {
+          studentId: student.id,
+          eventId: session.eventId,
+        },
+      },
+    }),
+  ]);
+
+  if (existingAttendance) {
+    return { status: "already_checked_in" as const, student };
+  }
+
+  if (!registration || registration.status === "CANCELLED") {
+    return { status: "not_registered" as const };
+  }
+
+  if (registration.status === "WAITLISTED") {
+    return { status: "error" as const, message: `${student.name} is currently on the WAITLIST. Confirm override to check-in.` };
+  }
+
+  // 3. Create Attendance
+  await prisma.attendance.create({
+    data: {
+      sessionId,
+      studentId: student.id,
+      checkInMethod: "MANUAL",
+      markedById: staff.id,
+    },
+  });
+
+  revalidatePath(`/volunteer/events/${session.eventId}`);
+  revalidatePath(`/admin/events/${session.eventId}`);
+
+  return { status: "success" as const, student };
+}
+
+export async function getRegisteredStudentsAction(sessionId: string) {
+  await verifyStaff();
+
+  const session = await prisma.session.findUnique({
+    where: { id: sessionId },
+    select: { eventId: true },
+  });
+
+  if (!session) throw new Error("Session not found");
+
+  const registrations = await prisma.registration.findMany({
+    where: {
+      eventId: session.eventId,
+      status: "REGISTERED",
+    },
+    include: {
+      student: {
+        select: { id: true, name: true, rollNumber: true },
+      },
+    },
+    orderBy: {
+      student: {
+        name: "asc",
+      },
+    },
+  });
+
+  return registrations.map((r) => r.student);
+}
+
+export async function getSessionCheckInCountAction(sessionId: string) {
+  await verifyStaff();
+  return await prisma.attendance.count({
+    where: { sessionId },
+  });
+}
