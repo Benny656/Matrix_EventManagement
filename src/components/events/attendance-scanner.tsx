@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useEffect, useRef, useState, useTransition } from "react";
-import { markAttendanceAction, overrideWaitlistAction } from "@/app/actions/attendance";
+import { markAttendanceAction, overrideWaitlistAction } from "@/actions/attendance";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";

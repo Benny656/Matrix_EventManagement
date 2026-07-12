@@ -1,5 +1,5 @@
 import React from "react";
-import { getEventsAction } from "@/app/actions/event";
+import { getEventsAction } from "@/actions/event";
 import StudentEventList from "@/components/events/student-event-list";
 
 export const dynamic = "force-dynamic";

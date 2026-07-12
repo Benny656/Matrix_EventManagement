@@ -1,6 +1,6 @@
 import React from "react";
 import Link from "next/link";
-import { getEventsAction } from "@/app/actions/event";
+import { getEventsAction } from "@/actions/event";
 import EventsTable from "@/components/events/events-table";
 
 export const dynamic = "force-dynamic";

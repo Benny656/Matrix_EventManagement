@@ -26,6 +26,14 @@ export async function getNotificationsAction() {
   });
 }
 
+export async function getUnreadNotificationCountAction() {
+  const user = await verifyUser();
+
+  return await prisma.notification.count({
+    where: { userId: user.id, read: false },
+  });
+}
+
 export async function markNotificationReadAction(id: string) {
   const user = await verifyUser();
 

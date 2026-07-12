@@ -1,0 +1,29 @@
+﻿{
+  "entries": [
+    { "path": "../skills/backend/better-auth-best-practices" },
+    { "path": "../skills/backend/better-auth-create-auth" },
+    { "path": "../skills/backend/better-auth-emailAndPassword" },
+    { "path": "../skills/backend/postgres" },
+    { "path": "../skills/backend/prisma-cli" },
+    { "path": "../skills/backend/prisma-client-api" },
+    { "path": "../skills/backend/prisma-database-setup" },
+    { "path": "../skills/backend/prisma-driver-adapter-implementation" },
+    { "path": "../skills/backend/prisma-postgres" },
+    { "path": "../skills/backend/prisma-postgres-setup" },
+    { "path": "../skills/backend/prisma-upgrade-v7" },
+    { "path": "../skills/backend/security" },
+    { "path": "../skills/core/testing" },
+    { "path": "../skills/core/systematic-debugging" },
+    { "path": "../skills/core/senior-engineer-workflow" },
+    { "path": "../skills/frontend/cache-components" },
+    { "path": "../skills/frontend/frontend-design" },
+    { "path": "../skills/frontend/nextjs" },
+    { "path": "../skills/frontend/performance" },
+    { "path": "../skills/frontend/react" },
+    { "path": "../skills/frontend/react-best-practices" },
+    { "path": "../skills/frontend/react-patterns" },
+    { "path": "../skills/frontend/shadcn" },
+    { "path": "../skills/quality/app-security-review" },
+    { "path": "../skills/quality/accessibility" }
+  ]
+}

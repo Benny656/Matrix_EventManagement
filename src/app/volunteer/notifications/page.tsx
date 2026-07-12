@@ -2,7 +2,7 @@ import React from "react";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
-import { getNotificationsAction } from "@/app/actions/notification";
+import { getNotificationsAction } from "@/actions/notification";
 import NotificationsList from "@/components/notifications-list";
 
 export const dynamic = "force-dynamic";

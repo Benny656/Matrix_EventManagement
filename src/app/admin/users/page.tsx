@@ -2,12 +2,19 @@ import React from "react";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
-import { getNotificationsAction } from "@/actions/notification";
-import NotificationsList from "@/components/notifications-list";
+import { getUsersAction } from "@/actions/user";
+import UsersListTable from "@/components/admin/users-list-table";
 
 export const dynamic = "force-dynamic";
 
-export default async function AdminNotificationsPage() {
+interface PageProps {
+  searchParams: Promise<{
+    q?: string;
+    role?: string;
+  }>;
+}
+
+export default async function AdminUsersPage({ searchParams }: PageProps) {
   const session = await auth.api.getSession({
     headers: await headers(),
   });
@@ -16,20 +23,21 @@ export default async function AdminNotificationsPage() {
     redirect("/login");
   }
 
-  const notifications = await getNotificationsAction();
+  const { q, role } = await searchParams;
+  const users = await getUsersAction(q, role);
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="font-heading text-2xl font-bold text-foreground tracking-tighter mb-1">
-          Notifications
+          Manage Users
         </h1>
         <p className="font-sans text-sm text-muted-foreground">
-          Platform-wide system alerts and operational updates.
+          View all registered users, search profiles, and adjust role permissions between Student, Volunteer, and Administrator.
         </p>
       </div>
 
-      <NotificationsList initialNotifications={notifications as any} />
+      <UsersListTable initialUsers={users as any} currentUserId={session.user.id} />
     </div>
   );
 }

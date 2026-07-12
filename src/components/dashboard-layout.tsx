@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { signOut } from "@/lib/auth-client";
+import { getUnreadNotificationCountAction } from "@/actions/notification";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 
 interface NavItem {
@@ -25,6 +26,25 @@ export default function DashboardLayout({ user, children }: DashboardLayoutProps
   const pathname = usePathname();
   const router = useRouter();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  // Poll for live unread count
+  React.useEffect(() => {
+    const fetchUnread = async () => {
+      try {
+        const count = await getUnreadNotificationCountAction();
+        setUnreadCount(count);
+      } catch (e) {
+        console.error("Failed to fetch unread count", e);
+      }
+    };
+    
+    fetchUnread();
+    
+    // Poll every 30 seconds
+    const interval = setInterval(fetchUnread, 30000);
+    return () => clearInterval(interval);
+  }, [pathname]); // Also re-fetch on route change
 
   const getNavItems = (): NavItem[] => {
     switch (user.role) {
@@ -85,18 +105,27 @@ export default function DashboardLayout({ user, children }: DashboardLayoutProps
         <div className="flex-1 space-y-1">
           {navItems.map((item) => {
             const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
+            const isUpdatesTab = item.label.includes("Updates");
+
             return (
               <Link
                 key={item.href}
                 href={item.href}
-                className={`flex items-center px-4 py-2 font-mono text-xs uppercase tracking-widest transition-all duration-150 rounded-none border-r-2 ${
+                className={`flex items-center justify-between px-4 py-2 font-mono text-xs uppercase tracking-widest transition-all duration-150 rounded-none border-r-2 ${
                   isActive
                     ? "bg-primary text-primary-foreground border-primary"
                     : "text-muted-foreground hover:bg-surface-container-high border-transparent"
                 }`}
               >
-                <span className="material-symbols-outlined mr-3 text-[18px]">{item.icon}</span>
-                {item.label}
+                <div className="flex items-center">
+                  <span className="material-symbols-outlined mr-3 text-[18px]">{item.icon}</span>
+                  {item.label}
+                </div>
+                {isUpdatesTab && unreadCount > 0 && (
+                  <span className="bg-primary text-primary-foreground text-[10px] px-1.5 py-0.5 rounded-sm">
+                    {unreadCount > 99 ? "99+" : unreadCount}
+                  </span>
+                )}
               </Link>
             );
           })}
@@ -132,9 +161,12 @@ export default function DashboardLayout({ user, children }: DashboardLayoutProps
           <div className="flex items-center gap-2">
             <Link
               href={user.role === "ADMIN" ? "/admin/notifications" : user.role === "VOLUNTEER" ? "/volunteer/notifications" : "/student/notifications"}
-              className="p-2 text-muted-foreground hover:bg-surface-container transition-colors flex items-center"
+              className="p-2 text-muted-foreground hover:bg-surface-container transition-colors flex items-center relative"
             >
               <span className="material-symbols-outlined">notifications</span>
+              {unreadCount > 0 && (
+                <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-primary rounded-full animate-pulse"></span>
+              )}
             </Link>
             
             <div className="w-8 h-8 ml-2 border border-border bg-surface-container-high overflow-hidden rounded-none">
@@ -176,19 +208,28 @@ export default function DashboardLayout({ user, children }: DashboardLayoutProps
               <div className="flex-1 space-y-1">
                 {navItems.map((item) => {
                   const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
+                  const isUpdatesTab = item.label.includes("Updates");
+
                   return (
                     <Link
                       key={item.href}
                       href={item.href}
                       onClick={() => setMobileMenuOpen(false)}
-                      className={`flex items-center px-4 py-2 font-mono text-xs uppercase tracking-widest transition-all duration-150 rounded-none border-r-2 ${
+                      className={`flex items-center justify-between px-4 py-2 font-mono text-xs uppercase tracking-widest transition-all duration-150 rounded-none border-r-2 ${
                         isActive
                           ? "bg-primary text-on-primary border-primary"
                           : "text-muted-foreground hover:bg-surface-container-high border-transparent"
                       }`}
                     >
-                      <span className="material-symbols-outlined mr-3 text-[18px]">{item.icon}</span>
-                      {item.label}
+                      <div className="flex items-center">
+                        <span className="material-symbols-outlined mr-3 text-[18px]">{item.icon}</span>
+                        {item.label}
+                      </div>
+                      {isUpdatesTab && unreadCount > 0 && (
+                        <span className="bg-primary text-primary-foreground text-[10px] px-1.5 py-0.5 rounded-sm">
+                          {unreadCount > 99 ? "99+" : unreadCount}
+                        </span>
+                      )}
                     </Link>
                   );
                 })}

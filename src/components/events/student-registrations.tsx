@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useTransition } from "react";
-import { cancelRegistrationAction } from "@/app/actions/registration";
+import { cancelRegistrationAction } from "@/actions/registration";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 

@@ -3,6 +3,9 @@ import { headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { auth } from "@/lib/auth";
+import Link from "next/link";
+import { buttonVariants } from "@/components/ui/button";
+import { cn } from "@/lib/utils";
 import AttendeeList from "@/components/events/attendee-list";
 
 export const dynamic = "force-dynamic";
@@ -62,7 +65,7 @@ export default async function VolunteerEventDetailsPage({ params }: PageProps) {
   return (
     <div className="space-y-6">
       {/* Header Info */}
-      <div className="flex flex-col md:flex-row justify-between items-start gap-4 border-b border-border pb-4">
+      <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-4 border-b border-border pb-4">
         <div>
           <div className="flex items-center gap-2 mb-1">
             <span className="font-mono text-xs text-primary uppercase font-bold tracking-widest">{event.category}</span>
@@ -83,6 +86,16 @@ export default async function VolunteerEventDetailsPage({ params }: PageProps) {
             Venue: {event.venue} • Coordinator: {event.coordinatorName}
           </p>
         </div>
+        <Link
+          href={`/api/reports/export?type=event&eventId=${event.id}`}
+          className={cn(
+            buttonVariants({ variant: "outline" }),
+            "font-mono text-xs uppercase tracking-wider rounded-none h-9 px-4 shadow-none hover:bg-surface-container border-border inline-flex items-center"
+          )}
+        >
+          <span className="material-symbols-outlined mr-2 text-[16px]">download</span>
+          Export CSV
+        </Link>
       </div>
 
       {/* Metrics Row */}

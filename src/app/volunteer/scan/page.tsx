@@ -1,5 +1,5 @@
 import React from "react";
-import { getActiveSessionsAction } from "@/app/actions/attendance";
+import { getActiveSessionsAction } from "@/actions/attendance";
 import AttendanceScanner from "@/components/events/attendance-scanner";
 
 export const dynamic = "force-dynamic";

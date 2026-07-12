@@ -1,5 +1,5 @@
 import React from "react";
-import { getActiveEventOptionsAction } from "@/app/actions/update";
+import { getActiveEventOptionsAction } from "@/actions/update";
 import PostUpdateForm from "@/components/events/post-update-form";
 
 export const dynamic = "force-dynamic";

@@ -2,7 +2,7 @@
 
 import React, { useState, useTransition } from "react";
 import Link from "next/link";
-import { markNotificationReadAction, markAllNotificationsReadAction } from "@/app/actions/notification";
+import { markNotificationReadAction, markAllNotificationsReadAction } from "@/actions/notification";
 import { Button } from "@/components/ui/button";
 
 interface Notification {
