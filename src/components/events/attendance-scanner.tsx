@@ -49,6 +49,24 @@ interface AttendanceScannerProps {
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
+// Roll-number normalisation
+// ──────────────────────────────────────────────────────────────────────────────
+//
+// ID-card barcodes often encode extra preamble bytes before the actual roll
+// number (e.g. CODE-128 Symbology Identifier "C1" → the raw decoded string
+// arrives as "C1URK25CS7025" instead of "URK25CS7025").
+//
+// This helper extracts the substring starting at the first "URK" occurrence,
+// which is the canonical prefix for all Karunya roll numbers.
+// Returns null when no "URK" is found, signalling an invalid scan.
+//
+function normalizeRollNumber(raw: string): string | null {
+  const idx = raw.indexOf("URK");
+  if (idx === -1) return null;
+  return raw.slice(idx);
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
 // Component
 // ──────────────────────────────────────────────────────────────────────────────
 
@@ -148,8 +166,20 @@ export default function AttendanceScanner({ sessions }: AttendanceScannerProps) 
     // value for this effect run, avoiding stale-closure bugs across session changes.
     const onConfirmedScan = async (decodedText: string) => {
       setScanResult(null);
+
+      // Strip any barcode preamble (e.g. CODE-128 Symbology Identifier "C1").
+      // Extract the substring from the first "URK" onward.
+      const rollNumber = normalizeRollNumber(decodedText);
+      if (!rollNumber) {
+        setScanResult({
+          type: "ERROR",
+          message: `Unrecognised barcode value — no roll number found in "${decodedText}".`,
+        });
+        return;
+      }
+
       try {
-        const result = await markAttendanceByScan(selectedSessionId, decodedText.trim());
+        const result = await markAttendanceByScan(selectedSessionId, rollNumber);
 
         if (result.status === "success") {
           setScanResult({
@@ -170,7 +200,7 @@ export default function AttendanceScanner({ sessions }: AttendanceScannerProps) 
         } else if (result.status === "not_registered") {
           setScanResult({
             type: "ERROR",
-            message: `No active registration found for "${decodedText}".`,
+            message: `No active registration found for "${rollNumber}".`,
           });
         } else {
           setScanResult({
@@ -198,24 +228,38 @@ export default function AttendanceScanner({ sessions }: AttendanceScannerProps) 
         streamRef.current = null;
       }
 
-      // 1. Open camera
+      // 1. Open camera — try exact rear camera first (required for torch access),
+      //    fall back to ideal if the device rejects the exact constraint.
       let stream: MediaStream;
       try {
         stream = await navigator.mediaDevices.getUserMedia({
           video: {
-            facingMode: { ideal: "environment" },
+            facingMode: { exact: "environment" },
             width: { ideal: 1280 },
             height: { ideal: 720 },
           },
           audio: false,
         });
-      } catch (err: any) {
-        if (!stopped) {
-          setCameraError(
-            "Camera access denied. Please allow camera permissions and try again."
-          );
+      } catch {
+        // exact constraint rejected (desktop, front-camera-only device, etc.) —
+        // fall back to ideal so the scanner still works.
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({
+            video: {
+              facingMode: { ideal: "environment" },
+              width: { ideal: 1280 },
+              height: { ideal: 720 },
+            },
+            audio: false,
+          });
+        } catch (err: any) {
+          if (!stopped) {
+            setCameraError(
+              "Camera access denied. Please allow camera permissions and try again."
+            );
+          }
+          return;
         }
-        return;
       }
 
       if (stopped) {
@@ -229,16 +273,44 @@ export default function AttendanceScanner({ sessions }: AttendanceScannerProps) 
       const video = videoRef.current;
       if (video) {
         video.srcObject = stream;
-        // playsInline is set on the element; muted is required for autoplay
         try { await video.play(); } catch { /* play may fail gracefully */ }
       }
 
-      // 3. Check torch capability
+      // 3. Wait for the video track to reach readyState "live" before checking
+      //    capabilities. On Android Chrome, getCapabilities() returns an empty
+      //    object immediately after getUserMedia — torch only appears once the
+      //    track has fully initialised, which is signalled by loadedmetadata.
       const track = stream.getVideoTracks()[0];
       if (track) {
-        const caps = track.getCapabilities() as MediaTrackCapabilities & { torch?: boolean };
-        if (caps?.torch) {
-          setTorchSupported(true);
+        const waitForLive = () =>
+          new Promise<void>((resolve) => {
+            if (track.readyState === "live") {
+              resolve();
+              return;
+            }
+            // loadedmetadata fires on the video element when the track is ready
+            const v = videoRef.current;
+            if (v) {
+              v.addEventListener("loadedmetadata", () => resolve(), { once: true });
+            } else {
+              // Fallback: short poll
+              const id = setInterval(() => {
+                if (track.readyState === "live" || stopped) {
+                  clearInterval(id);
+                  resolve();
+                }
+              }, 50);
+            }
+          });
+
+        await waitForLive();
+
+        if (!stopped) {
+          const caps = track.getCapabilities() as MediaTrackCapabilities & { torch?: boolean };
+          console.log("[torch-debug] track.getCapabilities():", caps);
+          if (caps?.torch) {
+            setTorchSupported(true);
+          }
         }
       }
 
@@ -386,16 +458,20 @@ export default function AttendanceScanner({ sessions }: AttendanceScannerProps) 
   };
 
   // ── Manual check-in helpers ───────────────────────────────────────────────
-  const triggerCheckIn = (rollNumber: string) => {
+  const triggerCheckIn = (rawInput: string) => {
     setScanResult(null);
     if (!selectedSessionId) {
       setScanResult({ type: "ERROR", message: "Please select an active session block first." });
       return;
     }
 
+    // Apply the same URK-normalisation as the scanner path so that a stray
+    // prefix typed in the manual field is silently discarded.
+    const rollNumber = normalizeRollNumber(rawInput.trim()) ?? rawInput.trim();
+
     startTransition(async () => {
       try {
-        const result = await markAttendanceByScan(selectedSessionId, rollNumber.trim());
+        const result = await markAttendanceByScan(selectedSessionId, rollNumber);
 
         if (result.status === "success") {
           setScanResult({
