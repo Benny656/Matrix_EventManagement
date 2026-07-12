@@ -1,3 +1,4 @@
+import "dotenv/config";
 import { auth } from "../src/lib/auth";
 import { prisma } from "../src/lib/db";
 
@@ -9,19 +10,28 @@ const admins = [
 async function main() {
   for (const admin of admins) {
     try {
-      // Creates the user + Better Auth account/session tables correctly
-      // (proper password hashing etc.) — do not insert into these tables by hand.
-      await auth.api.signUpEmail({
-        body: {
-          name: admin.name,
-          email: admin.email,
-          password: admin.password,
-        },
-      });
+      try {
+        // Creates the user + Better Auth account/session tables correctly
+        // (proper password hashing etc.) — do not insert into these tables by hand.
+        await auth.api.signUpEmail({
+          body: {
+            name: admin.name,
+            email: admin.email,
+            password: admin.password,
+          },
+        });
+        console.log(`Created auth account for ${admin.email}`);
+      } catch (signUpError: any) {
+        const errCode = signUpError.body?.code || "";
+        const errMsg = signUpError.message || "";
+        if (errCode === "USER_ALREADY_EXISTS_USE_ANOTHER_EMAIL" || errMsg.includes("already exists")) {
+          console.log(`User ${admin.email} already exists. Continuing to role update...`);
+        } else {
+          throw signUpError;
+        }
+      }
 
-      console.log(`Created auth account for ${admin.email}`);
-
-      // Promote to Admin role — signUpEmail creates them as the default role (STUDENT)
+      // Promote to Admin role
       await prisma.user.update({
         where: { email: admin.email },
         data: { role: "ADMIN" },
@@ -29,7 +39,7 @@ async function main() {
 
       console.log(`Promoted ${admin.email} to ADMIN`);
     } catch (e: any) {
-      console.error(`Error processing ${admin.email}:`, e.message || e);
+      console.error(`Error processing ${admin.email}:`, e);
     }
   }
 

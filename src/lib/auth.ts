@@ -24,6 +24,7 @@ export const auth = betterAuth({
   baseURL: process.env.NEXT_PUBLIC_APP_URL || "http://localhost:3000",
   emailAndPassword: { enabled: true },
   session: {
+    modelName: "UserSession",
     cookieCache: {
       enabled: true,
       maxAge: 60 * 5, // 5 minutes
