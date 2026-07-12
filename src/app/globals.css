@@ -65,6 +65,9 @@
   --radius-2xl: 16px;
   --radius-3xl: 20px;
   --radius-4xl: 24px;
+
+  --animate-rocket-float: rocket-float 3.5s ease-in-out infinite;
+  --animate-circuit-pulse: circuit-pulse 2.2s ease-in-out infinite;
 }
 
 :root {
@@ -246,4 +249,32 @@
   0%   { top: 10%; opacity: 0.9; }
   50%  { top: 90%; opacity: 1; }
   100% { top: 10%; opacity: 0.9; }
+}
+
+@keyframes rocket-float {
+  0%,
+  100% {
+    transform: translate(0, 0) rotate(-2deg);
+  }
+  50% {
+    transform: translate(3px, -6px) rotate(2deg);
+  }
+}
+
+@keyframes circuit-pulse {
+  0%,
+  100% {
+    opacity: 0.75;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+/* Respect reduced-motion preference — required per the frontend-design quality floor */
+@media (prefers-reduced-motion: reduce) {
+  .animate-rocket-float,
+  .animate-circuit-pulse {
+    animation: none !important;
+  }
 }
