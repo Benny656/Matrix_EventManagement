@@ -7,6 +7,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { signOut } from "@/lib/auth-client";
 import { getUnreadNotificationCountAction } from "@/actions/notification";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import ThemeToggle from "@/components/theme-toggle";
 import {
   BarChart2,
   CalendarDays,
@@ -109,9 +110,9 @@ export default function DashboardLayout({ user, children }: DashboardLayoutProps
   };
 
   return (
-    <div className="theme-clerk bg-background text-foreground font-sans min-h-screen flex overflow-hidden">
+    <div className="bg-background text-foreground font-sans min-h-screen flex overflow-hidden">
       {/* Sidebar (Desktop) */}
-      <nav className="hidden md:flex flex-col h-full py-5 px-3 bg-surface-container-low border-r border-border w-60 fixed left-0 top-0 z-40">
+      <nav className="hidden md:flex flex-col h-full py-5 px-3 bg-surface-container border-r border-border w-60 fixed left-0 top-0 z-40">
         {/* Brand */}
         <div className="mb-7 px-3 pb-5 border-b border-border flex items-center gap-3">
           <img src="/logo.png" alt="Matrix Logo" className="h-7 w-7 object-contain opacity-90" />
@@ -139,9 +140,9 @@ export default function DashboardLayout({ user, children }: DashboardLayoutProps
               <motion.div key={item.href} whileHover={{ x: 2 }} transition={{ duration: 0.12 }}>
                 <Link
                   href={item.href}
-                  className={`flex items-center justify-between px-3 py-2 font-mono text-[11px] uppercase tracking-widest transition-colors rounded-sm ${
+                  className={`flex items-center justify-between px-3 py-2.5 font-mono text-[11px] uppercase tracking-widest transition-all rounded-md ${
                     active
-                      ? "bg-primary text-primary-foreground"
+                      ? "bg-primary text-primary-foreground font-semibold"
                       : "text-muted-foreground hover:bg-surface-container-high hover:text-foreground"
                   }`}
                 >
@@ -194,7 +195,9 @@ export default function DashboardLayout({ user, children }: DashboardLayoutProps
             </h1>
           </div>
 
-          <div className="flex items-center gap-1">
+          <div className="flex items-center gap-1.5">
+            <ThemeToggle />
+            
             <Link
               href={notificationsHref}
               className="p-2 text-muted-foreground hover:text-foreground hover:bg-surface-container transition-colors flex items-center relative rounded-sm"
@@ -242,7 +245,7 @@ export default function DashboardLayout({ user, children }: DashboardLayoutProps
                 animate={{ x: 0 }}
                 exit={{ x: "-100%" }}
                 transition={{ type: "spring", damping: 30, stiffness: 300 }}
-                className="fixed left-0 top-0 w-60 h-full bg-surface-container-low py-5 px-3 flex flex-col border-r border-border z-50 md:hidden"
+                className="fixed left-0 top-0 w-60 h-full bg-surface-container py-5 px-3 flex flex-col border-r border-border z-50 md:hidden"
                 onClick={(e) => e.stopPropagation()}
               >
                 <div className="mb-5 px-3 pb-5 border-b border-border flex justify-between items-center">
@@ -270,9 +273,9 @@ export default function DashboardLayout({ user, children }: DashboardLayoutProps
                         key={item.href}
                         href={item.href}
                         onClick={() => setMobileMenuOpen(false)}
-                        className={`flex items-center justify-between px-3 py-2 font-mono text-[11px] uppercase tracking-widest transition-colors rounded-sm ${
+                        className={`flex items-center justify-between px-3 py-2.5 font-mono text-[11px] uppercase tracking-widest transition-all rounded-md ${
                           active
-                            ? "bg-primary text-primary-foreground"
+                            ? "bg-primary text-primary-foreground font-semibold"
                             : "text-muted-foreground hover:bg-surface-container-high hover:text-foreground"
                         }`}
                       >
@@ -293,7 +296,7 @@ export default function DashboardLayout({ user, children }: DashboardLayoutProps
                 <div className="mt-auto pt-4 border-t border-border">
                   <button
                     onClick={handleSignOut}
-                    className="w-full text-left flex items-center gap-2.5 px-3 py-2 text-muted-foreground hover:bg-surface-container-high hover:text-foreground font-mono text-[11px] uppercase tracking-widest transition-colors rounded-sm"
+                    className="w-full text-left flex items-center gap-2.5 px-3 py-2.5 text-muted-foreground hover:bg-surface-container-high hover:text-foreground font-mono text-[11px] uppercase tracking-widest transition-all rounded-md"
                   >
                     <LogOut size={14} />
                     Sign out
@@ -312,7 +315,7 @@ export default function DashboardLayout({ user, children }: DashboardLayoutProps
         </div>
 
         {/* Bottom Nav (Mobile) */}
-        <nav className="fixed bottom-0 left-0 right-0 z-30 md:hidden flex justify-around items-center h-14 glass-panel px-4">
+        <nav className="fixed bottom-0 left-0 right-0 z-30 md:hidden flex justify-around items-center h-16 border-t border-border/80 bg-background/80 backdrop-blur-md px-2">
           {navItems.slice(0, 3).map((item) => {
             const Icon = item.icon;
             const isRoot = ["/admin", "/volunteer", "/student"].includes(item.href);
@@ -321,8 +324,8 @@ export default function DashboardLayout({ user, children }: DashboardLayoutProps
               <Link
                 key={item.href}
                 href={item.href}
-                className={`flex flex-col items-center justify-center px-3 py-1 transition-colors gap-1 ${
-                  active ? "text-primary" : "text-muted-foreground"
+                className={`flex-1 flex flex-col items-center justify-center h-full py-1.5 transition-all gap-1 rounded-md active:scale-95 ${
+                  active ? "text-primary font-semibold" : "text-muted-foreground hover:text-foreground"
                 }`}
               >
                 <Icon size={18} />
@@ -332,7 +335,7 @@ export default function DashboardLayout({ user, children }: DashboardLayoutProps
           })}
           <button
             onClick={() => setMobileMenuOpen(true)}
-            className="flex flex-col items-center justify-center px-3 py-1 text-muted-foreground gap-1"
+            className="flex-1 flex flex-col items-center justify-center h-full py-1.5 text-muted-foreground hover:text-foreground transition-all gap-1 rounded-md active:scale-95 cursor-pointer"
           >
             <Menu size={18} />
             <span className="font-mono text-[8px] uppercase tracking-widest">More</span>

@@ -11,6 +11,7 @@ import { useSession, signIn, signUp } from "@/lib/auth-client";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { AtSign, Lock, LogIn, UserPlus, AlertCircle, ArrowLeft } from "lucide-react";
+import ThemeToggle from "@/components/theme-toggle";
 
 const loginSchema = z.object({
   email: z.string().email("Enter a valid email address"),
@@ -127,14 +128,17 @@ function LoginContent() {
   // Only show the loading state on the initial session load, not during background refocus refetches.
   if (sessionLoading && !isRefetching) {
     return (
-      <div className="theme-clerk min-h-screen flex items-center justify-center bg-background font-mono text-sm text-muted-foreground">
+      <div className="min-h-screen flex items-center justify-center bg-background font-mono text-sm text-muted-foreground">
         Checking session…
       </div>
     );
   }
 
   return (
-    <div className="theme-clerk min-h-screen flex items-center justify-center p-6 bg-gradient-to-br from-background to-muted selection:bg-primary/10 selection:text-primary">
+    <div className="min-h-screen flex items-center justify-center p-6 bg-gradient-to-br from-background to-surface-container relative selection:bg-primary/10 selection:text-primary">
+      <div className="absolute top-4 right-4">
+        <ThemeToggle />
+      </div>
 
       <motion.div
         className="w-full max-w-[400px] flex flex-col items-center gap-6"
