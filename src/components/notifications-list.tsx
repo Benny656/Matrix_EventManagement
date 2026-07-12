@@ -4,6 +4,7 @@ import React, { useState, useTransition } from "react";
 import Link from "next/link";
 import { markNotificationReadAction, markAllNotificationsReadAction } from "@/actions/notification";
 import { Button } from "@/components/ui/button";
+import { CalendarDays, Megaphone, CheckCircle2, ArrowUpCircle, Bell } from "lucide-react";
 
 interface Notification {
   id: string;
@@ -40,13 +41,13 @@ export default function NotificationsList({ initialNotifications }: Notification
     });
   };
 
-  const iconForType = (type: string) => {
+  const iconForType = (type: string): React.ElementType => {
     switch (type) {
-      case "NEW_EVENT": return "event";
-      case "UPDATE_POSTED": return "campaign";
-      case "REGISTRATION_CONFIRMED": return "check_circle";
-      case "WAITLIST_PROMOTED": return "arrow_upward";
-      default: return "notifications";
+      case "NEW_EVENT": return CalendarDays;
+      case "UPDATE_POSTED": return Megaphone;
+      case "REGISTRATION_CONFIRMED": return CheckCircle2;
+      case "WAITLIST_PROMOTED": return ArrowUpCircle;
+      default: return Bell;
     }
   };
 
@@ -100,13 +101,14 @@ export default function NotificationsList({ initialNotifications }: Notification
                 }`}
               >
                 {/* Icon */}
-                <span
-                  className={`material-symbols-outlined text-xl shrink-0 mt-0.5 ${
-                    notif.read ? "text-muted-foreground" : "text-primary"
-                  }`}
-                >
-                  {iconForType(notif.type)}
-                </span>
+                {(() => { const Icon = iconForType(notif.type); return (
+                  <Icon
+                    size={18}
+                    className={`shrink-0 mt-0.5 ${
+                      notif.read ? "text-muted-foreground" : "text-primary"
+                    }`}
+                  />
+                ); })()}
 
                 {/* Content */}
                 <div className="flex-1 min-w-0">

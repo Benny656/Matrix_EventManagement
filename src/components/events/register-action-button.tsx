@@ -4,6 +4,7 @@ import React, { useState, useTransition } from "react";
 import { registerForEventAction, cancelRegistrationAction } from "@/actions/registration";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { AlertCircle } from "lucide-react";
 
 interface RegisterActionButtonProps {
   eventId: string;
@@ -64,7 +65,7 @@ export default function RegisterActionButton({
     <div className="space-y-4">
       {error && (
         <Alert variant="destructive" className="rounded-none border-destructive bg-destructive/5 text-destructive font-mono text-xs uppercase">
-          <span className="material-symbols-outlined text-[16px] mr-2">error</span>
+          <AlertCircle size={14} className="mr-2 shrink-0" />
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       )}
@@ -108,10 +109,10 @@ export default function RegisterActionButton({
           className="w-full bg-primary text-primary-foreground font-mono text-xs uppercase tracking-widest py-6 hover:bg-primary-container active:scale-98 transition-all rounded-none h-11 shadow-none"
         >
           {isPending
-            ? "SUBMITTING PAYLOAD..."
+            ? "Submitting…"
             : isFull
-            ? "Join Waitlist / Queue"
-            : "Confirm Registration"}
+            ? "Join waitlist"
+            : "Register"}
         </Button>
       )}
     </div>

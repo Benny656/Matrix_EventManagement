@@ -6,6 +6,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/db";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
+import { BarChart2, Users, History } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -43,7 +44,7 @@ export default async function AdminReportsPage() {
         {/* Events Summary */}
         <div className="border border-border bg-card flex flex-col justify-between">
           <div className="p-6">
-            <span className="material-symbols-outlined text-primary text-2xl mb-3">analytics</span>
+            <BarChart2 size={22} className="text-primary mb-3" />
             <h3 className="font-heading font-bold text-base text-foreground mb-1">Events Summary</h3>
             <p className="font-sans text-xs text-muted-foreground leading-relaxed">
               Export overall statistics for all events including capacity, RSVPs, waitlists, check-ins, and attendance rates.
@@ -65,7 +66,7 @@ export default async function AdminReportsPage() {
         {/* Volunteer Performance */}
         <div className="border border-border bg-card flex flex-col justify-between">
           <div className="p-6">
-            <span className="material-symbols-outlined text-primary text-2xl mb-3">diversity_3</span>
+            <Users size={22} className="text-primary mb-3" />
             <h3 className="font-heading font-bold text-base text-foreground mb-1">Volunteer Performance</h3>
             <p className="font-sans text-xs text-muted-foreground leading-relaxed">
               Analyze volunteer activity showing the total number of attendance check-ins marked and validated by each operator.
@@ -87,7 +88,7 @@ export default async function AdminReportsPage() {
         {/* Global Registration Logs */}
         <div className="border border-border bg-card flex flex-col justify-between">
           <div className="p-6">
-            <span className="material-symbols-outlined text-primary text-2xl mb-3">history</span>
+            <History size={22} className="text-primary mb-3" />
             <h3 className="font-heading font-bold text-base text-foreground mb-1">Registration History Log</h3>
             <p className="font-sans text-xs text-muted-foreground leading-relaxed">
               Extract raw chronological logs of all event registrations, cancellations, and waitlist allocations with student profiles.

@@ -11,6 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { AlertCircle, MapPin, Trash2 } from "lucide-react";
 
 const basicInfoSchema = z.object({
   title: z.string().min(2, "Event title is required"),
@@ -153,7 +154,7 @@ export default function CreateEventWizard({ role }: { role: "ADMIN" | "VOLUNTEER
 
       {wizardError && (
         <Alert variant="destructive" className="rounded-none border-destructive bg-destructive/5 text-destructive font-mono text-xs uppercase">
-          <span className="material-symbols-outlined text-[16px] mr-2">error</span>
+          <AlertCircle size={14} className="mr-2 shrink-0" />
           <AlertDescription>{wizardError}</AlertDescription>
         </Alert>
       )}
@@ -219,7 +220,7 @@ export default function CreateEventWizard({ role }: { role: "ADMIN" | "VOLUNTEER
               <div className="flex flex-col gap-1">
                 <Label className="font-mono text-[11px] text-muted-foreground uppercase tracking-wider" htmlFor="venue">Location / Facility</Label>
                 <div className="relative">
-                  <span className="material-symbols-outlined absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground text-base">location_on</span>
+                  <MapPin size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
                   <Input
                     {...registerBasic("venue")}
                     className="w-full bg-background border border-border text-foreground pl-10 pr-3 py-6 font-mono text-sm focus-visible:ring-1 focus-visible:ring-primary rounded-none shadow-none"
@@ -386,7 +387,7 @@ export default function CreateEventWizard({ role }: { role: "ADMIN" | "VOLUNTEER
                     <div className="col-span-2 text-muted-foreground">{sess.venue}</div>
                     <div className="col-span-1 text-right">
                       <button onClick={() => removeSession(idx)} className="text-primary hover:text-primary-container">
-                        <span className="material-symbols-outlined text-[16px] pointer-events-none">delete</span>
+                        <Trash2 size={14} className="pointer-events-none" />
                       </button>
                     </div>
                   </div>

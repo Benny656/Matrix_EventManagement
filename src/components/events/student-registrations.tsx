@@ -4,6 +4,7 @@ import React, { useState, useTransition } from "react";
 import { cancelRegistrationAction } from "@/actions/registration";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { AlertCircle } from "lucide-react";
 
 interface RegistrationWithEvent {
   id: string;
@@ -51,7 +52,7 @@ export default function StudentRegistrations({ initialRegistrations }: { initial
     <div className="space-y-6">
       {error && (
         <Alert variant="destructive" className="rounded-none border-destructive bg-destructive/5 text-destructive font-mono text-xs uppercase">
-          <span className="material-symbols-outlined text-[16px] mr-2">error</span>
+          <AlertCircle size={14} className="mr-2 shrink-0" />
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       )}

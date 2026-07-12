@@ -3,6 +3,7 @@ import Link from "next/link";
 import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { auth } from "@/lib/auth";
+import { GraduationCap, Zap, ClipboardCheck, Heart } from "lucide-react";
 import { prisma } from "@/lib/db";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
@@ -135,7 +136,7 @@ export default async function AdminDashboardPage() {
         <div className="border border-border bg-card flex flex-col">
           <div className="bg-surface-container px-4 py-2 flex justify-between items-center border-b border-border">
             <span className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">Total Students</span>
-            <span className="material-symbols-outlined text-primary text-[18px]">school</span>
+            <GraduationCap size={16} className="text-primary" />
           </div>
           <div className="p-4">
             <h2 className="font-mono text-2xl font-bold text-foreground">{totalStudents}</h2>
@@ -147,7 +148,7 @@ export default async function AdminDashboardPage() {
         <div className="border border-border bg-card flex flex-col">
           <div className="bg-surface-container px-4 py-2 flex justify-between items-center border-b border-border">
             <span className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">Active Events</span>
-            <span className="material-symbols-outlined text-primary text-[18px]">bolt</span>
+            <Zap size={16} className="text-primary" />
           </div>
           <div className="p-4">
             <h2 className="font-mono text-2xl font-bold text-foreground">{activeEvents}</h2>
@@ -159,7 +160,7 @@ export default async function AdminDashboardPage() {
         <div className="border border-border bg-card flex flex-col">
           <div className="bg-surface-container px-4 py-2 flex justify-between items-center border-b border-border">
             <span className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">Attendance Rate</span>
-            <span className="material-symbols-outlined text-primary text-[18px]">fact_check</span>
+            <ClipboardCheck size={16} className="text-primary" />
           </div>
           <div className="p-4">
             <h2 className="font-mono text-2xl font-bold text-foreground">{attendanceRate}%</h2>
@@ -171,7 +172,7 @@ export default async function AdminDashboardPage() {
         <div className="border border-border bg-card flex flex-col">
           <div className="bg-surface-container px-4 py-2 flex justify-between items-center border-b border-border">
             <span className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">Total Volunteers</span>
-            <span className="material-symbols-outlined text-primary text-[18px]">volunteer_activism</span>
+            <Heart size={16} className="text-primary" />
           </div>
           <div className="p-4">
             <h2 className="font-mono text-2xl font-bold text-foreground">{totalVolunteers}</h2>

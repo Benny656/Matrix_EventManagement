@@ -4,6 +4,7 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { auth } from "@/lib/auth";
+import { Plus, User } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -45,7 +46,7 @@ export default async function VolunteerUpdatesPage() {
           href="/volunteer/updates/new"
           className="bg-primary text-primary-foreground font-mono text-xs uppercase tracking-widest py-3 px-6 hover:bg-primary-container active:scale-95 transition-all rounded-none flex items-center gap-1.5"
         >
-          <span className="material-symbols-outlined text-[16px]">add</span>
+          <Plus size={14} />
           New Announcement
         </Link>
       </div>
@@ -92,7 +93,7 @@ export default async function VolunteerUpdatesPage() {
                   </p>
 
                   <div className="flex items-center gap-2 font-mono text-[10px] text-muted-foreground pt-1 border-t border-dashed border-border/60">
-                    <span className="material-symbols-outlined text-[12px]">person</span>
+                    <User size={11} />
                     <span>AUTHOR: {update.author.name} ({update.author.role})</span>
                   </div>
                 </div>

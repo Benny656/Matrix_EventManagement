@@ -7,6 +7,7 @@ import Link from "next/link";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import AttendeeList from "@/components/events/attendee-list";
+import { Download } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -92,7 +93,7 @@ export default async function AdminEventDetailsPage({ params }: PageProps) {
             "font-mono text-xs uppercase tracking-wider rounded-none h-9 px-4 shadow-none hover:bg-surface-container border-border inline-flex items-center"
           )}
         >
-          <span className="material-symbols-outlined mr-2 text-[16px]">download</span>
+          <Download size={14} className="mr-2" />
           Export CSV
         </Link>
       </div>

@@ -6,6 +6,7 @@ import { postUpdateAction } from "@/actions/update";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { AlertCircle } from "lucide-react";
 
 interface EventOption {
   id: string;
@@ -55,7 +56,7 @@ export default function PostUpdateForm({ events, backUrl }: PostUpdateFormProps)
     <form onSubmit={handleSubmit} className="border border-border bg-card p-6 space-y-6 max-w-2xl">
       {error && (
         <Alert variant="destructive" className="rounded-none border-destructive bg-destructive/5 text-destructive font-mono text-xs uppercase">
-          <span className="material-symbols-outlined text-[16px] mr-2">error</span>
+          <AlertCircle size={14} className="mr-2 shrink-0" />
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       )}

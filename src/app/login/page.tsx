@@ -6,22 +6,22 @@ import Link from "next/link";
 import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
+import { motion, AnimatePresence } from "framer-motion";
 import { useSession, signIn, signUp } from "@/lib/auth-client";
-import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { Alert, AlertDescription } from "@/components/ui/alert";
+import { AtSign, Lock, LogIn, UserPlus, AlertCircle, ArrowLeft } from "lucide-react";
 
 const loginSchema = z.object({
-  email: z.string().email("Invalid email format"),
+  email: z.string().email("Enter a valid email address"),
   password: z.string().min(6, "Password must be at least 6 characters"),
 });
 
 const registerSchema = z.object({
-  name: z.string().min(2, "Name must be at least 2 characters"),
-  email: z.string().email("Invalid email format"),
-  phone: z.string().min(10, "Invalid phone number"),
-  rollNumber: z.string().min(5, "Invalid registration number"),
+  name: z.string().min(2, "Enter your full name"),
+  email: z.string().email("Enter a valid email address"),
+  phone: z.string().min(10, "Enter a valid phone number"),
+  rollNumber: z.string().min(5, "Enter your registration number"),
   password: z.string().min(6, "Password must be at least 6 characters"),
 });
 
@@ -36,7 +36,6 @@ function LoginContent() {
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
-  // Set mode based on query param if present
   useEffect(() => {
     const queryMode = searchParams.get("mode");
     if (queryMode === "register") {
@@ -46,7 +45,6 @@ function LoginContent() {
     }
   }, [searchParams]);
 
-  // Redirect if already authenticated
   useEffect(() => {
     if (session) {
       const role = session.user.role;
@@ -81,15 +79,12 @@ function LoginContent() {
     setError(null);
     try {
       await signIn.email(
-        {
-          email: data.email,
-          password: data.password,
-        },
+        { email: data.email, password: data.password },
         {
           onRequest: () => setLoading(true),
           onResponse: () => setLoading(false),
           onError: (ctx) => {
-            setError(ctx.error.message || "Failed to sign in");
+            setError(ctx.error.message || "Failed to sign in. Check your credentials.");
           },
           onSuccess: () => {
             router.refresh();
@@ -118,7 +113,7 @@ function LoginContent() {
           onRequest: () => setLoading(true),
           onResponse: () => setLoading(false),
           onError: (ctx) => {
-            setError(ctx.error.message || "Failed to sign up");
+            setError(ctx.error.message || "Failed to create account.");
           },
           onSuccess: () => {
             router.refresh();
@@ -133,257 +128,309 @@ function LoginContent() {
 
   if (sessionLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-background font-mono text-sm text-primary uppercase">
-        Verifying Security Protocol...
+      <div className="min-h-screen flex items-center justify-center bg-[#f7f7f8] font-mono text-sm text-[#5e5f6e]">
+        Checking session…
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-6 bg-background font-sans selection:bg-primary-container/20 selection:text-primary">
-      {/* Background Grid Accent */}
-      <div className="fixed inset-0 -z-10 pointer-events-none overflow-hidden opacity-[0.03]">
-        <div className="h-full w-full max-w-[1440px] mx-auto grid grid-cols-12 gap-4 px-6 border-x border-outline">
-          {Array.from({ length: 11 }).map((_, i) => (
-            <div key={i} className="border-r border-outline h-full" />
-          ))}
-        </div>
-      </div>
+    <div className="min-h-screen flex items-center justify-center p-6 bg-[#f7f7f8] selection:bg-primary/10 selection:text-primary">
 
-      <div className="w-full max-w-[400px] flex flex-col items-center">
-        {/* Header / Brand */}
-        <header className="mb-8 text-center">
-          <Link href="/">
-            <h1 className="font-heading text-3xl font-extrabold tracking-tighter text-primary uppercase hover:opacity-85 transition-opacity">
+      <motion.div
+        className="w-full max-w-[400px] flex flex-col items-center gap-6"
+        initial={{ opacity: 0, y: 16 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
+      >
+        {/* Brand */}
+        <div className="text-center">
+          <Link href="/" className="inline-block">
+            <h1 className="font-heading text-2xl font-bold tracking-tighter text-foreground uppercase hover:opacity-80 transition-opacity">
               Matrix
             </h1>
           </Link>
-          <div className="h-1 w-12 bg-primary mx-auto mt-1"></div>
-        </header>
+          <p className="font-mono text-[10px] uppercase tracking-widest text-[#747686] mt-1">
+            AIML · Karunya University
+          </p>
+        </div>
 
-        {/* Card */}
-        <Card className="w-full bg-surface-container-low border border-border p-6 flex flex-col gap-6 rounded-none shadow-none">
-          <div className="border-b border-outline-variant pb-3 -mx-6 px-6 bg-surface-container-high -mt-6">
-            <span className="font-mono text-[11px] font-semibold text-muted-foreground uppercase tracking-widest">
-              {mode === "login" ? "Authentication Required" : "Registration Protocol"}
+        {/* Card — Clerk-style: white surface, inset shadow, 8px radius */}
+        <div
+          className="w-full bg-white p-6 flex flex-col gap-5"
+          style={{
+            borderRadius: "8px",
+            boxShadow:
+              "0 0 0 1px #d9d9de, 0 2px 4px rgba(0,0,0,0.04), 0 8px 24px rgba(0,0,0,0.06)",
+          }}
+        >
+          {/* Card header */}
+          <div className="border-b border-[#eeeef0] pb-4">
+            <span className="font-sans text-sm font-semibold text-[#131316]">
+              {mode === "login" ? "Sign in to Matrix" : "Create your account"}
             </span>
+            <p className="font-sans text-xs text-[#747686] mt-0.5">
+              {mode === "login"
+                ? "Use your Karunya college email to continue."
+                : "Register with your department details."}
+            </p>
           </div>
 
-          {error && (
-            <Alert variant="destructive" className="rounded-none border-destructive bg-destructive/5 text-destructive">
-              <span className="material-symbols-outlined text-[16px] mr-1">error</span>
-              <AlertDescription className="font-mono text-xs uppercase">{error}</AlertDescription>
-            </Alert>
-          )}
+          {/* Error */}
+          <AnimatePresence>
+            {error && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: "auto" }}
+                exit={{ opacity: 0, height: 0 }}
+                className="flex items-start gap-2 bg-destructive/5 border border-destructive/20 px-3 py-2.5 rounded-md"
+              >
+                <AlertCircle size={14} className="text-destructive mt-0.5 shrink-0" />
+                <span className="font-mono text-[11px] text-destructive">{error}</span>
+              </motion.div>
+            )}
+          </AnimatePresence>
 
-          {mode === "login" ? (
-            <form onSubmit={handleLoginSubmit(onLogin)} className="flex flex-col gap-4">
-              {/* Email */}
-              <div className="flex flex-col gap-1">
-                <Label className="font-mono text-[11px] font-semibold text-muted-foreground uppercase tracking-wider" htmlFor="email">
-                  Email Address
-                </Label>
-                <div className="border border-border bg-white flex items-center px-2 focus-within:border-2 focus-within:border-primary">
-                  <span className="material-symbols-outlined text-muted-foreground mr-2">alternate_email</span>
+          {/* Forms */}
+          <AnimatePresence mode="wait">
+            {mode === "login" ? (
+              <motion.form
+                key="login"
+                initial={{ opacity: 0, x: -8 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: 8 }}
+                transition={{ duration: 0.2 }}
+                onSubmit={handleLoginSubmit(onLogin)}
+                className="flex flex-col gap-4"
+              >
+                {/* Email */}
+                <div className="flex flex-col gap-1.5">
+                  <Label className="font-sans text-xs font-medium text-[#131316]" htmlFor="email">
+                    Email address
+                  </Label>
+                  <div
+                    className="flex items-center gap-2 px-3 bg-white transition-all"
+                    style={{
+                      border: "1px solid #d9d9de",
+                      borderRadius: "6px",
+                    }}
+                    onFocus={() => {}}
+                  >
+                    <AtSign size={14} className="text-[#747686] shrink-0" />
+                    <Input
+                      {...registerLogin("email")}
+                      className="flex-1 py-2.5 bg-transparent border-none focus-visible:ring-0 focus-visible:ring-offset-0 font-sans text-sm text-[#131316] shadow-none placeholder:text-[#d9d9de] h-auto"
+                      id="email"
+                      placeholder="student@karunya.edu.in"
+                      type="email"
+                      disabled={loading}
+                    />
+                  </div>
+                  {loginErrors.email && (
+                    <span className="font-sans text-[11px] text-destructive">{loginErrors.email.message}</span>
+                  )}
+                </div>
+
+                {/* Password */}
+                <div className="flex flex-col gap-1.5">
+                  <Label className="font-sans text-xs font-medium text-[#131316]" htmlFor="password">
+                    Password
+                  </Label>
+                  <div
+                    className="flex items-center gap-2 px-3 bg-white transition-all"
+                    style={{ border: "1px solid #d9d9de", borderRadius: "6px" }}
+                  >
+                    <Lock size={14} className="text-[#747686] shrink-0" />
+                    <Input
+                      {...registerLogin("password")}
+                      className="flex-1 py-2.5 bg-transparent border-none focus-visible:ring-0 focus-visible:ring-offset-0 font-sans text-sm text-[#131316] shadow-none placeholder:text-[#d9d9de] h-auto"
+                      id="password"
+                      placeholder="••••••••"
+                      type="password"
+                      disabled={loading}
+                    />
+                  </div>
+                  {loginErrors.password && (
+                    <span className="font-sans text-[11px] text-destructive">{loginErrors.password.message}</span>
+                  )}
+                </div>
+
+                {/* Submit */}
+                <motion.button
+                  whileTap={{ scale: 0.98 }}
+                  className="mt-1 w-full bg-primary text-primary-foreground font-sans text-sm font-medium py-2.5 px-4 flex items-center justify-center gap-2 hover:bg-primary-container transition-colors disabled:opacity-50 disabled:pointer-events-none"
+                  style={{ borderRadius: "6px" }}
+                  type="submit"
+                  disabled={loading}
+                >
+                  {loading ? (
+                    "Signing in…"
+                  ) : (
+                    <>
+                      <span>Sign in</span>
+                      <LogIn size={14} />
+                    </>
+                  )}
+                </motion.button>
+              </motion.form>
+            ) : (
+              <motion.form
+                key="register"
+                initial={{ opacity: 0, x: 8 }}
+                animate={{ opacity: 1, x: 0 }}
+                exit={{ opacity: 0, x: -8 }}
+                transition={{ duration: 0.2 }}
+                onSubmit={handleSignupSubmit(onRegister)}
+                className="flex flex-col gap-4"
+              >
+                {/* Full Name */}
+                <div className="flex flex-col gap-1.5">
+                  <Label className="font-sans text-xs font-medium text-[#131316]" htmlFor="name">Full name</Label>
                   <Input
-                    {...registerLogin("email")}
-                    className="w-full py-3 bg-transparent border-none focus-visible:ring-0 focus-visible:ring-offset-0 font-mono text-sm text-foreground shadow-none"
-                    id="email"
-                    placeholder="user@matrix-platform.systems"
+                    {...registerSignup("name")}
+                    className="bg-white font-sans text-sm text-[#131316] shadow-none h-10 placeholder:text-[#d9d9de]"
+                    style={{ border: "1px solid #d9d9de", borderRadius: "6px" }}
+                    id="name"
+                    placeholder="e.g. Priya Rajan"
+                    type="text"
+                    disabled={loading}
+                  />
+                  {signupErrors.name && (
+                    <span className="font-sans text-[11px] text-destructive">{signupErrors.name.message}</span>
+                  )}
+                </div>
+
+                {/* Registration Number */}
+                <div className="flex flex-col gap-1.5">
+                  <Label className="font-sans text-xs font-medium text-[#131316]" htmlFor="rollNumber">
+                    University registration number
+                  </Label>
+                  <Input
+                    {...registerSignup("rollNumber")}
+                    className="bg-white font-mono text-sm text-[#131316] shadow-none h-10 placeholder:text-[#d9d9de]"
+                    style={{ border: "1px solid #d9d9de", borderRadius: "6px" }}
+                    id="rollNumber"
+                    placeholder="e.g. UR23AI001"
+                    type="text"
+                    disabled={loading}
+                  />
+                  {signupErrors.rollNumber && (
+                    <span className="font-sans text-[11px] text-destructive">{signupErrors.rollNumber.message}</span>
+                  )}
+                </div>
+
+                {/* Email */}
+                <div className="flex flex-col gap-1.5">
+                  <Label className="font-sans text-xs font-medium text-[#131316]" htmlFor="email-reg">
+                    College email
+                  </Label>
+                  <Input
+                    {...registerSignup("email")}
+                    className="bg-white font-sans text-sm text-[#131316] shadow-none h-10 placeholder:text-[#d9d9de]"
+                    style={{ border: "1px solid #d9d9de", borderRadius: "6px" }}
+                    id="email-reg"
+                    placeholder="student@karunya.edu.in"
                     type="email"
                     disabled={loading}
                   />
+                  {signupErrors.email && (
+                    <span className="font-sans text-[11px] text-destructive">{signupErrors.email.message}</span>
+                  )}
                 </div>
-                {loginErrors.email && (
-                  <span className="font-mono text-[10px] text-destructive uppercase mt-1">
-                    {loginErrors.email.message}
-                  </span>
-                )}
-              </div>
 
-              {/* Password */}
-              <div className="flex flex-col gap-1">
-                <Label className="font-mono text-[11px] font-semibold text-muted-foreground uppercase tracking-wider" htmlFor="password">
-                  Password
-                </Label>
-                <div className="border border-border bg-white flex items-center px-2 focus-within:border-2 focus-within:border-primary">
-                  <span className="material-symbols-outlined text-muted-foreground mr-2">lock</span>
+                {/* Phone */}
+                <div className="flex flex-col gap-1.5">
+                  <Label className="font-sans text-xs font-medium text-[#131316]" htmlFor="phone">
+                    Phone number
+                  </Label>
                   <Input
-                    {...registerLogin("password")}
-                    className="w-full py-3 bg-transparent border-none focus-visible:ring-0 focus-visible:ring-offset-0 font-mono text-sm text-foreground shadow-none"
-                    id="password"
+                    {...registerSignup("phone")}
+                    className="bg-white font-mono text-sm text-[#131316] shadow-none h-10 placeholder:text-[#d9d9de]"
+                    style={{ border: "1px solid #d9d9de", borderRadius: "6px" }}
+                    id="phone"
+                    placeholder="9876543210"
+                    type="tel"
+                    disabled={loading}
+                  />
+                  {signupErrors.phone && (
+                    <span className="font-sans text-[11px] text-destructive">{signupErrors.phone.message}</span>
+                  )}
+                </div>
+
+                {/* Password */}
+                <div className="flex flex-col gap-1.5">
+                  <Label className="font-sans text-xs font-medium text-[#131316]" htmlFor="password-reg">
+                    Password
+                  </Label>
+                  <Input
+                    {...registerSignup("password")}
+                    className="bg-white font-sans text-sm text-[#131316] shadow-none h-10 placeholder:text-[#d9d9de]"
+                    style={{ border: "1px solid #d9d9de", borderRadius: "6px" }}
+                    id="password-reg"
                     placeholder="••••••••"
                     type="password"
                     disabled={loading}
                   />
+                  {signupErrors.password && (
+                    <span className="font-sans text-[11px] text-destructive">{signupErrors.password.message}</span>
+                  )}
                 </div>
-                {loginErrors.password && (
-                  <span className="font-mono text-[10px] text-destructive uppercase mt-1">
-                    {loginErrors.password.message}
-                  </span>
-                )}
-              </div>
 
-              {/* Submit */}
-              <button
-                className="mt-4 bg-primary text-primary-foreground font-mono text-xs uppercase tracking-widest py-3 flex items-center justify-center gap-1 hover:bg-primary-container active:scale-[0.98] transition-all disabled:opacity-50 disabled:pointer-events-none"
-                type="submit"
-                disabled={loading}
-              >
-                {loading ? "LOGGING IN..." : "Log in"}
-                <span className="material-symbols-outlined !text-[14px]">login</span>
-              </button>
-            </form>
-          ) : (
-            <form onSubmit={handleSignupSubmit(onRegister)} className="flex flex-col gap-4">
-              {/* Full Name */}
-              <div className="flex flex-col gap-1">
-                <Label className="font-mono text-[11px] font-semibold text-muted-foreground uppercase tracking-wider" htmlFor="name">
-                  Full Name
-                </Label>
-                <Input
-                  {...registerSignup("name")}
-                  className="w-full hairline-border bg-white p-3 font-mono text-sm focus:border-2 focus:border-primary focus:outline-none transition-all placeholder:text-outline-variant rounded-none border border-border shadow-none"
-                  id="name"
-                  placeholder="e.g. ALAN TURING"
-                  type="text"
+                {/* Submit */}
+                <motion.button
+                  whileTap={{ scale: 0.98 }}
+                  className="mt-1 w-full bg-primary text-primary-foreground font-sans text-sm font-medium py-2.5 px-4 flex items-center justify-center gap-2 hover:bg-primary-container transition-colors disabled:opacity-50 disabled:pointer-events-none"
+                  style={{ borderRadius: "6px" }}
+                  type="submit"
                   disabled={loading}
-                />
-                {signupErrors.name && (
-                  <span className="font-mono text-[10px] text-destructive uppercase mt-1">
-                    {signupErrors.name.message}
-                  </span>
-                )}
-              </div>
-
-              {/* Registration Number */}
-              <div className="flex flex-col gap-1">
-                <Label className="font-mono text-[11px] font-semibold text-muted-foreground uppercase tracking-wider" htmlFor="rollNumber">
-                  Registration Number
-                </Label>
-                <Input
-                  {...registerSignup("rollNumber")}
-                  className="w-full hairline-border bg-white p-3 font-mono text-sm focus:border-2 focus:border-primary focus:outline-none transition-all placeholder:text-outline-variant rounded-none border border-border shadow-none"
-                  id="rollNumber"
-                  placeholder="e.g. UR23AI001"
-                  type="text"
-                  disabled={loading}
-                />
-                {signupErrors.rollNumber && (
-                  <span className="font-mono text-[10px] text-destructive uppercase mt-1">
-                    {signupErrors.rollNumber.message}
-                  </span>
-                )}
-              </div>
-
-              {/* Email */}
-              <div className="flex flex-col gap-1">
-                <Label className="font-mono text-[11px] font-semibold text-muted-foreground uppercase tracking-wider" htmlFor="email-reg">
-                  College Email
-                </Label>
-                <Input
-                  {...registerSignup("email")}
-                  className="w-full hairline-border bg-white p-3 font-mono text-sm focus:border-2 focus:border-primary focus:outline-none transition-all placeholder:text-outline-variant rounded-none border border-border shadow-none"
-                  id="email-reg"
-                  placeholder="student@karunya.edu.in"
-                  type="email"
-                  disabled={loading}
-                />
-                {signupErrors.email && (
-                  <span className="font-mono text-[10px] text-destructive uppercase mt-1">
-                    {signupErrors.email.message}
-                  </span>
-                )}
-              </div>
-
-              {/* Phone */}
-              <div className="flex flex-col gap-1">
-                <Label className="font-mono text-[11px] font-semibold text-muted-foreground uppercase tracking-wider" htmlFor="phone">
-                  Phone Number
-                </Label>
-                <Input
-                  {...registerSignup("phone")}
-                  className="w-full hairline-border bg-white p-3 font-mono text-sm focus:border-2 focus:border-primary focus:outline-none transition-all placeholder:text-outline-variant rounded-none border border-border shadow-none"
-                  id="phone"
-                  placeholder="9876543210"
-                  type="tel"
-                  disabled={loading}
-                />
-                {signupErrors.phone && (
-                  <span className="font-mono text-[10px] text-destructive uppercase mt-1">
-                    {signupErrors.phone.message}
-                  </span>
-                )}
-              </div>
-
-              {/* Password */}
-              <div className="flex flex-col gap-1">
-                <Label className="font-mono text-[11px] font-semibold text-muted-foreground uppercase tracking-wider" htmlFor="password-reg">
-                  Secure Password
-                </Label>
-                <Input
-                  {...registerSignup("password")}
-                  className="w-full hairline-border bg-white p-3 font-mono text-sm focus:border-2 focus:border-primary focus:outline-none transition-all placeholder:text-outline-variant rounded-none border border-border shadow-none"
-                  id="password-reg"
-                  placeholder="••••••••"
-                  type="password"
-                  disabled={loading}
-                />
-                {signupErrors.password && (
-                  <span className="font-mono text-[10px] text-destructive uppercase mt-1">
-                    {signupErrors.password.message}
-                  </span>
-                )}
-              </div>
-
-              {/* Submit */}
-              <button
-                className="mt-4 bg-primary text-primary-foreground font-mono text-xs uppercase tracking-widest py-3 flex items-center justify-center gap-1 hover:bg-primary-container active:scale-[0.98] transition-all disabled:opacity-50 disabled:pointer-events-none"
-                type="submit"
-                disabled={loading}
-              >
-                {loading ? "CREATING..." : "Create Account"}
-                <span className="material-symbols-outlined !text-[14px]">person_add</span>
-              </button>
-            </form>
-          )}
+                >
+                  {loading ? (
+                    "Creating account…"
+                  ) : (
+                    <>
+                      <span>Create account</span>
+                      <UserPlus size={14} />
+                    </>
+                  )}
+                </motion.button>
+              </motion.form>
+            )}
+          </AnimatePresence>
 
           {/* Toggle mode */}
-          <div className="text-center font-mono text-xs mt-2 border-t border-outline-variant pt-4 flex flex-col items-center gap-2">
+          <div className="border-t border-[#eeeef0] pt-4 text-center">
             {mode === "login" ? (
-              <div className="flex items-center gap-1">
-                <span className="text-muted-foreground">Don't have an account?</span>
+              <p className="font-sans text-xs text-[#5e5f6e]">
+                Don&apos;t have an account?{" "}
                 <button
-                  onClick={() => setMode("register")}
-                  className="text-primary font-bold hover:underline uppercase tracking-wider"
+                  onClick={() => { setMode("register"); setError(null); }}
+                  className="text-primary font-medium hover:underline"
                   disabled={loading}
                 >
                   Register
                 </button>
-              </div>
+              </p>
             ) : (
-              <div className="flex items-center gap-1">
-                <span className="text-muted-foreground">Already have an account?</span>
+              <p className="font-sans text-xs text-[#5e5f6e]">
+                Already have an account?{" "}
                 <button
-                  onClick={() => setMode("login")}
-                  className="text-primary font-bold hover:underline uppercase tracking-wider"
+                  onClick={() => { setMode("login"); setError(null); }}
+                  className="text-primary font-medium hover:underline"
                   disabled={loading}
                 >
-                  Log in
+                  Sign in
                 </button>
-              </div>
+              </p>
             )}
           </div>
-        </Card>
+        </div>
 
-        {/* Footer */}
-        <footer className="mt-8 text-center w-full">
-          <div className="flex justify-between items-center opacity-40 border-t border-outline-variant pt-4 px-1">
-            <span className="font-mono text-[10px] uppercase">v2.0.24-stable</span>
-            <span className="font-mono text-[10px] uppercase">Secure Protocol</span>
-          </div>
-        </footer>
-      </div>
+        {/* Back link */}
+        <Link href="/" className="flex items-center gap-1.5 font-sans text-xs text-[#747686] hover:text-foreground transition-colors">
+          <ArrowLeft size={12} />
+          Back to home
+        </Link>
+      </motion.div>
     </div>
   );
 }
@@ -392,11 +439,13 @@ import { Suspense } from "react";
 
 export default function LoginPage() {
   return (
-    <Suspense fallback={
-      <div className="flex items-center justify-center min-h-screen font-mono text-xs uppercase bg-background text-muted-foreground">
-        Loading Authentication Protocol...
-      </div>
-    }>
+    <Suspense
+      fallback={
+        <div className="flex items-center justify-center min-h-screen font-sans text-sm bg-[#f7f7f8] text-[#5e5f6e]">
+          Loading…
+        </div>
+      }
+    >
       <LoginContent />
     </Suspense>
   );

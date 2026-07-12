@@ -6,6 +6,7 @@ import { archiveEventAction } from "@/actions/event";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription } from "@/components/ui/alert";
+import { Search, AlertCircle, Pencil, Archive } from "lucide-react";
 
 interface Session {
   id: string;
@@ -85,7 +86,9 @@ export default function EventsTable({ initialEvents, role }: EventsTableProps) {
       {/* Controls / Filter Header */}
       <div className="flex flex-col md:flex-row md:items-end justify-between gap-4 border-b border-border pb-4 bg-background">
         <div className="relative w-full max-w-md">
-          <span className="absolute left-3 top-1/2 -translate-y-1/2 material-symbols-outlined text-muted-foreground text-base">search</span>
+          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+            <Search size={14} />
+          </span>
           <Input
             className="w-full bg-surface-container-low border border-border pl-10 pr-4 py-2 font-mono text-xs rounded-none shadow-none h-9"
             placeholder="Search events by title or category..."
@@ -123,7 +126,7 @@ export default function EventsTable({ initialEvents, role }: EventsTableProps) {
 
       {error && (
         <Alert variant="destructive" className="rounded-none border-destructive bg-destructive/5 text-destructive font-mono text-xs uppercase">
-          <span className="material-symbols-outlined text-[16px] mr-2">error</span>
+          <AlertCircle size={14} className="mr-2 shrink-0" />
           <AlertDescription>{error}</AlertDescription>
         </Alert>
       )}
@@ -192,7 +195,7 @@ export default function EventsTable({ initialEvents, role }: EventsTableProps) {
                       className="p-1 hover:text-primary transition-colors flex items-center"
                       title="Manage Details"
                     >
-                      <span className="material-symbols-outlined text-[16px]">edit</span>
+                      <Pencil size={14} />
                     </Link>
 
                     {event.status !== "ARCHIVED" && (
@@ -202,7 +205,7 @@ export default function EventsTable({ initialEvents, role }: EventsTableProps) {
                         className="p-1 text-destructive hover:text-red-700 transition-colors flex items-center disabled:opacity-50"
                         title="Archive Event"
                       >
-                        <span className="material-symbols-outlined text-[16px]">archive</span>
+                        <Archive size={14} />
                       </button>
                     )}
                   </div>

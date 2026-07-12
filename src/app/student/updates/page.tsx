@@ -3,6 +3,7 @@ import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { auth } from "@/lib/auth";
+import { User } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -98,7 +99,7 @@ export default async function StudentUpdatesPage() {
                   </p>
 
                   <div className="flex items-center gap-2 font-mono text-[10px] text-muted-foreground pt-1 border-t border-dashed border-border/60">
-                    <span className="material-symbols-outlined text-[12px]">person</span>
+                    <User size={11} />
                     <span>AUTHOR: {update.author.name} ({update.author.role})</span>
                   </div>
                 </div>

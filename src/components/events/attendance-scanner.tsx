@@ -6,6 +6,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { CheckCircle2, AlertCircle, TriangleAlert } from "lucide-react";
 
 interface ActiveSession {
   id: string;
@@ -181,7 +182,7 @@ export default function AttendanceScanner({ sessions }: AttendanceScannerProps) 
           <div className="space-y-3">
             {scanResult.type === "SUCCESS" && (
               <Alert className="rounded-none border-tertiary bg-tertiary/5 text-tertiary font-mono text-xs uppercase">
-                <span className="material-symbols-outlined text-[16px] mr-2">check_circle</span>
+                <CheckCircle2 size={14} className="mr-2 shrink-0" />
                 <div>
                   <AlertTitle className="font-bold tracking-wide">CHECK-IN CONFIRMED</AlertTitle>
                   <AlertDescription className="mt-1">{scanResult.message}</AlertDescription>
@@ -191,7 +192,7 @@ export default function AttendanceScanner({ sessions }: AttendanceScannerProps) 
 
             {scanResult.type === "ERROR" && (
               <Alert variant="destructive" className="rounded-none border-destructive bg-destructive/5 text-destructive font-mono text-xs uppercase">
-                <span className="material-symbols-outlined text-[16px] mr-2">error</span>
+                <AlertCircle size={14} className="mr-2 shrink-0" />
                 <div>
                   <AlertTitle className="font-bold tracking-wide">ACCESS DENIED</AlertTitle>
                   <AlertDescription className="mt-1">{scanResult.message}</AlertDescription>
@@ -201,7 +202,7 @@ export default function AttendanceScanner({ sessions }: AttendanceScannerProps) 
 
             {scanResult.type === "WARNING" && (
               <Alert className="rounded-none border-primary bg-primary/5 text-primary font-mono text-xs uppercase">
-                <span className="material-symbols-outlined text-[16px] mr-2">warning</span>
+                <TriangleAlert size={14} className="mr-2 shrink-0" />
                 <div>
                   <AlertTitle className="font-bold tracking-wide">WAITLISTED WARNING</AlertTitle>
                   <AlertDescription className="mt-1">{scanResult.message}</AlertDescription>

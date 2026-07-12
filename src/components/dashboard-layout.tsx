@@ -3,14 +3,30 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
+import { motion, AnimatePresence } from "framer-motion";
 import { signOut } from "@/lib/auth-client";
 import { getUnreadNotificationCountAction } from "@/actions/notification";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import {
+  BarChart2,
+  CalendarDays,
+  Users,
+  BellRing,
+  FileText,
+  Home,
+  CalendarCheck,
+  ScanLine,
+  PenLine,
+  LogOut,
+  Menu,
+  X,
+  Bell,
+} from "lucide-react";
 
 interface NavItem {
   label: string;
   href: string;
-  icon: string;
+  icon: React.ElementType;
 }
 
 interface DashboardLayoutProps {
@@ -28,7 +44,6 @@ export default function DashboardLayout({ user, children }: DashboardLayoutProps
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const [unreadCount, setUnreadCount] = useState(0);
 
-  // Poll for live unread count
   React.useEffect(() => {
     const fetchUnread = async () => {
       try {
@@ -38,45 +53,50 @@ export default function DashboardLayout({ user, children }: DashboardLayoutProps
         console.error("Failed to fetch unread count", e);
       }
     };
-    
     fetchUnread();
-    
-    // Poll every 30 seconds
     const interval = setInterval(fetchUnread, 30000);
     return () => clearInterval(interval);
-  }, [pathname]); // Also re-fetch on route change
+  }, [pathname]);
 
   const getNavItems = (): NavItem[] => {
     switch (user.role) {
       case "ADMIN":
         return [
-          { label: "Overview", href: "/admin", icon: "monitoring" },
-          { label: "All Events", href: "/admin/events", icon: "calendar_month" },
-          { label: "Manage Users", href: "/admin/users", icon: "group" },
-          { label: "Updates", href: "/admin/updates", icon: "notifications_active" },
-          { label: "Reports", href: "/admin/reports", icon: "summarize" },
+          { label: "Overview", href: "/admin", icon: BarChart2 },
+          { label: "All Events", href: "/admin/events", icon: CalendarDays },
+          { label: "Users", href: "/admin/users", icon: Users },
+          { label: "Updates", href: "/admin/updates", icon: BellRing },
+          { label: "Reports", href: "/admin/reports", icon: FileText },
         ];
       case "VOLUNTEER":
         return [
-          { label: "Overview", href: "/volunteer", icon: "home" },
-          { label: "Manage Events", href: "/volunteer/events", icon: "event_note" },
-          { label: "Scanner", href: "/volunteer/scan", icon: "qr_code_scanner" },
-          { label: "Manual Entry", href: "/volunteer/manual", icon: "edit_calendar" },
-          { label: "Updates Feed", href: "/volunteer/updates", icon: "notifications_active" },
+          { label: "Overview", href: "/volunteer", icon: Home },
+          { label: "Events", href: "/volunteer/events", icon: CalendarCheck },
+          { label: "QR Scanner", href: "/volunteer/scan", icon: ScanLine },
+          { label: "Manual Entry", href: "/volunteer/manual", icon: PenLine },
+          { label: "Updates", href: "/volunteer/updates", icon: BellRing },
         ];
       case "STUDENT":
       default:
         return [
-          { label: "Home", href: "/student", icon: "home" },
-          { label: "Browse Events", href: "/student/events", icon: "calendar_month" },
-          { label: "Registrations", href: "/student/registrations", icon: "event_available" },
-          { label: "Attendance", href: "/student/attendance", icon: "fact_check" },
-          { label: "Updates", href: "/student/updates", icon: "notifications_active" },
+          { label: "Home", href: "/student", icon: Home },
+          { label: "Events", href: "/student/events", icon: CalendarDays },
+          { label: "Registrations", href: "/student/registrations", icon: CalendarCheck },
+          { label: "Updates", href: "/student/updates", icon: BellRing },
         ];
     }
   };
 
   const navItems = getNavItems();
+
+  const roleLabel = user.role === "ADMIN" ? "Admin" : user.role === "VOLUNTEER" ? "Volunteer" : "Student";
+
+  const notificationsHref =
+    user.role === "ADMIN"
+      ? "/admin/notifications"
+      : user.role === "VOLUNTEER"
+      ? "/volunteer/notifications"
+      : "/student/notifications";
 
   const handleSignOut = async () => {
     await signOut({
@@ -91,193 +111,224 @@ export default function DashboardLayout({ user, children }: DashboardLayoutProps
 
   return (
     <div className="bg-background text-foreground font-sans min-h-screen flex overflow-hidden">
-      {/* Sidebar Nav (Desktop) */}
-      <nav className="hidden md:flex flex-col h-full py-6 px-4 bg-surface-container-low border-r border-border w-64 fixed left-0 top-0 z-40">
-        <div className="mb-8 px-2">
-          <span className="font-heading text-lg font-bold text-foreground tracking-tighter uppercase">
-            Matrix System
+      {/* Sidebar (Desktop) */}
+      <nav className="hidden md:flex flex-col h-full py-5 px-3 bg-surface-container-low border-r border-border w-60 fixed left-0 top-0 z-40">
+        {/* Brand */}
+        <div className="mb-7 px-3 pb-5 border-b border-border">
+          <span className="font-heading text-base font-bold text-foreground tracking-tighter uppercase">
+            Matrix
           </span>
-          <p className="font-mono text-[10px] text-muted-foreground uppercase tracking-widest mt-1">
-            {user.role} Panel
+          <p className="font-mono text-[9px] text-muted-foreground uppercase tracking-widest mt-0.5">
+            {roleLabel}
           </p>
         </div>
 
-        <div className="flex-1 space-y-1">
+        {/* Nav items */}
+        <div className="flex-1 space-y-0.5">
           {navItems.map((item) => {
-            const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
-            const isUpdatesTab = item.label.includes("Updates");
+            const Icon = item.icon;
+            const isActive = pathname === item.href || (item.href !== "/admin" && item.href !== "/volunteer" && item.href !== "/student" && pathname.startsWith(item.href + "/"));
+            const isRoot = ["/admin", "/volunteer", "/student"].includes(item.href);
+            const isActiveRoot = isRoot && pathname === item.href;
+            const active = isActiveRoot || (!isRoot && isActive);
+            const isUpdatesTab = item.label === "Updates";
 
             return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={`flex items-center justify-between px-4 py-2 font-mono text-xs uppercase tracking-widest transition-all duration-150 rounded-none border-r-2 ${
-                  isActive
-                    ? "bg-primary text-primary-foreground border-primary"
-                    : "text-muted-foreground hover:bg-surface-container-high border-transparent"
-                }`}
-              >
-                <div className="flex items-center">
-                  <span className="material-symbols-outlined mr-3 text-[18px]">{item.icon}</span>
-                  {item.label}
-                </div>
-                {isUpdatesTab && unreadCount > 0 && (
-                  <span className="bg-primary text-primary-foreground text-[10px] px-1.5 py-0.5 rounded-sm">
-                    {unreadCount > 99 ? "99+" : unreadCount}
-                  </span>
-                )}
-              </Link>
+              <motion.div key={item.href} whileHover={{ x: 2 }} transition={{ duration: 0.12 }}>
+                <Link
+                  href={item.href}
+                  className={`flex items-center justify-between px-3 py-2 font-mono text-[11px] uppercase tracking-widest transition-colors rounded-sm ${
+                    active
+                      ? "bg-primary text-primary-foreground"
+                      : "text-muted-foreground hover:bg-surface-container-high hover:text-foreground"
+                  }`}
+                >
+                  <div className="flex items-center gap-2.5">
+                    <Icon size={14} />
+                    {item.label}
+                  </div>
+                  {isUpdatesTab && unreadCount > 0 && (
+                    <motion.span
+                      initial={{ scale: 0 }}
+                      animate={{ scale: 1 }}
+                      className="bg-primary text-primary-foreground text-[9px] px-1.5 py-0.5 rounded-sm min-w-[18px] text-center"
+                      style={active ? { backgroundColor: "rgba(255,255,255,0.25)" } : {}}
+                    >
+                      {unreadCount > 99 ? "99+" : unreadCount}
+                    </motion.span>
+                  )}
+                </Link>
+              </motion.div>
             );
           })}
         </div>
 
-        <div className="mt-auto pt-6 border-t border-border space-y-1">
+        {/* Sign out */}
+        <div className="mt-auto pt-4 border-t border-border">
           <button
             onClick={handleSignOut}
-            className="w-full text-left flex items-center px-4 py-2 text-muted-foreground hover:bg-surface-container-high font-mono text-xs uppercase tracking-widest transition-all duration-150 rounded-none"
+            className="w-full text-left flex items-center gap-2.5 px-3 py-2 text-muted-foreground hover:bg-surface-container-high hover:text-foreground font-mono text-[11px] uppercase tracking-widest transition-colors rounded-sm"
           >
-            <span className="material-symbols-outlined mr-3 text-[18px]">logout</span>
-            Logout
+            <LogOut size={14} />
+            Sign out
           </button>
         </div>
       </nav>
 
-      {/* Main Content Area */}
-      <div className="flex-1 flex flex-col md:ml-64 h-screen overflow-hidden">
-        {/* Top App Bar */}
-        <header className="flex justify-between items-center px-6 w-full z-30 bg-background border-b border-border h-16 sticky top-0">
+      {/* Main */}
+      <div className="flex-1 flex flex-col md:ml-60 h-screen overflow-hidden">
+        {/* Top bar */}
+        <header className="flex justify-between items-center px-5 w-full z-30 bg-background border-b border-border h-14 sticky top-0">
           <div className="flex items-center gap-3">
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-              className="md:hidden p-1 text-primary hover:bg-surface-container"
+              className="md:hidden p-1.5 text-muted-foreground hover:text-foreground hover:bg-surface-container rounded-sm transition-colors"
+              aria-label="Open menu"
             >
-              <span className="material-symbols-outlined">menu</span>
+              <Menu size={18} />
             </button>
-            <h1 className="font-heading text-xl font-bold uppercase tracking-tighter text-primary">
-              Hi, {user.name.split(" ")[0]}
+            <h1 className="font-heading text-base font-bold uppercase tracking-tighter text-foreground">
+              {user.name.split(" ")[0]}
             </h1>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1">
             <Link
-              href={user.role === "ADMIN" ? "/admin/notifications" : user.role === "VOLUNTEER" ? "/volunteer/notifications" : "/student/notifications"}
-              className="p-2 text-muted-foreground hover:bg-surface-container transition-colors flex items-center relative"
+              href={notificationsHref}
+              className="p-2 text-muted-foreground hover:text-foreground hover:bg-surface-container transition-colors flex items-center relative rounded-sm"
+              aria-label="Notifications"
             >
-              <span className="material-symbols-outlined">notifications</span>
+              <Bell size={17} />
               {unreadCount > 0 && (
-                <span className="absolute top-1.5 right-1.5 w-2 h-2 bg-primary rounded-full animate-pulse"></span>
+                <motion.span
+                  initial={{ scale: 0 }}
+                  animate={{ scale: 1 }}
+                  className="absolute top-1.5 right-1.5 w-1.5 h-1.5 bg-primary rounded-full"
+                />
               )}
             </Link>
-            
-            <div className="w-8 h-8 ml-2 border border-border bg-surface-container-high overflow-hidden rounded-none">
-              <Avatar className="w-full h-full rounded-none">
+
+            <div className="w-7 h-7 ml-1 border border-border bg-surface-container-high overflow-hidden rounded-sm">
+              <Avatar className="w-full h-full rounded-sm">
                 <AvatarImage
                   src={`https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(user.name)}&backgroundColor=c0573e,8a726c`}
-                  className="w-full h-full object-cover grayscale opacity-80"
+                  className="w-full h-full object-cover"
                 />
-                <AvatarFallback className="rounded-none">{user.name.slice(0, 2).toUpperCase()}</AvatarFallback>
+                <AvatarFallback className="rounded-sm text-[10px]">
+                  {user.name.slice(0, 2).toUpperCase()}
+                </AvatarFallback>
               </Avatar>
             </div>
           </div>
         </header>
 
-        {/* Mobile Navigation Drawer Overlay */}
-        {mobileMenuOpen && (
-          <div
-            className="fixed inset-0 bg-black/40 z-40 md:hidden"
-            onClick={() => setMobileMenuOpen(false)}
-          >
-            <div
-              className="w-64 h-full bg-surface-container-low py-6 px-4 flex flex-col border-r border-border"
-              onClick={(e) => e.stopPropagation()}
-            >
-              <div className="mb-8 px-2 flex justify-between items-center">
-                <div>
-                  <span className="font-heading text-lg font-bold text-foreground tracking-tighter uppercase">
-                    Matrix System
-                  </span>
-                  <p className="font-mono text-[10px] text-muted-foreground uppercase tracking-widest mt-1">
-                    {user.role} Panel
-                  </p>
+        {/* Mobile Navigation Drawer */}
+        <AnimatePresence>
+          {mobileMenuOpen && (
+            <>
+              <motion.div
+                key="overlay"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="fixed inset-0 bg-black/40 z-40 md:hidden"
+                onClick={() => setMobileMenuOpen(false)}
+              />
+              <motion.div
+                key="drawer"
+                initial={{ x: "-100%" }}
+                animate={{ x: 0 }}
+                exit={{ x: "-100%" }}
+                transition={{ type: "spring", damping: 30, stiffness: 300 }}
+                className="fixed left-0 top-0 w-60 h-full bg-surface-container-low py-5 px-3 flex flex-col border-r border-border z-50 md:hidden"
+                onClick={(e) => e.stopPropagation()}
+              >
+                <div className="mb-5 px-3 pb-5 border-b border-border flex justify-between items-center">
+                  <div>
+                    <span className="font-heading text-base font-bold text-foreground tracking-tighter uppercase">Matrix</span>
+                    <p className="font-mono text-[9px] text-muted-foreground uppercase tracking-widest mt-0.5">{roleLabel}</p>
+                  </div>
+                  <button onClick={() => setMobileMenuOpen(false)} className="text-muted-foreground hover:text-foreground p-1">
+                    <X size={16} />
+                  </button>
                 </div>
-                <button onClick={() => setMobileMenuOpen(false)} className="text-primary">
-                  <span className="material-symbols-outlined">close</span>
-                </button>
-              </div>
 
-              <div className="flex-1 space-y-1">
-                {navItems.map((item) => {
-                  const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
-                  const isUpdatesTab = item.label.includes("Updates");
+                <div className="flex-1 space-y-0.5">
+                  {navItems.map((item) => {
+                    const Icon = item.icon;
+                    const isRoot = ["/admin", "/volunteer", "/student"].includes(item.href);
+                    const active = isRoot ? pathname === item.href : pathname === item.href || pathname.startsWith(item.href + "/");
+                    const isUpdatesTab = item.label === "Updates";
 
-                  return (
-                    <Link
-                      key={item.href}
-                      href={item.href}
-                      onClick={() => setMobileMenuOpen(false)}
-                      className={`flex items-center justify-between px-4 py-2 font-mono text-xs uppercase tracking-widest transition-all duration-150 rounded-none border-r-2 ${
-                        isActive
-                          ? "bg-primary text-on-primary border-primary"
-                          : "text-muted-foreground hover:bg-surface-container-high border-transparent"
-                      }`}
-                    >
-                      <div className="flex items-center">
-                        <span className="material-symbols-outlined mr-3 text-[18px]">{item.icon}</span>
-                        {item.label}
-                      </div>
-                      {isUpdatesTab && unreadCount > 0 && (
-                        <span className="bg-primary text-primary-foreground text-[10px] px-1.5 py-0.5 rounded-sm">
-                          {unreadCount > 99 ? "99+" : unreadCount}
-                        </span>
-                      )}
-                    </Link>
-                  );
-                })}
-              </div>
+                    return (
+                      <Link
+                        key={item.href}
+                        href={item.href}
+                        onClick={() => setMobileMenuOpen(false)}
+                        className={`flex items-center justify-between px-3 py-2 font-mono text-[11px] uppercase tracking-widest transition-colors rounded-sm ${
+                          active
+                            ? "bg-primary text-primary-foreground"
+                            : "text-muted-foreground hover:bg-surface-container-high hover:text-foreground"
+                        }`}
+                      >
+                        <div className="flex items-center gap-2.5">
+                          <Icon size={14} />
+                          {item.label}
+                        </div>
+                        {isUpdatesTab && unreadCount > 0 && (
+                          <span className="bg-primary text-primary-foreground text-[9px] px-1.5 py-0.5 rounded-sm">
+                            {unreadCount > 99 ? "99+" : unreadCount}
+                          </span>
+                        )}
+                      </Link>
+                    );
+                  })}
+                </div>
 
-              <div className="mt-auto pt-6 border-t border-border space-y-1">
-                <button
-                  onClick={handleSignOut}
-                  className="w-full text-left flex items-center px-4 py-2 text-muted-foreground hover:bg-surface-container-high font-mono text-xs uppercase tracking-widest transition-all duration-150 rounded-none"
-                >
-                  <span className="material-symbols-outlined mr-3 text-[18px]">logout</span>
-                  Logout
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
+                <div className="mt-auto pt-4 border-t border-border">
+                  <button
+                    onClick={handleSignOut}
+                    className="w-full text-left flex items-center gap-2.5 px-3 py-2 text-muted-foreground hover:bg-surface-container-high hover:text-foreground font-mono text-[11px] uppercase tracking-widest transition-colors rounded-sm"
+                  >
+                    <LogOut size={14} />
+                    Sign out
+                  </button>
+                </div>
+              </motion.div>
+            </>
+          )}
+        </AnimatePresence>
 
-        {/* Content Canvas */}
+        {/* Content */}
         <div className="flex-1 overflow-y-auto p-4 md:p-6 pb-24 md:pb-6 bg-background">
           {children}
         </div>
 
-        {/* Bottom Navigation (Mobile) */}
-        <nav className="fixed bottom-0 left-0 right-0 z-30 md:hidden flex justify-around items-center h-16 bg-background border-t border-border px-4 pb-safe">
+        {/* Bottom Nav (Mobile) */}
+        <nav className="fixed bottom-0 left-0 right-0 z-30 md:hidden flex justify-around items-center h-14 bg-background border-t border-border px-4">
           {navItems.slice(0, 3).map((item) => {
-            const isActive = pathname === item.href || pathname.startsWith(item.href + "/");
+            const Icon = item.icon;
+            const isRoot = ["/admin", "/volunteer", "/student"].includes(item.href);
+            const active = isRoot ? pathname === item.href : pathname === item.href || pathname.startsWith(item.href + "/");
             return (
               <Link
                 key={item.href}
                 href={item.href}
-                className={`flex flex-col items-center justify-center px-3 py-1 transition-all duration-100 rounded-none ${
-                  isActive
-                    ? "text-primary scale-105 font-bold"
-                    : "text-muted-foreground"
+                className={`flex flex-col items-center justify-center px-3 py-1 transition-colors gap-1 ${
+                  active ? "text-primary" : "text-muted-foreground"
                 }`}
               >
-                <span className="material-symbols-outlined text-[20px]">{item.icon}</span>
-                <span className="font-mono text-[9px] uppercase tracking-widest">{item.label}</span>
+                <Icon size={18} />
+                <span className="font-mono text-[8px] uppercase tracking-widest">{item.label}</span>
               </Link>
             );
           })}
           <button
             onClick={() => setMobileMenuOpen(true)}
-            className="flex flex-col items-center justify-center px-3 py-1 text-muted-foreground"
+            className="flex flex-col items-center justify-center px-3 py-1 text-muted-foreground gap-1"
           >
-            <span className="material-symbols-outlined text-[20px]">menu</span>
-            <span className="font-mono text-[9px] uppercase tracking-widest">More</span>
+            <Menu size={18} />
+            <span className="font-mono text-[8px] uppercase tracking-widest">More</span>
           </button>
         </nav>
       </div>

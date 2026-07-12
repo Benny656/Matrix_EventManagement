@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import { Input } from "@/components/ui/input";
+import { Search, CalendarDays, MapPin } from "lucide-react";
 
 interface Session {
   id: string;
@@ -44,10 +45,12 @@ export default function StudentEventList({ events }: { events: EventWithCount[] 
       {/* Search and Filters */}
       <div className="flex flex-col md:flex-row gap-4 border-b border-border pb-4 bg-background">
         <div className="relative flex-grow max-w-md">
-          <span className="absolute left-3 top-1/2 -translate-y-1/2 material-symbols-outlined text-muted-foreground text-base">search</span>
+          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+            <Search size={14} />
+          </span>
           <Input
             className="w-full bg-surface-container-low border border-border pl-10 pr-4 py-2 font-mono text-xs rounded-none shadow-none h-9"
-            placeholder="Search active deployments..."
+            placeholder="Search events by title or type…"
             value={search}
             onChange={(e) => setSearch(e.target.value)}
           />
@@ -109,12 +112,12 @@ export default function StudentEventList({ events }: { events: EventWithCount[] 
 
                   <div className="mt-6 space-y-2 font-mono text-[11px] text-muted-foreground border-t border-border pt-3">
                     <div className="flex items-center gap-2">
-                      <span className="material-symbols-outlined text-[14px]">calendar_today</span>
-                      <span>DATE: {dateStr}</span>
+                      <CalendarDays size={12} />
+                      <span>{dateStr}</span>
                     </div>
                     <div className="flex items-center gap-2">
-                      <span className="material-symbols-outlined text-[14px]">location_on</span>
-                      <span>VENUE: {event.venue}</span>
+                      <MapPin size={12} />
+                      <span>{event.venue}</span>
                     </div>
                     <div className="flex items-center justify-between mt-2 pt-2 border-t border-dashed border-border">
                       <span>CAPACITY:</span>

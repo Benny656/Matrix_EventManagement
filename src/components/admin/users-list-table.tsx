@@ -6,6 +6,7 @@ import { updateUserRoleAction } from "@/actions/user";
 import { Button, buttonVariants } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { cn } from "@/lib/utils";
+import { TriangleAlert, CheckCircle2 } from "lucide-react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -78,14 +79,14 @@ export default function UsersListTable({ initialUsers, currentUserId }: UsersLis
       {/* Alert Banners */}
       {error && (
         <div className="border border-destructive bg-destructive/10 text-destructive p-4 font-mono text-xs uppercase flex items-center gap-2">
-          <span className="material-symbols-outlined text-[16px]">warning</span>
+          <TriangleAlert size={14} className="shrink-0" />
           {error}
         </div>
       )}
 
       {success && (
         <div className="border border-primary/30 bg-primary/5 text-primary p-4 font-mono text-xs uppercase flex items-center gap-2">
-          <span className="material-symbols-outlined text-[16px]">check_circle</span>
+          <CheckCircle2 size={14} className="shrink-0" />
           {success}
         </div>
       )}

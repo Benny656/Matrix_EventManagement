@@ -1,5 +1,6 @@
 import React from "react";
 import { Button } from "@/components/ui/button";
+import { CalendarDays, MapPin, TriangleAlert, RefreshCw } from "lucide-react";
 
 export default function StudentDashboardPage() {
   return (
@@ -22,12 +23,12 @@ export default function StudentDashboardPage() {
               <h3 className="font-heading text-lg font-bold text-foreground mb-4">Neural Architecture Search Workshop</h3>
               <div className="mt-auto space-y-2 font-mono text-xs text-muted-foreground">
                 <div className="flex items-center gap-2">
-                  <span className="material-symbols-outlined text-[16px]">calendar_today</span>
-                  <span>OCT 24 / 14:00 - 17:00</span>
+                  <CalendarDays size={13} className="text-muted-foreground" />
+                  <span>OCT 24 / 14:00 – 17:00</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="material-symbols-outlined text-[16px]">location_on</span>
-                  <span>LAB 4B - Sector 7</span>
+                  <MapPin size={13} className="text-muted-foreground" />
+                  <span>Lab 4B – Sector 7</span>
                 </div>
               </div>
             </div>
@@ -48,11 +49,11 @@ export default function StudentDashboardPage() {
               <h3 className="font-heading text-lg font-bold text-foreground mb-4">Ethics in Gen AI Seminars</h3>
               <div className="mt-auto space-y-2 font-mono text-xs text-muted-foreground">
                 <div className="flex items-center gap-2">
-                  <span className="material-symbols-outlined text-[16px]">calendar_today</span>
-                  <span>NOV 02 / 09:00 - 11:30</span>
+                  <CalendarDays size={13} className="text-muted-foreground" />
+                  <span>NOV 02 / 09:00 – 11:30</span>
                 </div>
                 <div className="flex items-center gap-2">
-                  <span className="material-symbols-outlined text-[16px]">location_on</span>
+                  <MapPin size={13} className="text-muted-foreground" />
                   <span>Main Auditorium</span>
                 </div>
               </div>
@@ -77,7 +78,7 @@ export default function StudentDashboardPage() {
           {/* Update 1: High Priority */}
           <div className="col-span-1 md:col-span-8 border border-border bg-card flex flex-col">
             <div className="bg-primary-container text-on-primary-container px-4 py-2 border-b border-border flex items-center gap-2">
-              <span className="material-symbols-outlined text-[16px]">warning</span>
+              <TriangleAlert size={14} className="shrink-0" />
               <span className="font-mono text-[10px] font-semibold uppercase tracking-wider">Department-wide Notice</span>
             </div>
             <div className="p-4 flex-grow">
@@ -95,7 +96,7 @@ export default function StudentDashboardPage() {
           {/* Update 2: Event Specific */}
           <div className="col-span-1 md:col-span-4 border border-border bg-card flex flex-col">
             <div className="bg-surface-container px-4 py-2 border-b border-border flex items-center gap-2">
-              <span className="material-symbols-outlined text-[16px]">update</span>
+              <RefreshCw size={14} className="shrink-0" />
               <span className="font-mono text-[10px] font-semibold uppercase tracking-wider">Event Specific</span>
             </div>
             <div className="p-4 flex-grow">

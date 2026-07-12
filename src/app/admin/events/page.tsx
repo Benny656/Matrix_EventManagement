@@ -2,6 +2,7 @@ import React from "react";
 import Link from "next/link";
 import { getEventsAction } from "@/actions/event";
 import EventsTable from "@/components/events/events-table";
+import { Plus } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -25,7 +26,7 @@ export default async function AdminEventsPage() {
             href="/admin/events/new"
             className="bg-primary text-primary-foreground font-mono text-xs uppercase tracking-widest py-3 px-6 hover:bg-primary-container transition-all active:scale-95 flex items-center justify-center gap-1"
           >
-            <span className="material-symbols-outlined text-[16px]">add</span>
+            <Plus size={14} />
             Create Event
           </Link>
         </div>

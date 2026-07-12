@@ -4,6 +4,7 @@ import { notFound, redirect } from "next/navigation";
 import { prisma } from "@/lib/db";
 import { auth } from "@/lib/auth";
 import Link from "next/link";
+import { Download } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import AttendeeList from "@/components/events/attendee-list";
@@ -93,7 +94,7 @@ export default async function VolunteerEventDetailsPage({ params }: PageProps) {
             "font-mono text-xs uppercase tracking-wider rounded-none h-9 px-4 shadow-none hover:bg-surface-container border-border inline-flex items-center"
           )}
         >
-          <span className="material-symbols-outlined mr-2 text-[16px]">download</span>
+          <Download size={14} className="mr-2" />
           Export CSV
         </Link>
       </div>

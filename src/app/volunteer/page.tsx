@@ -3,6 +3,7 @@
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
+import { Plus, Megaphone } from "lucide-react";
 
 export default function VolunteerDashboardPage() {
   const [time, setTime] = useState("");
@@ -144,11 +145,11 @@ export default function VolunteerDashboardPage() {
             </h2>
             <div className="grid grid-cols-1 gap-2">
               <Link href="/volunteer/events/new" className="w-full bg-primary text-primary-foreground font-mono text-xs uppercase tracking-wider py-3 flex items-center justify-center gap-1 hover:bg-primary-container transition-all active:scale-98">
-                <span className="material-symbols-outlined text-[16px]">add</span>
+                <Plus size={14} />
                 Create Event
               </Link>
               <Link href="/volunteer/updates/new" className="w-full border border-border bg-background text-foreground font-mono text-xs uppercase tracking-wider py-3 flex items-center justify-center gap-1 hover:bg-surface-container transition-all active:scale-98">
-                <span className="material-symbols-outlined text-[16px]">campaign</span>
+                <Megaphone size={14} />
                 Post Update
               </Link>
             </div>
