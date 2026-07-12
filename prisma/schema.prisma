@@ -58,7 +58,6 @@ model User {
 
   // Custom Fields
   rollNumber    String?   @unique
-  phone         String?
   role          Role      @default(STUDENT)
 
   // Relations

@@ -48,7 +48,6 @@ export async function getUsersAction(search?: string, roleFilter?: string) {
       name: true,
       email: true,
       rollNumber: true,
-      phone: true,
       role: true,
       createdAt: true,
     },

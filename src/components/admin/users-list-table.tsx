@@ -19,7 +19,6 @@ interface User {
   name: string;
   email: string;
   rollNumber: string | null;
-  phone: string | null;
   role: "ADMIN" | "VOLUNTEER" | "STUDENT";
   createdAt: Date;
 }
@@ -149,7 +148,6 @@ export default function UsersListTable({ initialUsers, currentUserId }: UsersLis
                 <tr className="border-b border-border font-mono text-[10px] uppercase text-muted-foreground bg-surface-container/30">
                   <th className="py-3 px-4">User Info</th>
                   <th className="py-3 px-4">Roll Number</th>
-                  <th className="py-3 px-4">Phone</th>
                   <th className="py-3 px-4">Joined</th>
                   <th className="py-3 px-4">Current Role</th>
                   <th className="py-3 px-4 text-right">Actions</th>
@@ -176,9 +174,6 @@ export default function UsersListTable({ initialUsers, currentUserId }: UsersLis
                       </td>
                       <td className="py-3 px-4 font-mono text-xs text-muted-foreground">
                         {user.rollNumber || "N/A"}
-                      </td>
-                      <td className="py-3 px-4 font-mono text-xs text-muted-foreground">
-                        {user.phone || "N/A"}
                       </td>
                       <td className="py-3 px-4 font-mono text-xs text-muted-foreground">
                         {dateStr}

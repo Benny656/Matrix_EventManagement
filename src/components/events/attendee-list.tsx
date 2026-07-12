@@ -6,7 +6,6 @@ interface User {
   id: string;
   name: string;
   email: string;
-  phone: string | null;
   rollNumber: string | null;
 }
 
@@ -41,18 +40,16 @@ export default function AttendeeList({ registrations }: AttendeeListProps) {
         ) : (
           <div className="border border-border bg-card overflow-hidden">
             <div className="grid grid-cols-12 bg-surface-container px-4 py-2 border-b border-border font-mono text-[10px] uppercase tracking-widest font-bold text-muted-foreground">
-              <div className="col-span-4">Student Name</div>
-              <div className="col-span-3">Roll Number</div>
-              <div className="col-span-3">Phone</div>
-              <div className="col-span-2 text-right">Confirmed Date</div>
+              <div className="col-span-5">Student Name</div>
+              <div className="col-span-4">Roll Number</div>
+              <div className="col-span-3 text-right">Confirmed Date</div>
             </div>
             <div className="divide-y divide-border font-mono text-xs">
               {confirmed.map((reg) => (
                 <div key={reg.id} className="grid grid-cols-12 px-4 py-3 items-center hover:bg-surface-container-low/50">
-                  <div className="col-span-4 pr-2 font-sans font-semibold text-foreground">{reg.student.name}</div>
-                  <div className="col-span-3 text-muted-foreground">{reg.student.rollNumber || "N/A"}</div>
-                  <div className="col-span-3 text-muted-foreground">{reg.student.phone || "N/A"}</div>
-                  <div className="col-span-2 text-right text-muted-foreground">
+                  <div className="col-span-5 pr-2 font-sans font-semibold text-foreground">{reg.student.name}</div>
+                  <div className="col-span-4 text-muted-foreground">{reg.student.rollNumber || "N/A"}</div>
+                  <div className="col-span-3 text-right text-muted-foreground">
                     {new Date(reg.createdAt).toLocaleDateString()}
                   </div>
                 </div>
@@ -77,18 +74,16 @@ export default function AttendeeList({ registrations }: AttendeeListProps) {
           <div className="border border-border bg-card overflow-hidden">
             <div className="grid grid-cols-12 bg-surface-container px-4 py-2 border-b border-border font-mono text-[10px] uppercase tracking-widest font-bold text-muted-foreground">
               <div className="col-span-1">Pos</div>
-              <div className="col-span-4">Student Name</div>
-              <div className="col-span-3">Roll Number</div>
-              <div className="col-span-2">Phone</div>
+              <div className="col-span-5">Student Name</div>
+              <div className="col-span-4">Roll Number</div>
               <div className="col-span-2 text-right">Requested Date</div>
             </div>
             <div className="divide-y divide-border font-mono text-xs">
               {waitlisted.map((reg, idx) => (
                 <div key={reg.id} className="grid grid-cols-12 px-4 py-3 items-center hover:bg-surface-container-low/50">
                   <div className="col-span-1 font-bold text-primary">#{idx + 1}</div>
-                  <div className="col-span-4 pr-2 font-sans font-semibold text-foreground">{reg.student.name}</div>
-                  <div className="col-span-3 text-muted-foreground">{reg.student.rollNumber || "N/A"}</div>
-                  <div className="col-span-2 text-muted-foreground">{reg.student.phone || "N/A"}</div>
+                  <div className="col-span-5 pr-2 font-sans font-semibold text-foreground">{reg.student.name}</div>
+                  <div className="col-span-4 text-muted-foreground">{reg.student.rollNumber || "N/A"}</div>
                   <div className="col-span-2 text-right text-muted-foreground">
                     {new Date(reg.createdAt).toLocaleDateString()}
                   </div>

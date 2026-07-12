@@ -85,7 +85,6 @@ export async function GET(req: NextRequest) {
         "Student Name",
         "Roll Number",
         "Email",
-        "Phone",
         "Registration Status",
         "Registration Date",
         "Attended Sessions",
@@ -99,7 +98,6 @@ export async function GET(req: NextRequest) {
           reg.student.name,
           reg.student.rollNumber || "N/A",
           reg.student.email,
-          reg.student.phone || "N/A",
           reg.status,
           reg.createdAt.toISOString(),
           studentSessions.join("; "),
@@ -193,7 +191,6 @@ export async function GET(req: NextRequest) {
       const headersList = [
         "Volunteer Name",
         "Email",
-        "Phone",
         "Account Created At",
         "Total Check-ins Validated",
       ];
@@ -203,7 +200,6 @@ export async function GET(req: NextRequest) {
         const row = [
           v.name,
           v.email,
-          v.phone || "N/A",
           v.createdAt.toISOString(),
           v.markedAttendances.length,
         ];
@@ -228,7 +224,6 @@ export async function GET(req: NextRequest) {
         "Student Name",
         "Roll Number",
         "Email",
-        "Phone",
         "Event Title",
         "Event Category",
         "Event Date",
@@ -242,7 +237,6 @@ export async function GET(req: NextRequest) {
           reg.student.name,
           reg.student.rollNumber || "N/A",
           reg.student.email,
-          reg.student.phone || "N/A",
           reg.event.title,
           reg.event.category,
           reg.event.date.toISOString(),

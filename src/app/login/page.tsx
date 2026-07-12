@@ -20,7 +20,6 @@ const loginSchema = z.object({
 const registerSchema = z.object({
   name: z.string().min(2, "Enter your full name"),
   email: z.string().email("Enter a valid email address"),
-  phone: z.string().min(10, "Enter a valid phone number"),
   rollNumber: z.string().min(5, "Enter your registration number"),
   password: z.string().min(6, "Password must be at least 6 characters"),
 });
@@ -31,7 +30,7 @@ type RegisterFormValues = z.infer<typeof registerSchema>;
 function LoginContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { data: session, isPending: sessionLoading } = useSession();
+  const { data: session, isPending: sessionLoading, isRefetching } = useSession();
   const [mode, setMode] = useState<"login" | "register">("login");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
@@ -106,7 +105,6 @@ function LoginContent() {
           email: data.email,
           password: data.password,
           name: data.name,
-          phone: data.phone,
           rollNumber: data.rollNumber,
         },
         {
@@ -126,7 +124,8 @@ function LoginContent() {
     }
   };
 
-  if (sessionLoading) {
+  // Only show the loading state on the initial session load, not during background refocus refetches.
+  if (sessionLoading && !isRefetching) {
     return (
       <div className="theme-clerk min-h-screen flex items-center justify-center bg-background font-mono text-sm text-muted-foreground">
         Checking session…
@@ -325,23 +324,6 @@ function LoginContent() {
                   )}
                 </div>
 
-                {/* Phone */}
-                <div className="flex flex-col gap-1.5">
-                  <Label className="font-sans text-xs font-medium text-foreground" htmlFor="phone">
-                    Phone number
-                  </Label>
-                  <Input
-                    {...registerSignup("phone")}
-                    className="bg-background/50 font-mono text-sm text-foreground shadow-none h-10 placeholder:text-muted-foreground/50 border border-border rounded-md focus-visible:ring-1 focus-visible:ring-primary"
-                    id="phone"
-                    placeholder="9876543210"
-                    type="tel"
-                    disabled={loading}
-                  />
-                  {signupErrors.phone && (
-                    <span className="font-sans text-[11px] text-destructive">{signupErrors.phone.message}</span>
-                  )}
-                </div>
 
                 {/* Password */}
                 <div className="flex flex-col gap-1.5">
