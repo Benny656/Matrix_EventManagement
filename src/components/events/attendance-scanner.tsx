@@ -21,6 +21,7 @@ import {
   ChevronDown,
   Zap,
   ZapOff,
+  RefreshCw,
 } from "lucide-react";
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -101,6 +102,10 @@ export default function AttendanceScanner({ sessions }: AttendanceScannerProps) 
   // ── Torch state ────────────────────────────────────────────────────────────
   const [torchSupported, setTorchSupported] = useState(false);
   const [torchOn, setTorchOn] = useState(false);
+
+  // ── Camera Selection states ───────────────────────────────────────────────
+  const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
+  const [activeDeviceId, setActiveDeviceId] = useState<string>("");
 
   // ── Scan-result alert state (with optimistic) ──────────────────────────────
   const [scanResult, setScanResult] = useState<{
@@ -228,25 +233,33 @@ export default function AttendanceScanner({ sessions }: AttendanceScannerProps) 
         streamRef.current = null;
       }
 
-      // 1. Open camera — try exact rear camera first (required for torch access),
-      //    fall back to ideal if the device rejects the exact constraint.
+      // 1. Open camera — try exact activeDeviceId if selected, otherwise try exact rear camera first,
+      //    falling back to ideal if the device rejects the exact constraint.
       let stream: MediaStream;
       try {
+        const videoConstraints: MediaTrackConstraints = activeDeviceId
+          ? { deviceId: { exact: activeDeviceId } }
+          : { facingMode: { exact: "environment" } };
+
         stream = await navigator.mediaDevices.getUserMedia({
           video: {
-            facingMode: { exact: "environment" },
+            ...videoConstraints,
             width: { ideal: 1280 },
             height: { ideal: 720 },
           },
           audio: false,
         });
       } catch {
-        // exact constraint rejected (desktop, front-camera-only device, etc.) —
+        // exact constraint rejected (desktop, front-camera-only device, or exact deviceId not matching) —
         // fall back to ideal so the scanner still works.
         try {
+          const videoConstraints: MediaTrackConstraints = activeDeviceId
+            ? { deviceId: activeDeviceId }
+            : { facingMode: { ideal: "environment" } };
+
           stream = await navigator.mediaDevices.getUserMedia({
             video: {
-              facingMode: { ideal: "environment" },
+              ...videoConstraints,
               width: { ideal: 1280 },
               height: { ideal: 720 },
             },
@@ -276,41 +289,38 @@ export default function AttendanceScanner({ sessions }: AttendanceScannerProps) 
         try { await video.play(); } catch { /* play may fail gracefully */ }
       }
 
-      // 3. Wait for the video track to reach readyState "live" before checking
-      //    capabilities. On Android Chrome, getCapabilities() returns an empty
-      //    object immediately after getUserMedia — torch only appears once the
-      //    track has fully initialised, which is signalled by loadedmetadata.
-      const track = stream.getVideoTracks()[0];
-      if (track) {
-        const waitForLive = () =>
-          new Promise<void>((resolve) => {
-            if (track.readyState === "live") {
-              resolve();
-              return;
-            }
-            // loadedmetadata fires on the video element when the track is ready
-            const v = videoRef.current;
-            if (v) {
-              v.addEventListener("loadedmetadata", () => resolve(), { once: true });
-            } else {
-              // Fallback: short poll
-              const id = setInterval(() => {
-                if (track.readyState === "live" || stopped) {
-                  clearInterval(id);
-                  resolve();
-                }
-              }, 50);
-            }
-          });
-
-        await waitForLive();
-
+      // 3. Populate devices list once stream has started (and permissions are granted)
+      try {
+        const allDevices = await navigator.mediaDevices.enumerateDevices();
+        const videoInputs = allDevices.filter((d) => d.kind === "videoinput");
         if (!stopped) {
-          const caps = track.getCapabilities() as MediaTrackCapabilities & { torch?: boolean };
-          console.log("[torch-debug] track.getCapabilities():", caps);
-          if (caps?.torch) {
-            setTorchSupported(true);
+          setDevices(videoInputs);
+          // If activeDeviceId isn't set, set it to the track's current deviceId to highlight it in the list
+          const activeTrack = stream.getVideoTracks()[0];
+          if (activeTrack && !activeDeviceId) {
+            const currentId = activeTrack.getSettings().deviceId;
+            if (currentId) {
+              setActiveDeviceId(currentId);
+            }
           }
+        }
+      } catch (err) {
+        console.warn("Failed to enumerate camera devices:", err);
+      }
+
+      // 4. Optimistically enable the torch button now that we have a live camera stream.
+      //    If the track supports it, it will work. If it doesn't, we will disable the
+      //    button when toggleTorch is clicked and applyConstraints throws.
+      //    We can also do a quick check on track capabilities to be even smarter if supported:
+      const track = stream.getVideoTracks()[0];
+      if (track && !stopped) {
+        const caps = typeof track.getCapabilities === "function" ? (track.getCapabilities() as any) : null;
+        if (caps && caps.torch !== undefined) {
+          setTorchSupported(!!caps.torch);
+        } else {
+          // If capabilities are not supported or torch is not listed (e.g. browser compatibility),
+          // we optimistically enable it so they can try.
+          setTorchSupported(true);
         }
       }
 
@@ -437,7 +447,7 @@ export default function AttendanceScanner({ sessions }: AttendanceScannerProps) 
       setTorchSupported(false);
       setTorchOn(false);
     };
-  }, [selectedSessionId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [selectedSessionId, activeDeviceId]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Torch toggle ──────────────────────────────────────────────────────────
   const toggleTorch = async () => {
@@ -452,8 +462,22 @@ export default function AttendanceScanner({ sessions }: AttendanceScannerProps) 
         advanced: [{ torch: next } as MediaTrackConstraintSet & { torch: boolean }],
       });
       setTorchOn(next);
-    } catch (err) {
-      console.error("Torch toggle failed:", err);
+    } catch {
+      // applyConstraints threw — this device genuinely doesn't support torch.
+      // Hide the button permanently for this session.
+      setTorchSupported(false);
+      setTorchOn(false);
+    }
+  };
+
+  // ── Switch Camera ──────────────────────────────────────────────────────────
+  const switchCamera = () => {
+    if (devices.length <= 1) return;
+    const currentIndex = devices.findIndex((d) => d.deviceId === activeDeviceId);
+    const nextIndex = (currentIndex + 1) % devices.length;
+    const nextDevice = devices[nextIndex];
+    if (nextDevice) {
+      setActiveDeviceId(nextDevice.deviceId);
     }
   };
 
@@ -637,6 +661,17 @@ export default function AttendanceScanner({ sessions }: AttendanceScannerProps) 
             className="absolute top-3 right-3 z-20 p-2 rounded-full bg-black/50 text-white hover:bg-black/70 transition-colors active:scale-95"
           >
             {torchOn ? <ZapOff size={20} /> : <Zap size={20} />}
+          </button>
+        )}
+
+        {/* Camera switch toggle — only rendered when multiple cameras are found */}
+        {devices.length > 1 && scannerReady && (
+          <button
+            onClick={switchCamera}
+            aria-label="Switch camera"
+            className="absolute top-3 left-3 z-20 p-2 rounded-full bg-black/50 text-white hover:bg-black/70 transition-colors active:scale-95"
+          >
+            <RefreshCw size={20} />
           </button>
         )}
 
