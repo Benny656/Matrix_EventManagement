@@ -22,32 +22,32 @@ export default async function StudentEventDetailsPage({ params }: PageProps) {
 
   const { id } = await params;
 
-  // Fetch event details
-  const event = await prisma.event.findUnique({
-    where: { id },
-    include: {
-      sessions: {
-        orderBy: { startTime: "asc" },
+  // Fetch event details and student's registration status in parallel
+  const [event, userRegistration] = await Promise.all([
+    prisma.event.findUnique({
+      where: { id },
+      include: {
+        sessions: {
+          orderBy: { startTime: "asc" },
+        },
+        registrations: {
+          where: { NOT: { status: "CANCELLED" } },
+        },
       },
-      registrations: {
-        where: { NOT: { status: "CANCELLED" } },
+    }),
+    prisma.registration.findUnique({
+      where: {
+        studentId_eventId: {
+          studentId: session.user.id,
+          eventId: id,
+        },
       },
-    },
-  });
+    }),
+  ]);
 
   if (!event) {
     notFound();
   }
-
-  // Fetch student's registration status
-  const userRegistration = await prisma.registration.findUnique({
-    where: {
-      studentId_eventId: {
-        studentId: session.user.id,
-        eventId: id,
-      },
-    },
-  });
 
   const activeRegistrationsCount = event.registrations.filter((r) => r.status === "REGISTERED").length;
   const isFull = activeRegistrationsCount >= event.maxParticipants;

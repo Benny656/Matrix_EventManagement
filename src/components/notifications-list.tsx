@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useTransition } from "react";
+import React, { useState, useTransition, useOptimistic } from "react";
 import Link from "next/link";
 import { markNotificationReadAction, markAllNotificationsReadAction } from "@/actions/notification";
 import { Button } from "@/components/ui/button";
@@ -23,21 +23,43 @@ export default function NotificationsList({ initialNotifications }: Notification
   const [notifications, setNotifications] = useState(initialNotifications);
   const [isPending, startTransition] = useTransition();
 
-  const unreadCount = notifications.filter((n) => !n.read).length;
+  // Optimistic updates for notifications
+  const [optimisticNotifications, setOptimisticNotifications] = useOptimistic(
+    notifications,
+    (state, action: { type: "MARK_READ"; id: string } | { type: "MARK_ALL_READ" }) => {
+      if (action.type === "MARK_READ") {
+        return state.map((n) => (n.id === action.id ? { ...n, read: true } : n));
+      } else {
+        return state.map((n) => ({ ...n, read: true }));
+      }
+    }
+  );
+
+  const unreadCount = optimisticNotifications.filter((n) => !n.read).length;
 
   const handleMarkRead = (id: string) => {
     startTransition(async () => {
-      await markNotificationReadAction(id);
-      setNotifications((prev) =>
-        prev.map((n) => (n.id === id ? { ...n, read: true } : n))
-      );
+      setOptimisticNotifications({ type: "MARK_READ", id });
+      try {
+        await markNotificationReadAction(id);
+        setNotifications((prev) =>
+          prev.map((n) => (n.id === id ? { ...n, read: true } : n))
+        );
+      } catch (e) {
+        console.error(e);
+      }
     });
   };
 
   const handleMarkAllRead = () => {
     startTransition(async () => {
-      await markAllNotificationsReadAction();
-      setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+      setOptimisticNotifications({ type: "MARK_ALL_READ" });
+      try {
+        await markAllNotificationsReadAction();
+        setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
+      } catch (e) {
+        console.error(e);
+      }
     });
   };
 
@@ -75,13 +97,13 @@ export default function NotificationsList({ initialNotifications }: Notification
         )}
       </div>
 
-      {notifications.length === 0 ? (
+      {optimisticNotifications.length === 0 ? (
         <div className="border border-border p-12 text-center text-muted-foreground font-mono text-xs uppercase bg-card">
           No notifications in your inbox.
         </div>
       ) : (
         <div className="space-y-2">
-          {notifications.map((notif) => {
+          {optimisticNotifications.map((notif) => {
             const dateStr = new Date(notif.createdAt).toLocaleString("en-US", {
               month: "short",
               day: "numeric",

@@ -50,3 +50,4 @@ scratch_fix.py
 next-env.d.ts
 /src/generated/prisma
 designinspo/
+scripts/seed-admins.ts

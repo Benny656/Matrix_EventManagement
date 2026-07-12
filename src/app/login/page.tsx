@@ -175,9 +175,9 @@ function LoginContent() {
           <AnimatePresence>
             {error && (
               <motion.div
-                initial={{ opacity: 0, height: 0 }}
-                animate={{ opacity: 1, height: "auto" }}
-                exit={{ opacity: 0, height: 0 }}
+                initial={{ opacity: 0, y: -10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: -10 }}
                 className="flex items-start gap-2 bg-destructive/5 border border-destructive/20 px-3 py-2.5 rounded-md"
               >
                 <AlertCircle size={14} className="text-destructive mt-0.5 shrink-0" />

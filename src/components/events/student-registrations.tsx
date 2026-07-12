@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useTransition } from "react";
+import React, { useState, useTransition, useOptimistic } from "react";
 import { cancelRegistrationAction } from "@/actions/registration";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -25,13 +25,23 @@ export default function StudentRegistrations({ initialRegistrations }: { initial
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
-  const activeRegistrations = registrations.filter((r) => r.status !== "CANCELLED");
+  // Optimistic registrations state
+  const [optimisticRegistrations, setOptimisticRegistrations] = useOptimistic(
+    registrations,
+    (state, eventIdToCancel: string) =>
+      state.map((r) =>
+        r.event.id === eventIdToCancel ? { ...r, status: "CANCELLED" as const } : r
+      )
+  );
+
+  const activeRegistrations = optimisticRegistrations.filter((r) => r.status !== "CANCELLED");
 
   const handleCancel = async (eventId: string) => {
     setError(null);
     if (!confirm("Are you sure you want to cancel your registration? This action will promote the next student on the waitlist.")) return;
 
     startTransition(async () => {
+      setOptimisticRegistrations(eventId);
       try {
         const res = await cancelRegistrationAction(eventId);
         if (res.success) {

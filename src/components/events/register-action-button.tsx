@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useTransition } from "react";
+import React, { useState, useTransition, useOptimistic } from "react";
 import { registerForEventAction, cancelRegistrationAction } from "@/actions/registration";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
@@ -23,9 +23,17 @@ export default function RegisterActionButton({
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
+  // Optimistic status updates
+  const [optimisticStatus, setOptimisticStatus] = useOptimistic(
+    status,
+    (state, nextStatus: "REGISTERED" | "CANCELLED" | "WAITLISTED" | null) => nextStatus
+  );
+
   const handleRegister = async () => {
     setError(null);
     startTransition(async () => {
+      const nextStatus = isFull ? "WAITLISTED" : "REGISTERED";
+      setOptimisticStatus(nextStatus);
       try {
         const res = await registerForEventAction(eventId);
         if (res.success) {
@@ -42,6 +50,7 @@ export default function RegisterActionButton({
     if (!confirm("Are you sure you want to cancel your registration?")) return;
 
     startTransition(async () => {
+      setOptimisticStatus("CANCELLED");
       try {
         const res = await cancelRegistrationAction(eventId);
         if (res.success) {
@@ -53,7 +62,7 @@ export default function RegisterActionButton({
     });
   };
 
-  if (isDeadlinePassed && status !== "REGISTERED" && status !== "WAITLISTED") {
+  if (isDeadlinePassed && optimisticStatus !== "REGISTERED" && optimisticStatus !== "WAITLISTED") {
     return (
       <div className="border border-border p-4 bg-surface-container text-center font-mono text-xs uppercase text-muted-foreground">
         Registration cutoff date has passed.
@@ -70,7 +79,7 @@ export default function RegisterActionButton({
         </Alert>
       )}
 
-      {status === "REGISTERED" && (
+      {optimisticStatus === "REGISTERED" && (
         <div className="space-y-3">
           <div className="border border-tertiary bg-tertiary/5 text-tertiary p-4 font-mono text-xs uppercase text-center">
             Registration Status: Confirmed / Registered
@@ -86,7 +95,7 @@ export default function RegisterActionButton({
         </div>
       )}
 
-      {status === "WAITLISTED" && (
+      {optimisticStatus === "WAITLISTED" && (
         <div className="space-y-3">
           <div className="border border-primary bg-primary/5 text-primary p-4 font-mono text-xs uppercase text-center font-bold">
             Registration Status: Waitlisted
@@ -102,7 +111,7 @@ export default function RegisterActionButton({
         </div>
       )}
 
-      {(status === null || status === "CANCELLED") && (
+      {(optimisticStatus === null || optimisticStatus === "CANCELLED") && (
         <Button
           onClick={handleRegister}
           disabled={isPending}

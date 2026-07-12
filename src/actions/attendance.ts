@@ -25,16 +25,22 @@ export async function markAttendanceAction(params: {
   const staff = await verifyStaff();
   const { sessionId, rollNumber, method } = params;
 
-  // 1. Resolve student by roll number
-  const student = await prisma.user.findFirst({
-    where: {
-      rollNumber: {
-        equals: rollNumber,
-        mode: "insensitive", // case insensitive matching
+  // 1. Fetch student and session in parallel (Step 1 of parallel queries)
+  const [student, session] = await Promise.all([
+    prisma.user.findFirst({
+      where: {
+        rollNumber: {
+          equals: rollNumber,
+          mode: "insensitive", // case insensitive matching
+        },
+        role: "STUDENT",
       },
-      role: "STUDENT",
-    },
-  });
+    }),
+    prisma.session.findUnique({
+      where: { id: sessionId },
+      include: { event: true },
+    }),
+  ]);
 
   if (!student) {
     return {
@@ -44,12 +50,6 @@ export async function markAttendanceAction(params: {
     };
   }
 
-  // 2. Resolve session & event
-  const session = await prisma.session.findUnique({
-    where: { id: sessionId },
-    include: { event: true },
-  });
-
   if (!session) {
     return {
       success: false,
@@ -58,13 +58,23 @@ export async function markAttendanceAction(params: {
     };
   }
 
-  // 3. Check if attendance already marked
-  const existingAttendance = await prisma.attendance.findFirst({
-    where: {
-      sessionId,
-      studentId: student.id,
-    },
-  });
+  // 2. Fetch existing attendance and registration in parallel (Step 2 of parallel queries)
+  const [existingAttendance, registration] = await Promise.all([
+    prisma.attendance.findFirst({
+      where: {
+        sessionId,
+        studentId: student.id,
+      },
+    }),
+    prisma.registration.findUnique({
+      where: {
+        studentId_eventId: {
+          studentId: student.id,
+          eventId: session.eventId,
+        },
+      },
+    }),
+  ]);
 
   if (existingAttendance) {
     return {
@@ -74,16 +84,6 @@ export async function markAttendanceAction(params: {
       studentName: student.name,
     };
   }
-
-  // 4. Verify Registration Status
-  const registration = await prisma.registration.findUnique({
-    where: {
-      studentId_eventId: {
-        studentId: student.id,
-        eventId: session.eventId,
-      },
-    },
-  });
 
   if (!registration || registration.status === "CANCELLED") {
     return {

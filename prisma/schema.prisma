@@ -69,6 +69,8 @@ model User {
   markedAttendances Attendance[]     @relation("MarkedAttendance")
   updates           Update[]
   notifications     Notification[]
+
+  @@index([role])
 }
 
 model UserSession {
@@ -164,6 +166,8 @@ model Registration {
   createdAt DateTime           @default(now())
 
   @@unique([studentId, eventId])
+  @@index([studentId])
+  @@index([eventId])
 }
 
 model Attendance {
@@ -181,6 +185,8 @@ model Attendance {
   createdAt     DateTime         @default(now())
 
   @@unique([sessionId, studentId])
+  @@index([studentId])
+  @@index([sessionId])
 }
 
 model Update {

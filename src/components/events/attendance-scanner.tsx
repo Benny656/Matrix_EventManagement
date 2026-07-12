@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useEffect, useRef, useState, useTransition } from "react";
+import React, { useEffect, useRef, useState, useTransition, useOptimistic } from "react";
 import { markAttendanceAction, overrideWaitlistAction } from "@/actions/attendance";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -33,6 +33,12 @@ export default function AttendanceScanner({ sessions }: AttendanceScannerProps) 
     studentName?: string;
     studentId?: string;
   } | null>(null);
+
+  // Optimistic Scan Result
+  const [optimisticScanResult, setOptimisticScanResult] = useOptimistic(
+    scanResult,
+    (state, nextResult: typeof scanResult) => nextResult
+  );
 
   // Scanner container ref
   const scannerRef = useRef<any>(null);
@@ -124,6 +130,11 @@ export default function AttendanceScanner({ sessions }: AttendanceScannerProps) 
     if (!scanResult?.studentId || !selectedSessionId) return;
 
     startTransition(async () => {
+      setOptimisticScanResult({
+        type: "SUCCESS",
+        message: `${scanResult.studentName} promoted from Waitlist and Checked-In successfully!`,
+        studentName: scanResult.studentName,
+      });
       try {
         const res = await overrideWaitlistAction({
           sessionId: selectedSessionId,
@@ -178,34 +189,34 @@ export default function AttendanceScanner({ sessions }: AttendanceScannerProps) 
         </div>
 
         {/* Scan Status Alerts */}
-        {scanResult && (
+        {optimisticScanResult && (
           <div className="space-y-3">
-            {scanResult.type === "SUCCESS" && (
+            {optimisticScanResult.type === "SUCCESS" && (
               <Alert className="rounded-none border-tertiary bg-tertiary/5 text-tertiary font-mono text-xs uppercase">
                 <CheckCircle2 size={14} className="mr-2 shrink-0" />
                 <div>
                   <AlertTitle className="font-bold tracking-wide">CHECK-IN CONFIRMED</AlertTitle>
-                  <AlertDescription className="mt-1">{scanResult.message}</AlertDescription>
+                  <AlertDescription className="mt-1">{optimisticScanResult.message}</AlertDescription>
                 </div>
               </Alert>
             )}
 
-            {scanResult.type === "ERROR" && (
+            {optimisticScanResult.type === "ERROR" && (
               <Alert variant="destructive" className="rounded-none border-destructive bg-destructive/5 text-destructive font-mono text-xs uppercase">
                 <AlertCircle size={14} className="mr-2 shrink-0" />
                 <div>
                   <AlertTitle className="font-bold tracking-wide">ACCESS DENIED</AlertTitle>
-                  <AlertDescription className="mt-1">{scanResult.message}</AlertDescription>
+                  <AlertDescription className="mt-1">{optimisticScanResult.message}</AlertDescription>
                 </div>
               </Alert>
             )}
 
-            {scanResult.type === "WARNING" && (
+            {optimisticScanResult.type === "WARNING" && (
               <Alert className="rounded-none border-primary bg-primary/5 text-primary font-mono text-xs uppercase">
                 <TriangleAlert size={14} className="mr-2 shrink-0" />
                 <div>
                   <AlertTitle className="font-bold tracking-wide">WAITLISTED WARNING</AlertTitle>
-                  <AlertDescription className="mt-1">{scanResult.message}</AlertDescription>
+                  <AlertDescription className="mt-1">{optimisticScanResult.message}</AlertDescription>
                   <Button
                     onClick={handleOverride}
                     disabled={isPending}
