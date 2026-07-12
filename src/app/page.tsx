@@ -9,6 +9,7 @@ import {
   Terminal,
   Users,
 } from "lucide-react";
+import LandingAnimations from "@/components/landing-animations";
 
 export default async function Home() {
   const session = await auth.api.getSession({
@@ -27,10 +28,11 @@ export default async function Home() {
   }
 
   return (
-    <div className="bg-background text-foreground font-sans min-h-screen flex flex-col selection:bg-primary/10 selection:text-primary">
+    <div className="theme-warp bg-background text-foreground font-sans min-h-screen flex flex-col selection:bg-primary/10 selection:text-primary">
+      <LandingAnimations />
 
       {/* Header */}
-      <header className="w-full top-0 sticky bg-background/95 backdrop-blur-sm border-b border-border z-50">
+      <header className="w-full top-0 sticky glass-panel z-50">
         <div className="flex justify-between items-center px-6 py-3 w-full max-w-7xl mx-auto min-h-[60px]">
           <div className="flex flex-col">
             <span className="font-heading text-xl font-bold tracking-tighter text-foreground">MATRIX</span>
@@ -93,7 +95,7 @@ export default async function Home() {
           {/* Asymmetric grid: 1 wide + 2 stacked */}
           <div className="grid grid-cols-1 md:grid-cols-5 gap-0 border border-border">
             {/* Wide left card */}
-            <div className="md:col-span-2 border-b md:border-b-0 md:border-r border-border p-8 flex flex-col gap-6 group hover:bg-surface-container transition-colors">
+            <div className="feature-card md:col-span-2 border-b md:border-b-0 md:border-r border-border p-8 flex flex-col gap-6 group hover:bg-surface-container transition-colors">
               <div className="w-10 h-10 border border-border flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-primary-foreground group-hover:border-primary transition-colors">
                 <BrainCircuit size={20} />
               </div>
@@ -107,7 +109,7 @@ export default async function Home() {
 
             {/* Right column — 2 stacked */}
             <div className="md:col-span-3 flex flex-col">
-              <div className="border-b border-border p-8 flex flex-col gap-5 group hover:bg-surface-container transition-colors flex-1">
+              <div className="feature-card border-b border-border p-8 flex flex-col gap-5 group hover:bg-surface-container transition-colors flex-1">
                 <div className="w-10 h-10 border border-border flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-primary-foreground group-hover:border-primary transition-colors">
                   <Terminal size={20} />
                 </div>
@@ -119,7 +121,7 @@ export default async function Home() {
                 </div>
               </div>
 
-              <div className="p-8 flex flex-col gap-5 group hover:bg-surface-container transition-colors flex-1">
+              <div className="feature-card p-8 flex flex-col gap-5 group hover:bg-surface-container transition-colors flex-1">
                 <div className="w-10 h-10 border border-border flex items-center justify-center text-primary group-hover:bg-primary group-hover:text-primary-foreground group-hover:border-primary transition-colors">
                   <Users size={20} />
                 </div>

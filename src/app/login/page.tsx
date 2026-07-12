@@ -128,14 +128,14 @@ function LoginContent() {
 
   if (sessionLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center bg-[#f7f7f8] font-mono text-sm text-[#5e5f6e]">
+      <div className="theme-clerk min-h-screen flex items-center justify-center bg-background font-mono text-sm text-muted-foreground">
         Checking session…
       </div>
     );
   }
 
   return (
-    <div className="min-h-screen flex items-center justify-center p-6 bg-[#f7f7f8] selection:bg-primary/10 selection:text-primary">
+    <div className="theme-clerk min-h-screen flex items-center justify-center p-6 bg-gradient-to-br from-background to-muted selection:bg-primary/10 selection:text-primary">
 
       <motion.div
         className="w-full max-w-[400px] flex flex-col items-center gap-6"
@@ -155,21 +155,16 @@ function LoginContent() {
           </p>
         </div>
 
-        {/* Card — Clerk-style: white surface, inset shadow, 8px radius */}
+        {/* Card — Clerk-style with Glassmorphism */}
         <div
-          className="w-full bg-white p-6 flex flex-col gap-5"
-          style={{
-            borderRadius: "8px",
-            boxShadow:
-              "0 0 0 1px #d9d9de, 0 2px 4px rgba(0,0,0,0.04), 0 8px 24px rgba(0,0,0,0.06)",
-          }}
+          className="w-full glass-panel p-6 flex flex-col gap-5 rounded-xl shadow-lg"
         >
           {/* Card header */}
-          <div className="border-b border-[#eeeef0] pb-4">
-            <span className="font-sans text-sm font-semibold text-[#131316]">
+          <div className="border-b border-border pb-4">
+            <span className="font-sans text-sm font-semibold text-foreground">
               {mode === "login" ? "Sign in to Matrix" : "Create your account"}
             </span>
-            <p className="font-sans text-xs text-[#747686] mt-0.5">
+            <p className="font-sans text-xs text-muted-foreground mt-0.5">
               {mode === "login"
                 ? "Use your Karunya college email to continue."
                 : "Register with your department details."}
@@ -205,21 +200,16 @@ function LoginContent() {
               >
                 {/* Email */}
                 <div className="flex flex-col gap-1.5">
-                  <Label className="font-sans text-xs font-medium text-[#131316]" htmlFor="email">
+                  <Label className="font-sans text-xs font-medium text-foreground" htmlFor="email">
                     Email address
                   </Label>
                   <div
-                    className="flex items-center gap-2 px-3 bg-white transition-all"
-                    style={{
-                      border: "1px solid #d9d9de",
-                      borderRadius: "6px",
-                    }}
-                    onFocus={() => {}}
+                    className="flex items-center gap-2 px-3 bg-background/50 transition-all border border-border rounded-md focus-within:ring-1 focus-within:ring-primary"
                   >
-                    <AtSign size={14} className="text-[#747686] shrink-0" />
+                    <AtSign size={14} className="text-muted-foreground shrink-0" />
                     <Input
                       {...registerLogin("email")}
-                      className="flex-1 py-2.5 bg-transparent border-none focus-visible:ring-0 focus-visible:ring-offset-0 font-sans text-sm text-[#131316] shadow-none placeholder:text-[#d9d9de] h-auto"
+                      className="flex-1 py-2.5 bg-transparent border-none focus-visible:ring-0 focus-visible:ring-offset-0 font-sans text-sm text-foreground shadow-none placeholder:text-muted-foreground/50 h-auto"
                       id="email"
                       placeholder="student@karunya.edu.in"
                       type="email"
@@ -233,17 +223,16 @@ function LoginContent() {
 
                 {/* Password */}
                 <div className="flex flex-col gap-1.5">
-                  <Label className="font-sans text-xs font-medium text-[#131316]" htmlFor="password">
+                  <Label className="font-sans text-xs font-medium text-foreground" htmlFor="password">
                     Password
                   </Label>
                   <div
-                    className="flex items-center gap-2 px-3 bg-white transition-all"
-                    style={{ border: "1px solid #d9d9de", borderRadius: "6px" }}
+                    className="flex items-center gap-2 px-3 bg-background/50 transition-all border border-border rounded-md focus-within:ring-1 focus-within:ring-primary"
                   >
-                    <Lock size={14} className="text-[#747686] shrink-0" />
+                    <Lock size={14} className="text-muted-foreground shrink-0" />
                     <Input
                       {...registerLogin("password")}
-                      className="flex-1 py-2.5 bg-transparent border-none focus-visible:ring-0 focus-visible:ring-offset-0 font-sans text-sm text-[#131316] shadow-none placeholder:text-[#d9d9de] h-auto"
+                      className="flex-1 py-2.5 bg-transparent border-none focus-visible:ring-0 focus-visible:ring-offset-0 font-sans text-sm text-foreground shadow-none placeholder:text-muted-foreground/50 h-auto"
                       id="password"
                       placeholder="••••••••"
                       type="password"
@@ -285,11 +274,10 @@ function LoginContent() {
               >
                 {/* Full Name */}
                 <div className="flex flex-col gap-1.5">
-                  <Label className="font-sans text-xs font-medium text-[#131316]" htmlFor="name">Full name</Label>
+                  <Label className="font-sans text-xs font-medium text-foreground" htmlFor="name">Full name</Label>
                   <Input
                     {...registerSignup("name")}
-                    className="bg-white font-sans text-sm text-[#131316] shadow-none h-10 placeholder:text-[#d9d9de]"
-                    style={{ border: "1px solid #d9d9de", borderRadius: "6px" }}
+                    className="bg-background/50 font-sans text-sm text-foreground shadow-none h-10 placeholder:text-muted-foreground/50 border border-border rounded-md focus-visible:ring-1 focus-visible:ring-primary"
                     id="name"
                     placeholder="e.g. Priya Rajan"
                     type="text"
@@ -302,13 +290,12 @@ function LoginContent() {
 
                 {/* Registration Number */}
                 <div className="flex flex-col gap-1.5">
-                  <Label className="font-sans text-xs font-medium text-[#131316]" htmlFor="rollNumber">
+                  <Label className="font-sans text-xs font-medium text-foreground" htmlFor="rollNumber">
                     University registration number
                   </Label>
                   <Input
                     {...registerSignup("rollNumber")}
-                    className="bg-white font-mono text-sm text-[#131316] shadow-none h-10 placeholder:text-[#d9d9de]"
-                    style={{ border: "1px solid #d9d9de", borderRadius: "6px" }}
+                    className="bg-background/50 font-mono text-sm text-foreground shadow-none h-10 placeholder:text-muted-foreground/50 border border-border rounded-md focus-visible:ring-1 focus-visible:ring-primary"
                     id="rollNumber"
                     placeholder="e.g. UR23AI001"
                     type="text"
@@ -321,13 +308,12 @@ function LoginContent() {
 
                 {/* Email */}
                 <div className="flex flex-col gap-1.5">
-                  <Label className="font-sans text-xs font-medium text-[#131316]" htmlFor="email-reg">
+                  <Label className="font-sans text-xs font-medium text-foreground" htmlFor="email-reg">
                     College email
                   </Label>
                   <Input
                     {...registerSignup("email")}
-                    className="bg-white font-sans text-sm text-[#131316] shadow-none h-10 placeholder:text-[#d9d9de]"
-                    style={{ border: "1px solid #d9d9de", borderRadius: "6px" }}
+                    className="bg-background/50 font-sans text-sm text-foreground shadow-none h-10 placeholder:text-muted-foreground/50 border border-border rounded-md focus-visible:ring-1 focus-visible:ring-primary"
                     id="email-reg"
                     placeholder="student@karunya.edu.in"
                     type="email"
@@ -340,13 +326,12 @@ function LoginContent() {
 
                 {/* Phone */}
                 <div className="flex flex-col gap-1.5">
-                  <Label className="font-sans text-xs font-medium text-[#131316]" htmlFor="phone">
+                  <Label className="font-sans text-xs font-medium text-foreground" htmlFor="phone">
                     Phone number
                   </Label>
                   <Input
                     {...registerSignup("phone")}
-                    className="bg-white font-mono text-sm text-[#131316] shadow-none h-10 placeholder:text-[#d9d9de]"
-                    style={{ border: "1px solid #d9d9de", borderRadius: "6px" }}
+                    className="bg-background/50 font-mono text-sm text-foreground shadow-none h-10 placeholder:text-muted-foreground/50 border border-border rounded-md focus-visible:ring-1 focus-visible:ring-primary"
                     id="phone"
                     placeholder="9876543210"
                     type="tel"
@@ -359,13 +344,12 @@ function LoginContent() {
 
                 {/* Password */}
                 <div className="flex flex-col gap-1.5">
-                  <Label className="font-sans text-xs font-medium text-[#131316]" htmlFor="password-reg">
+                  <Label className="font-sans text-xs font-medium text-foreground" htmlFor="password-reg">
                     Password
                   </Label>
                   <Input
                     {...registerSignup("password")}
-                    className="bg-white font-sans text-sm text-[#131316] shadow-none h-10 placeholder:text-[#d9d9de]"
-                    style={{ border: "1px solid #d9d9de", borderRadius: "6px" }}
+                    className="bg-background/50 font-sans text-sm text-foreground shadow-none h-10 placeholder:text-muted-foreground/50 border border-border rounded-md focus-visible:ring-1 focus-visible:ring-primary"
                     id="password-reg"
                     placeholder="••••••••"
                     type="password"
@@ -398,9 +382,9 @@ function LoginContent() {
           </AnimatePresence>
 
           {/* Toggle mode */}
-          <div className="border-t border-[#eeeef0] pt-4 text-center">
+          <div className="border-t border-border pt-4 text-center">
             {mode === "login" ? (
-              <p className="font-sans text-xs text-[#5e5f6e]">
+              <p className="font-sans text-xs text-muted-foreground">
                 Don&apos;t have an account?{" "}
                 <button
                   onClick={() => { setMode("register"); setError(null); }}
@@ -411,7 +395,7 @@ function LoginContent() {
                 </button>
               </p>
             ) : (
-              <p className="font-sans text-xs text-[#5e5f6e]">
+              <p className="font-sans text-xs text-muted-foreground">
                 Already have an account?{" "}
                 <button
                   onClick={() => { setMode("login"); setError(null); }}
@@ -426,7 +410,7 @@ function LoginContent() {
         </div>
 
         {/* Back link */}
-        <Link href="/" className="flex items-center gap-1.5 font-sans text-xs text-[#747686] hover:text-foreground transition-colors">
+        <Link href="/" className="flex items-center gap-1.5 font-sans text-xs text-muted-foreground hover:text-foreground transition-colors">
           <ArrowLeft size={12} />
           Back to home
         </Link>
@@ -441,7 +425,7 @@ export default function LoginPage() {
   return (
     <Suspense
       fallback={
-        <div className="flex items-center justify-center min-h-screen font-sans text-sm bg-[#f7f7f8] text-[#5e5f6e]">
+        <div className="flex items-center justify-center min-h-screen font-sans text-sm bg-background text-muted-foreground">
           Loading…
         </div>
       }

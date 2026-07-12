@@ -110,7 +110,7 @@ export default function DashboardLayout({ user, children }: DashboardLayoutProps
   };
 
   return (
-    <div className="bg-background text-foreground font-sans min-h-screen flex overflow-hidden">
+    <div className="theme-raycast bg-background text-foreground font-sans min-h-screen flex overflow-hidden">
       {/* Sidebar (Desktop) */}
       <nav className="hidden md:flex flex-col h-full py-5 px-3 bg-surface-container-low border-r border-border w-60 fixed left-0 top-0 z-40">
         {/* Brand */}
@@ -178,7 +178,7 @@ export default function DashboardLayout({ user, children }: DashboardLayoutProps
       {/* Main */}
       <div className="flex-1 flex flex-col md:ml-60 h-screen overflow-hidden">
         {/* Top bar */}
-        <header className="flex justify-between items-center px-5 w-full z-30 bg-background border-b border-border h-14 sticky top-0">
+        <header className="flex justify-between items-center px-5 w-full z-30 glass-panel h-14 sticky top-0">
           <div className="flex items-center gap-3">
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
@@ -301,11 +301,22 @@ export default function DashboardLayout({ user, children }: DashboardLayoutProps
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-4 md:p-6 pb-24 md:pb-6 bg-background">
-          {children}
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={pathname}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: -10 }}
+              transition={{ duration: 0.2, ease: "easeOut" }}
+              className="h-full"
+            >
+              {children}
+            </motion.div>
+          </AnimatePresence>
         </div>
 
         {/* Bottom Nav (Mobile) */}
-        <nav className="fixed bottom-0 left-0 right-0 z-30 md:hidden flex justify-around items-center h-14 bg-background border-t border-border px-4">
+        <nav className="fixed bottom-0 left-0 right-0 z-30 md:hidden flex justify-around items-center h-14 glass-panel px-4">
           {navItems.slice(0, 3).map((item) => {
             const Icon = item.icon;
             const isRoot = ["/admin", "/volunteer", "/student"].includes(item.href);
