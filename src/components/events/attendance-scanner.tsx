@@ -19,8 +19,6 @@ import {
   TriangleAlert,
   ScanLine,
   ChevronDown,
-  Zap,
-  ZapOff,
   RefreshCw,
 } from "lucide-react";
 
@@ -99,10 +97,6 @@ export default function AttendanceScanner({ sessions }: AttendanceScannerProps) 
   const [scannerReady, setScannerReady] = useState(false);
   const [cameraError, setCameraError] = useState<string | null>(null);
 
-  // ── Torch state ────────────────────────────────────────────────────────────
-  const [torchSupported, setTorchSupported] = useState(false);
-  const [torchOn, setTorchOn] = useState(false);
-
   // ── Camera Selection states ───────────────────────────────────────────────
   const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
   const [activeDeviceId, setActiveDeviceId] = useState<string>("");
@@ -161,8 +155,6 @@ export default function AttendanceScanner({ sessions }: AttendanceScannerProps) 
     // Reset per-session state
     setScannerReady(false);
     setCameraError(null);
-    setTorchSupported(false);
-    setTorchOn(false);
     recentReadsRef.current = [];
     processingRef.current = false;
 
@@ -308,22 +300,6 @@ export default function AttendanceScanner({ sessions }: AttendanceScannerProps) 
         console.warn("Failed to enumerate camera devices:", err);
       }
 
-      // 4. Optimistically enable the torch button now that we have a live camera stream.
-      //    If the track supports it, it will work. If it doesn't, we will disable the
-      //    button when toggleTorch is clicked and applyConstraints throws.
-      //    We can also do a quick check on track capabilities to be even smarter if supported:
-      const track = stream.getVideoTracks()[0];
-      if (track && !stopped) {
-        const caps = typeof track.getCapabilities === "function" ? (track.getCapabilities() as any) : null;
-        if (caps && caps.torch !== undefined) {
-          setTorchSupported(!!caps.torch);
-        } else {
-          // If capabilities are not supported or torch is not listed (e.g. browser compatibility),
-          // we optimistically enable it so they can try.
-          setTorchSupported(true);
-        }
-      }
-
       // 4. Load zxing-wasm reader (WASM bundle, fetched once and cached)
       let readBarcodes: typeof import("zxing-wasm/reader").readBarcodes;
       try {
@@ -444,31 +420,10 @@ export default function AttendanceScanner({ sessions }: AttendanceScannerProps) 
         streamRef.current = null;
       }
       setScannerReady(false);
-      setTorchSupported(false);
-      setTorchOn(false);
     };
   }, [selectedSessionId, activeDeviceId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-  // ── Torch toggle ──────────────────────────────────────────────────────────
-  const toggleTorch = async () => {
-    const stream = streamRef.current;
-    if (!stream) return;
-    const track = stream.getVideoTracks()[0];
-    if (!track) return;
 
-    const next = !torchOn;
-    try {
-      await track.applyConstraints({
-        advanced: [{ torch: next } as MediaTrackConstraintSet & { torch: boolean }],
-      });
-      setTorchOn(next);
-    } catch {
-      // applyConstraints threw — this device genuinely doesn't support torch.
-      // Hide the button permanently for this session.
-      setTorchSupported(false);
-      setTorchOn(false);
-    }
-  };
 
   // ── Switch Camera ──────────────────────────────────────────────────────────
   const switchCamera = () => {
@@ -653,16 +608,7 @@ export default function AttendanceScanner({ sessions }: AttendanceScannerProps) 
           playsInline
         />
 
-        {/* Torch toggle — only rendered when device supports torch */}
-        {torchSupported && scannerReady && (
-          <button
-            onClick={toggleTorch}
-            aria-label={torchOn ? "Turn torch off" : "Turn torch on"}
-            className="absolute top-3 right-3 z-20 p-2 rounded-full bg-black/50 text-white hover:bg-black/70 transition-colors active:scale-95"
-          >
-            {torchOn ? <ZapOff size={20} /> : <Zap size={20} />}
-          </button>
-        )}
+
 
         {/* Camera switch toggle — only rendered when multiple cameras are found */}
         {devices.length > 1 && scannerReady && (
