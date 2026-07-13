@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 import AttendeeList from "@/components/events/attendee-list";
 import { Download } from "lucide-react";
 import EditDeadlineForm from "@/components/events/edit-deadline-form";
+import EditCapacityForm from "@/components/events/edit-capacity-form";
 
 export const dynamic = "force-dynamic";
 
@@ -125,6 +126,7 @@ export default async function AdminEventDetailsPage({ params }: PageProps) {
         {/* Right Side: Timeline & Settings */}
         <div className="lg:col-span-4 space-y-6">
           <EditDeadlineForm eventId={event.id} initialDeadline={event.registrationDeadline} />
+          <EditCapacityForm eventId={event.id} initialCapacity={event.maxParticipants} />
           
           <div className="border border-border p-6 bg-card space-y-6">
             <h3 className="font-mono text-xs uppercase tracking-widest text-muted-foreground border-b border-border pb-1 font-semibold">

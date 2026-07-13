@@ -21,6 +21,9 @@ export async function registerForEventAction(eventId: string) {
   const user = await verifyStudent();
 
   return await prisma.$transaction(async (tx) => {
+    // Lock the event row for updates to serialize concurrent registrations
+    await tx.$executeRaw`SELECT id FROM "Event" WHERE id = ${eventId} FOR UPDATE`;
+
     // 1. Fetch Event details and capacity
     const event = await tx.event.findUnique({
       where: { id: eventId },
@@ -84,7 +87,7 @@ export async function registerForEventAction(eventId: string) {
     await tx.notification.create({
       data: {
         userId: user.id,
-        type: isWaitlist ? "UPDATE_POSTED" : "NEW_EVENT",
+        type: isWaitlist ? "UPDATE_POSTED" : "REGISTRATION_CONFIRMED",
         message: isWaitlist
           ? `You have been added to the waitlist for ${event.title}.`
           : `Registration confirmed for ${event.title}!`,
@@ -107,6 +110,9 @@ export async function cancelRegistrationAction(eventId: string) {
   const user = await verifyStudent();
 
   return await prisma.$transaction(async (tx) => {
+    // Lock the event row for updates
+    await tx.$executeRaw`SELECT id FROM "Event" WHERE id = ${eventId} FOR UPDATE`;
+
     const existing = await tx.registration.findUnique({
       where: {
         studentId_eventId: {
@@ -154,7 +160,7 @@ export async function cancelRegistrationAction(eventId: string) {
         await tx.notification.create({
           data: {
             userId: nextWaitlisted.studentId,
-            type: "NEW_EVENT",
+            type: "REGISTRATION_CONFIRMED",
             message: `Good news! You have been promoted from the waitlist and registered for ${existing.event.title}.`,
             linkUrl: `/student/events/${eventId}`,
           },

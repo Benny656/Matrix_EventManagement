@@ -147,6 +147,88 @@ export async function updateEventDeadlineAction(id: string, registrationDeadline
   return { success: true };
 }
 
+export async function updateEventCapacityAction(id: string, maxParticipants: number) {
+  await verifyAuth(["ADMIN", "VOLUNTEER"]);
+
+  if (!maxParticipants || maxParticipants < 1) {
+    throw new Error("Capacity must be at least 1.");
+  }
+
+  await prisma.$transaction(async (tx) => {
+    // Lock the event row for safety
+    await tx.$executeRaw`SELECT id FROM "Event" WHERE id = ${id} FOR UPDATE`;
+
+    // Fetch current confirmed registration count
+    const confirmedCount = await tx.registration.count({
+      where: {
+        eventId: id,
+        status: "REGISTERED",
+      },
+    });
+
+    if (maxParticipants < confirmedCount) {
+      throw new Error(`Capacity cannot be set below the current confirmed registration count (${confirmedCount}).`);
+    }
+
+    // Update event capacity
+    const event = await tx.event.update({
+      where: { id },
+      data: {
+        maxParticipants,
+      },
+    });
+
+    // If capacity is increased, promote waitlisted students
+    const availableSpots = maxParticipants - confirmedCount;
+    if (availableSpots > 0) {
+      const waitlisted = await tx.registration.findMany({
+        where: {
+          eventId: id,
+          status: "WAITLISTED",
+        },
+        orderBy: {
+          createdAt: "asc",
+        },
+        take: availableSpots,
+      });
+
+      if (waitlisted.length > 0) {
+        // Promote to REGISTERED
+        await tx.registration.updateMany({
+          where: {
+            id: {
+              in: waitlisted.map((r) => r.id),
+            },
+          },
+          data: {
+            status: "REGISTERED",
+          },
+        });
+
+        // Create notification for each promoted student
+        for (const reg of waitlisted) {
+          await tx.notification.create({
+            data: {
+              userId: reg.studentId,
+              type: "REGISTRATION_CONFIRMED",
+              message: `Good news! You have been promoted from the waitlist and registered for ${event.title}.`,
+              linkUrl: `/student/events/${id}`,
+            },
+          });
+        }
+      }
+    }
+  });
+
+  revalidatePath(`/student/events/${id}`);
+  revalidatePath(`/volunteer/events/${id}`);
+  revalidatePath(`/admin/events/${id}`);
+  revalidatePath("/volunteer/events");
+  revalidatePath("/admin/events");
+
+  return { success: true };
+}
+
 export async function archiveEventAction(id: string) {
   await verifyAuth(["ADMIN", "VOLUNTEER"]);
 

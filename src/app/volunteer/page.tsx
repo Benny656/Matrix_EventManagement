@@ -1,29 +1,48 @@
-"use client";
-
-import React, { useEffect, useState } from "react";
+import React from "react";
 import Link from "next/link";
+import { headers } from "next/headers";
+import { redirect } from "next/navigation";
+import { auth } from "@/lib/auth";
+import { prisma } from "@/lib/db";
 import { Button } from "@/components/ui/button";
 import { Plus, Megaphone } from "lucide-react";
+import VolunteerClock from "@/components/volunteer-clock";
 
-export default function VolunteerDashboardPage() {
-  const [time, setTime] = useState("");
+export const dynamic = "force-dynamic";
 
-  useEffect(() => {
-    const updateClock = () => {
-      const now = new Date();
-      setTime(
-        now.toLocaleTimeString("en-US", {
-          hour12: false,
-          hour: "2-digit",
-          minute: "2-digit",
-          second: "2-digit",
-        })
-      );
-    };
-    updateClock();
-    const interval = setInterval(updateClock, 1000);
-    return () => clearInterval(interval);
-  }, []);
+export default async function VolunteerDashboardPage() {
+  const session = await auth.api.getSession({
+    headers: await headers(),
+  });
+
+  if (!session || (session.user.role !== "VOLUNTEER" && session.user.role !== "ADMIN")) {
+    redirect("/login");
+  }
+
+  const userId = session.user.id;
+
+  // Query real metrics from the database
+  const [eventsCreated, attendeesScanned] = await Promise.all([
+    prisma.event.count({
+      where: { createdById: userId },
+    }),
+    prisma.attendance.count({
+      where: { markedById: userId },
+    }),
+  ]);
+
+  // Fetch active events (ongoing or upcoming)
+  const activeEvents = await prisma.event.findMany({
+    where: {
+      status: {
+        in: ["ONGOING", "UPCOMING"],
+      },
+    },
+    orderBy: {
+      date: "asc",
+    },
+    take: 4,
+  });
 
   return (
     <div className="space-y-6">
@@ -38,9 +57,7 @@ export default function VolunteerDashboardPage() {
           </p>
         </div>
         <div className="flex gap-2 font-mono text-[11px] text-muted-foreground">
-          <div className="border border-border px-3 py-1 bg-surface-container">
-            SYS.TIME: <span className="text-foreground font-bold">{time || "00:00:00"}</span>
-          </div>
+          <VolunteerClock />
           <div className="border border-border px-3 py-1 bg-surface-container">
             STATUS: <span className="text-primary font-bold">ONLINE</span>
           </div>
@@ -51,19 +68,19 @@ export default function VolunteerDashboardPage() {
       <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
         <div className="border border-border bg-card p-4">
           <div className="font-mono text-[10px] text-muted-foreground mb-1">TOTAL HOURS</div>
-          <div className="font-heading text-2xl font-bold text-foreground">124.5</div>
+          <div className="font-heading text-2xl font-bold text-foreground">N/A</div>
         </div>
         <div className="border border-border bg-card p-4">
           <div className="font-mono text-[10px] text-muted-foreground mb-1">EVENTS ORGANIZED</div>
-          <div className="font-heading text-2xl font-bold text-foreground">12</div>
+          <div className="font-heading text-2xl font-bold text-foreground">{eventsCreated}</div>
         </div>
         <div className="border border-border bg-card p-4">
           <div className="font-mono text-[10px] text-muted-foreground mb-1">ATTENDEES SCANNED</div>
-          <div className="font-heading text-2xl font-bold text-foreground">843</div>
+          <div className="font-heading text-2xl font-bold text-foreground">{attendeesScanned}</div>
         </div>
         <div className="border border-border bg-card p-4">
           <div className="font-mono text-[10px] text-muted-foreground mb-1">RATING AVG</div>
-          <div className="font-heading text-2xl font-bold text-primary">4.9/5</div>
+          <div className="font-heading text-2xl font-bold text-primary">N/A</div>
         </div>
       </div>
 
@@ -79,61 +96,63 @@ export default function VolunteerDashboardPage() {
           </div>
 
           <div className="space-y-3">
-            {/* Card 1 */}
-            <div className="border border-border bg-card p-0 hover:bg-surface-container transition-colors">
-              <div className="flex items-stretch">
-                <div className="w-1 bg-primary"></div>
-                <div className="p-4 flex-1 flex flex-col md:flex-row md:items-center justify-between gap-4">
-                  <div>
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="font-mono text-[11px] text-muted-foreground">EVT-892</span>
-                      <span className="bg-primary/10 text-primary border border-primary/20 px-2 py-[2px] font-mono text-[9px] uppercase font-semibold">
-                        Ongoing
-                      </span>
-                    </div>
-                    <h3 className="font-heading text-base font-bold text-foreground">
-                      Neural Architecture Search Workshop
-                    </h3>
-                    <p className="font-mono text-xs text-muted-foreground mt-1">
-                      Lab 4B • Oct 24 • 14:00 - 17:00
-                    </p>
-                  </div>
-                  <div className="flex items-center gap-2">
-                    <Link href="/volunteer/scan" className="bg-primary text-primary-foreground font-mono text-[11px] uppercase tracking-wider py-2 px-4 hover:bg-primary-container active:scale-95 transition-all text-center">
-                      Launch Scanner
-                    </Link>
-                  </div>
-                </div>
+            {activeEvents.length === 0 ? (
+              <div className="border border-border p-12 text-center text-muted-foreground font-mono text-xs uppercase bg-card">
+                No active deployments at this time.
               </div>
-            </div>
+            ) : (
+              activeEvents.map((event) => {
+                const eventCode = `EVT-${event.id.slice(0, 4).toUpperCase()}`;
+                const eventDateStr = new Date(event.date).toLocaleDateString("en-US", {
+                  month: "short",
+                  day: "numeric",
+                });
+                const eventTimeStr = new Date(event.date).toLocaleTimeString("en-US", {
+                  hour: "2-digit",
+                  minute: "2-digit",
+                  hour12: false,
+                });
 
-            {/* Card 2 */}
-            <div className="border border-border bg-card p-0 hover:bg-surface-container transition-colors">
-              <div className="flex items-stretch">
-                <div className="w-1 bg-secondary"></div>
-                <div className="p-4 flex-1 flex flex-col md:flex-row md:items-center justify-between gap-4">
-                  <div>
-                    <div className="flex items-center gap-2 mb-1">
-                      <span className="font-mono text-[11px] text-muted-foreground">EVT-904</span>
-                      <span className="bg-secondary-container text-on-secondary-container border border-border px-2 py-[2px] font-mono text-[9px] uppercase font-semibold">
-                        Upcoming
-                      </span>
+                return (
+                  <div key={event.id} className="border border-border bg-card p-0 hover:bg-surface-container transition-colors">
+                    <div className="flex items-stretch">
+                      <div className={`w-1 ${event.status === "ONGOING" ? "bg-primary" : "bg-secondary"}`}></div>
+                      <div className="p-4 flex-1 flex flex-col md:flex-row md:items-center justify-between gap-4">
+                        <div>
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="font-mono text-[11px] text-muted-foreground">{eventCode}</span>
+                            <span className={`border px-2 py-[2px] font-mono text-[9px] uppercase font-semibold ${
+                              event.status === "ONGOING"
+                                ? "bg-primary/10 text-primary border-primary/20 animate-pulse"
+                                : "bg-secondary-container text-on-secondary-container border-border"
+                            }`}>
+                              {event.status}
+                            </span>
+                          </div>
+                          <h3 className="font-heading text-base font-bold text-foreground">
+                            {event.title}
+                          </h3>
+                          <p className="font-mono text-xs text-muted-foreground mt-1">
+                            {event.venue} • {eventDateStr} • {eventTimeStr}
+                          </p>
+                        </div>
+                        <div className="flex items-center gap-2">
+                          {event.status === "ONGOING" ? (
+                            <Link href="/volunteer/attendance" className="bg-primary text-primary-foreground font-mono text-[11px] uppercase tracking-wider py-2 px-4 hover:bg-primary-container active:scale-95 transition-all text-center">
+                              Launch Scanner
+                            </Link>
+                          ) : (
+                            <Link href={`/volunteer/events/${event.id}`} className="border border-border bg-background text-foreground font-mono text-[11px] uppercase tracking-wider py-2 px-4 hover:bg-surface-container active:scale-95 transition-all text-center">
+                              Manage Event
+                            </Link>
+                          )}
+                        </div>
+                      </div>
                     </div>
-                    <h3 className="font-heading text-base font-bold text-foreground">
-                      Ethics in Gen AI Seminars
-                    </h3>
-                    <p className="font-mono text-xs text-muted-foreground mt-1">
-                      Main Auditorium • Nov 02 • 09:00 - 11:30
-                    </p>
                   </div>
-                  <div className="flex items-center gap-2">
-                    <Link href="/volunteer/events/manage" className="border border-border bg-background text-foreground font-mono text-[11px] uppercase tracking-wider py-2 px-4 hover:bg-surface-container active:scale-95 transition-all text-center">
-                      Manage Event
-                    </Link>
-                  </div>
-                </div>
-              </div>
-            </div>
+                );
+              })
+            )}
           </div>
         </div>
 

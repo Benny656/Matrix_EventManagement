@@ -8,11 +8,53 @@ import {
   BrainCircuit,
   Terminal,
   Users,
+  Mail,
 } from "lucide-react";
 import LandingAnimations from "@/components/landing-animations";
 import MockTerminal from "@/components/mock-terminal";
 import ThemeToggle from "@/components/theme-toggle";
 import ShootingStarsGrid from "@/components/shooting-stars-grid";
+import { MATRIX_SOCIALS } from "@/lib/constants";
+import { LinkedInIcon, InstagramIcon, GitHubIcon } from "@/components/ui/brand-icons";
+
+const socialLinks = [
+  {
+    name: "LinkedIn",
+    href: MATRIX_SOCIALS.linkedin,
+    icon: LinkedInIcon,
+    description: "Professional updates, event milestones & industry connects.",
+    bgColor: "hover:bg-primary/5 hover:border-primary/30",
+    iconColor: "text-primary",
+    tag: "@matrix-karunya",
+  },
+  {
+    name: "Instagram",
+    href: MATRIX_SOCIALS.instagram,
+    icon: InstagramIcon,
+    description: "Glimpses of hackathons, workshop highlights & student life.",
+    bgColor: "hover:bg-primary/5 hover:border-primary/30",
+    iconColor: "text-primary",
+    tag: "@matrixkarunya",
+  },
+  {
+    name: "GitHub",
+    href: MATRIX_SOCIALS.github,
+    icon: GitHubIcon,
+    description: "Explore repositories, student projects & open-source code.",
+    bgColor: "hover:bg-primary/5 hover:border-primary/30",
+    iconColor: "text-primary",
+    tag: "matrix-aiml-karunya",
+  },
+  {
+    name: "Email Contact",
+    href: MATRIX_SOCIALS.email,
+    icon: Mail,
+    description: "Queries, collaborations, guest talks & partnerships.",
+    bgColor: "hover:bg-primary/5 hover:border-primary/30",
+    iconColor: "text-primary",
+    tag: "matrix@karunya.edu.in",
+  },
+];
 
 export default async function Home() {
   const session = await auth.api.getSession({
@@ -174,6 +216,50 @@ export default async function Home() {
                 </div>
               </div>
             </div>
+          </div>
+        </section>
+
+        {/* Let's Connect Section */}
+        <section className="px-6 py-20 max-w-7xl mx-auto w-full border-t border-border/60" id="matrix-socials">
+          <div className="font-mono text-[10px] text-primary uppercase tracking-widest mb-8 flex items-center gap-2 font-bold">
+            <span className="w-1.5 h-1.5 bg-primary rounded-full" />
+            Let&apos;s Connect
+          </div>
+
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-6">
+            {socialLinks.map((social) => {
+              const Icon = social.icon;
+              return (
+                <a
+                  key={social.name}
+                  href={social.href}
+                  target={social.name !== "Email Contact" ? "_blank" : undefined}
+                  rel={social.name !== "Email Contact" ? "noopener noreferrer" : undefined}
+                  className={`group relative flex flex-col justify-between p-6 bg-card border border-border/80 rounded-xl overflow-hidden shadow-sm transition-all duration-300 ease-out hover:-translate-y-2.5 hover:scale-[1.02] hover:shadow-lg ${social.bgColor}`}
+                >
+                  {/* Subtle ambient light gradient that glows on hover */}
+                  <div className="absolute inset-0 bg-gradient-to-tr from-transparent via-transparent to-primary/5 opacity-0 group-hover:opacity-100 transition-opacity duration-300 pointer-events-none" />
+                  
+                  <div className="flex items-center justify-between mb-4">
+                    <div className={`p-3 rounded-lg bg-muted/40 border border-border/60 group-hover:bg-background group-hover:border-primary/20 transition-all duration-300 ${social.iconColor}`}>
+                      <Icon size={22} className="transition-transform duration-300 group-hover:scale-110" />
+                    </div>
+                    <span className="font-mono text-[9px] uppercase tracking-widest text-muted-foreground group-hover:text-primary transition-colors font-bold">
+                      {social.name}
+                    </span>
+                  </div>
+
+                  <div className="space-y-2">
+                    <p className="font-sans text-xs text-muted-foreground leading-relaxed">
+                      {social.description}
+                    </p>
+                    <div className="font-mono text-[10px] text-foreground/80 font-semibold tracking-wide truncate group-hover:text-primary transition-colors">
+                      {social.tag}
+                    </div>
+                  </div>
+                </a>
+              );
+            })}
           </div>
         </section>
 
