@@ -59,6 +59,8 @@ model User {
   // Custom Fields
   rollNumber    String?   @unique
   role          Role      @default(STUDENT)
+  phoneNumber   String?
+  mustChangePassword Boolean @default(false)
 
   // Relations
   sessions          UserSession[]

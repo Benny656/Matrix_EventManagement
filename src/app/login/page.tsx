@@ -10,7 +10,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useSession, signIn, signUp } from "@/lib/auth-client";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { AtSign, Lock, LogIn, UserPlus, AlertCircle, ArrowLeft } from "lucide-react";
+import { AtSign, Lock, LogIn, UserPlus, AlertCircle, ArrowLeft, Info, X } from "lucide-react";
 import ThemeToggle from "@/components/theme-toggle";
 
 const loginSchema = z.object({
@@ -35,6 +35,7 @@ function LoginContent() {
   const [mode, setMode] = useState<"login" | "register">("login");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+  const [showForgot, setShowForgot] = useState(false);
 
   useEffect(() => {
     const queryMode = searchParams.get("mode");
@@ -227,9 +228,19 @@ function LoginContent() {
 
                 {/* Password */}
                 <div className="flex flex-col gap-1.5">
-                  <Label className="font-sans text-xs font-medium text-foreground" htmlFor="password">
-                    Password
-                  </Label>
+                  <div className="flex justify-between items-center">
+                    <Label className="font-sans text-xs font-medium text-foreground" htmlFor="password">
+                      Password
+                    </Label>
+                    <button
+                      type="button"
+                      onClick={() => setShowForgot((v) => !v)}
+                      className="font-sans text-xs text-primary font-medium hover:underline hover:text-primary/80 transition-colors flex items-center gap-1"
+                    >
+                      <Info size={11} />
+                      Forgot password?
+                    </button>
+                  </div>
                   <div
                     className="flex items-center gap-2 px-3 bg-background/50 transition-all border border-border rounded-md focus-within:ring-1 focus-within:ring-primary"
                   >
@@ -247,6 +258,28 @@ function LoginContent() {
                     <span className="font-sans text-[11px] text-destructive">{loginErrors.password.message}</span>
                   )}
                 </div>
+
+                {/* Forgot password info */}
+                {showForgot && (
+                  <div className="flex items-start gap-2 border border-primary/20 bg-primary/5 text-foreground p-3 font-sans text-xs leading-relaxed relative">
+                    <Info size={13} className="shrink-0 mt-0.5 text-primary" />
+                    <span>
+                      Forgot your password?{" "}
+                      <span className="font-medium">
+                        Ask an Admin or Volunteer to reset it from the Manage Users panel.
+                      </span>{" "}
+                      They&apos;ll generate a temporary password for you.
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() => setShowForgot(false)}
+                      className="absolute top-2 right-2 text-muted-foreground hover:text-foreground transition-colors"
+                      aria-label="Dismiss"
+                    >
+                      <X size={12} />
+                    </button>
+                  </div>
+                )}
 
                 {/* Submit */}
                 <motion.button

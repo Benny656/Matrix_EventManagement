@@ -9,6 +9,14 @@ import { getUnreadNotificationCountAction } from "@/actions/notification";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import ThemeToggle from "@/components/theme-toggle";
 import {
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuLabel,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
   BarChart2,
   CalendarDays,
   Users,
@@ -65,6 +73,7 @@ export default function DashboardLayout({ user, children }: DashboardLayoutProps
         return [
           { label: "Overview", href: "/admin", icon: BarChart2 },
           { label: "All Events", href: "/admin/events", icon: CalendarDays },
+          { label: "Attendance", href: "/volunteer/attendance", icon: ScanLine },
           { label: "Users", href: "/admin/users", icon: Users },
           { label: "Updates", href: "/admin/updates", icon: BellRing },
           { label: "Reports", href: "/admin/reports", icon: FileText },
@@ -74,6 +83,7 @@ export default function DashboardLayout({ user, children }: DashboardLayoutProps
           { label: "Overview", href: "/volunteer", icon: Home },
           { label: "Events", href: "/volunteer/events", icon: CalendarCheck },
           { label: "Attendance", href: "/volunteer/attendance", icon: ScanLine },
+          { label: "Users", href: "/volunteer/users", icon: Users },
           { label: "Updates", href: "/volunteer/updates", icon: BellRing },
         ];
       case "STUDENT":
@@ -213,17 +223,50 @@ export default function DashboardLayout({ user, children }: DashboardLayoutProps
               )}
             </Link>
 
-            <div className="w-7 h-7 ml-1 border border-border bg-surface-container-high overflow-hidden rounded-sm">
-              <Avatar className="w-full h-full rounded-sm">
-                <AvatarImage
-                  src={`https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(user.name)}&backgroundColor=c0573e,8a726c`}
-                  className="w-full h-full object-cover"
-                />
-                <AvatarFallback className="rounded-sm text-[10px]">
-                  {user.name.slice(0, 2).toUpperCase()}
-                </AvatarFallback>
-              </Avatar>
-            </div>
+            <DropdownMenu>
+              <DropdownMenuTrigger
+                className="w-7 h-7 ml-1 border border-border bg-surface-container-high overflow-hidden rounded-sm cursor-pointer hover:bg-surface-container-high/80 transition-colors focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-primary active:scale-95 duration-100"
+                aria-label="User menu"
+              >
+                <Avatar className="w-full h-full rounded-sm">
+                  <AvatarImage
+                    src={`https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(user.name)}&backgroundColor=c0573e,8a726c`}
+                    className="w-full h-full object-cover"
+                  />
+                  <AvatarFallback className="rounded-sm text-[10px]">
+                    {user.name.slice(0, 2).toUpperCase()}
+                  </AvatarFallback>
+                </Avatar>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent
+                align="end"
+                className="w-56 font-mono text-[10px] uppercase tracking-widest bg-surface-container border border-border mt-1.5"
+              >
+                <DropdownMenuLabel className="px-2.5 py-2 flex flex-col gap-1 normal-case font-sans">
+                  <span className="font-semibold text-foreground text-xs leading-none">
+                    {user.name}
+                  </span>
+                  <span className="text-[10px] text-muted-foreground leading-none font-mono tracking-widest uppercase mt-0.5">
+                    {roleLabel}
+                  </span>
+                </DropdownMenuLabel>
+                <DropdownMenuSeparator className="-mx-1 my-1 h-px bg-border" />
+                <DropdownMenuItem
+                  render={<Link href="/profile" />}
+                  className="w-full flex items-center gap-2 px-2.5 py-2 cursor-pointer text-foreground hover:bg-surface-container-high hover:text-foreground font-sans text-xs normal-case tracking-normal rounded-md"
+                >
+                  Profile / Settings
+                </DropdownMenuItem>
+                <DropdownMenuSeparator className="-mx-1 my-1 h-px bg-border" />
+                <DropdownMenuItem
+                  onClick={handleSignOut}
+                  className="w-full flex items-center gap-2 px-2.5 py-2 cursor-pointer text-destructive focus:bg-destructive/10 focus:text-destructive dark:focus:bg-destructive/20 font-sans text-xs normal-case tracking-normal rounded-md"
+                >
+                  <LogOut size={14} className="text-destructive shrink-0" />
+                  <span>Log out</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
           </div>
         </header>
 
