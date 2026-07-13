@@ -6,6 +6,7 @@ import { prisma, Prisma } from "@/lib/db";
 import { auth } from "@/lib/auth";
 import { Role } from "@/lib/db";
 import crypto from "crypto";
+import { hashPassword } from "@better-auth/utils/password";
 
 // ─── Auth helpers ─────────────────────────────────────────────────────────────
 
@@ -137,10 +138,31 @@ export async function resetUserPasswordAction(userId: string) {
 
   const tempPassword = generateTempPassword();
 
-  // Let Better Auth hash and store the password properly.
-  await auth.api.setUserPassword({
-    body: { userId, newPassword: tempPassword },
+  // Hash using Better Auth's own hasher so the credential account row is valid.
+  const passwordHash = await hashPassword(tempPassword);
+
+  // Update-or-create the credential account for this user.
+  const existingAccount = await prisma.account.findFirst({
+    where: { userId, providerId: "credential" },
   });
+
+  if (existingAccount) {
+    await prisma.account.update({
+      where: { id: existingAccount.id },
+      data: { password: passwordHash },
+    });
+  } else {
+    await prisma.account.create({
+      data: {
+        userId,
+        accountId: userId,
+        providerId: "credential",
+        password: passwordHash,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+    });
+  }
 
   // Mark the user as needing a password change on next login.
   await prisma.user.update({
@@ -173,9 +195,29 @@ export async function forceSetNewPasswordAction(newPassword: string) {
     throw new Error("Password must be at least 8 characters.");
   }
 
-  await auth.api.setUserPassword({
-    body: { userId: session.user.id, newPassword },
+  const passwordHash = await hashPassword(newPassword);
+
+  const existingAccount = await prisma.account.findFirst({
+    where: { userId: session.user.id, providerId: "credential" },
   });
+
+  if (existingAccount) {
+    await prisma.account.update({
+      where: { id: existingAccount.id },
+      data: { password: passwordHash },
+    });
+  } else {
+    await prisma.account.create({
+      data: {
+        userId: session.user.id,
+        accountId: session.user.id,
+        providerId: "credential",
+        password: passwordHash,
+        createdAt: new Date(),
+        updatedAt: new Date(),
+      },
+    });
+  }
 
   await prisma.user.update({
     where: { id: session.user.id },
