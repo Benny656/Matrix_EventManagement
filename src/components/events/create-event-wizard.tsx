@@ -146,22 +146,22 @@ export default function CreateEventWizard({ role }: { role: "ADMIN" | "VOLUNTEER
   return (
     <div className="flex flex-col gap-6 max-w-4xl mx-auto w-full pb-12 selection:bg-primary-container/20 selection:text-primary">
       {/* Wizard Header Progress Indicator */}
-      <header className="border-b border-border bg-card p-6 sticky top-16 z-10 -mx-6 md:mx-0">
+      <header className="border-b border-border bg-card p-4 md:p-6 sticky top-14 md:top-16 z-10 -mx-4 md:mx-0">
         <div className="flex flex-col md:flex-row items-start md:items-center justify-between gap-4">
           <h2 className="font-heading text-lg font-bold text-foreground uppercase tracking-tight">Create New Event</h2>
-          <div className="flex items-center gap-4 font-mono text-[11px] uppercase tracking-wider">
-            <div className={`flex items-center gap-2 ${step >= 1 ? "text-primary font-bold" : "text-muted-foreground"}`}>
-              <span className={`w-6 h-6 border flex items-center justify-center ${step === 1 ? "bg-primary text-primary-foreground border-primary" : "border-border"}`}>1</span>
+          <div className="flex flex-wrap items-center gap-2 md:gap-4 font-mono text-[10px] md:text-[11px] uppercase tracking-wider">
+            <div className={`flex items-center gap-1.5 md:gap-2 ${step >= 1 ? "text-primary font-bold" : "text-muted-foreground"}`}>
+              <span className={`w-5 h-5 md:w-6 md:h-6 border flex items-center justify-center text-[9px] md:text-xs ${step === 1 ? "bg-primary text-primary-foreground border-primary" : "border-border"}`}>1</span>
               <span>Basic Info</span>
             </div>
-            <div className="w-8 h-[1px] bg-border"></div>
-            <div className={`flex items-center gap-2 ${step >= 2 ? "text-primary font-bold" : "text-muted-foreground"}`}>
-              <span className={`w-6 h-6 border flex items-center justify-center ${step === 2 ? "bg-primary text-primary-foreground border-primary" : "border-border"}`}>2</span>
+            <div className="hidden sm:block w-6 md:w-8 h-[1px] bg-border"></div>
+            <div className={`flex items-center gap-1.5 md:gap-2 ${step >= 2 ? "text-primary font-bold" : "text-muted-foreground"}`}>
+              <span className={`w-5 h-5 md:w-6 md:h-6 border flex items-center justify-center text-[9px] md:text-xs ${step === 2 ? "bg-primary text-primary-foreground border-primary" : "border-border"}`}>2</span>
               <span>Sessions</span>
             </div>
-            <div className="w-8 h-[1px] bg-border"></div>
-            <div className={`flex items-center gap-2 ${step >= 3 ? "text-primary font-bold" : "text-muted-foreground"}`}>
-              <span className={`w-6 h-6 border flex items-center justify-center ${step === 3 ? "bg-primary text-primary-foreground border-primary" : "border-border"}`}>3</span>
+            <div className="hidden sm:block w-6 md:w-8 h-[1px] bg-border"></div>
+            <div className={`flex items-center gap-1.5 md:gap-2 ${step >= 3 ? "text-primary font-bold" : "text-muted-foreground"}`}>
+              <span className={`w-5 h-5 md:w-6 md:h-6 border flex items-center justify-center text-[9px] md:text-xs ${step === 3 ? "bg-primary text-primary-foreground border-primary" : "border-border"}`}>3</span>
               <span>Review</span>
             </div>
           </div>
@@ -398,7 +398,7 @@ export default function CreateEventWizard({ role }: { role: "ADMIN" | "VOLUNTEER
             ) : (
               <div className="border border-border bg-background divide-y divide-border">
                 {/* Table Header */}
-                <div className="grid grid-cols-12 gap-2 px-4 py-2 bg-surface-container font-mono text-[10px] text-muted-foreground uppercase tracking-widest font-bold">
+                <div className="hidden md:grid grid-cols-12 gap-2 px-4 py-2 bg-surface-container font-mono text-[10px] text-muted-foreground uppercase tracking-widest font-bold">
                   <div className="col-span-4">Time Block</div>
                   <div className="col-span-5">Designation</div>
                   <div className="col-span-2">Location</div>
@@ -407,15 +407,23 @@ export default function CreateEventWizard({ role }: { role: "ADMIN" | "VOLUNTEER
 
                 {/* Table Body */}
                 {sessions.map((sess, idx) => (
-                  <div key={idx} className="grid grid-cols-12 gap-2 px-4 py-3 font-mono text-xs items-center">
-                    <div className="col-span-4 text-muted-foreground">
-                      {new Date(sess.startTime).toLocaleString("en-US", { hour12: false })} - {new Date(sess.endTime).toLocaleTimeString("en-US", { hour12: false, hour: "2-digit", minute: "2-digit" })}
+                  <div key={idx} className="flex flex-col md:grid md:grid-cols-12 gap-2 px-4 py-3 font-mono text-xs items-stretch md:items-center border-b border-border last:border-b-0 md:border-b-0">
+                    <div className="md:col-span-5 font-semibold text-foreground text-sm md:text-xs">{sess.title}</div>
+                    
+                    <div className="flex flex-wrap items-center justify-between gap-2 pt-1 border-t border-border/45 md:border-t-0 md:pt-0 md:col-span-6 md:grid md:grid-cols-6">
+                      <div className="text-muted-foreground md:col-span-4">
+                        {new Date(sess.startTime).toLocaleString("en-US", { hour12: false })}
+                      </div>
+                      <div className="text-muted-foreground md:col-span-2 md:text-right">
+                        <span className="inline md:hidden text-muted-foreground/60 text-[9px] uppercase font-bold mr-1">Venue:</span>
+                        {sess.venue}
+                      </div>
                     </div>
-                    <div className="col-span-5 font-semibold text-foreground">{sess.title}</div>
-                    <div className="col-span-2 text-muted-foreground">{sess.venue}</div>
-                    <div className="col-span-1 text-right">
-                      <button onClick={() => removeSession(idx)} className="text-primary hover:text-primary-container">
+                    
+                    <div className="md:col-span-1 text-right flex justify-end pt-2 border-t border-border/45 md:border-t-0 md:pt-0">
+                      <button onClick={() => removeSession(idx)} className="p-2 border border-destructive/20 md:border-none hover:bg-destructive/5 md:hover:bg-transparent text-primary hover:text-primary-container flex items-center justify-center gap-1.5 w-full md:w-auto font-mono text-[10px] md:text-xs uppercase cursor-pointer">
                         <Trash2 size={14} className="pointer-events-none" />
+                        <span className="inline md:hidden text-destructive font-bold">Delete Block</span>
                       </button>
                     </div>
                   </div>
@@ -489,12 +497,12 @@ export default function CreateEventWizard({ role }: { role: "ADMIN" | "VOLUNTEER
               </h3>
               <div className="divide-y divide-border font-mono text-xs">
                 {sessions.map((sess, idx) => (
-                  <div key={idx} className="py-2 flex justify-between">
+                  <div key={idx} className="py-2 flex flex-col sm:flex-row sm:justify-between gap-1 sm:gap-4">
                     <div>
                       <span className="font-semibold text-foreground">{sess.title}</span>
                       <span className="text-muted-foreground block text-[11px] mt-0.5">Location: {sess.venue}</span>
                     </div>
-                    <div className="text-right text-muted-foreground">
+                    <div className="text-left sm:text-right text-muted-foreground">
                       {new Date(sess.startTime).toLocaleString("en-US", { hour12: false })} - {new Date(sess.endTime).toLocaleTimeString("en-US", { hour12: false, hour: "2-digit", minute: "2-digit" })}
                     </div>
                   </div>

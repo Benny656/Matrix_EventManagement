@@ -181,7 +181,7 @@ export default function DashboardLayout({ user, children }: DashboardLayoutProps
       {/* Main */}
       <div className="flex-1 flex flex-col md:ml-60 h-screen overflow-hidden">
         {/* Top bar */}
-        <header className="flex justify-between items-center px-5 w-full z-30 glass-panel h-14 sticky top-0">
+        <header className="flex justify-between items-center px-5 w-full z-30 glass-panel h-[calc(3.5rem+env(safe-area-inset-top))] pt-[env(safe-area-inset-top)] sticky top-0">
           <div className="flex items-center gap-3">
             <button
               onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
@@ -245,7 +245,7 @@ export default function DashboardLayout({ user, children }: DashboardLayoutProps
                 animate={{ x: 0 }}
                 exit={{ x: "-100%" }}
                 transition={{ type: "spring", damping: 30, stiffness: 300 }}
-                className="fixed left-0 top-0 w-60 h-full bg-surface-container py-5 px-3 flex flex-col border-r border-border z-50 md:hidden"
+                className="fixed left-0 top-0 w-60 h-full bg-surface-container pt-[calc(1.25rem+env(safe-area-inset-top))] pb-5 px-3 flex flex-col border-r border-border z-50 md:hidden"
                 onClick={(e) => e.stopPropagation()}
               >
                 <div className="mb-5 px-3 pb-5 border-b border-border flex justify-between items-center">
@@ -261,7 +261,7 @@ export default function DashboardLayout({ user, children }: DashboardLayoutProps
                   </button>
                 </div>
 
-                <div className="flex-1 space-y-0.5">
+                <div className="flex-1 overflow-y-auto space-y-0.5">
                   {navItems.map((item) => {
                     const Icon = item.icon;
                     const isRoot = ["/admin", "/volunteer", "/student"].includes(item.href);
@@ -308,14 +308,14 @@ export default function DashboardLayout({ user, children }: DashboardLayoutProps
         </AnimatePresence>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto p-4 md:p-6 pb-24 md:pb-6 bg-background">
+        <div className="flex-1 overflow-y-auto p-4 md:p-6 pb-[calc(5.5rem+env(safe-area-inset-bottom))] md:pb-6 bg-background">
           <div className="h-full">
             {children}
           </div>
         </div>
 
         {/* Bottom Nav (Mobile) */}
-        <nav className="fixed bottom-0 left-0 right-0 z-30 md:hidden flex justify-around items-center h-16 border-t border-border/80 bg-background/80 backdrop-blur-md px-2">
+        <nav className="fixed bottom-0 left-0 right-0 z-30 md:hidden flex justify-around items-center h-[calc(4rem+env(safe-area-inset-bottom))] pb-[env(safe-area-inset-bottom)] border-t border-border/80 bg-background/80 backdrop-blur-md px-2">
           {navItems.slice(0, 3).map((item) => {
             const Icon = item.icon;
             const isRoot = ["/admin", "/volunteer", "/student"].includes(item.href);

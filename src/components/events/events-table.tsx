@@ -134,7 +134,7 @@ export default function EventsTable({ initialEvents, role }: EventsTableProps) {
       {/* Grid Canvas */}
       <div className="border border-border bg-card">
         {/* Table Header */}
-        <div className="grid grid-cols-12 border-b border-border bg-surface-container px-4 py-3 font-mono text-[10px] uppercase tracking-wider text-muted-foreground font-bold">
+        <div className="hidden md:grid grid-cols-12 border-b border-border bg-surface-container px-4 py-3 font-mono text-[10px] uppercase tracking-wider text-muted-foreground font-bold">
           <div className="col-span-5">Event Title</div>
           <div className="col-span-2">Date</div>
           <div className="col-span-2">Status</div>
@@ -157,55 +157,61 @@ export default function EventsTable({ initialEvents, role }: EventsTableProps) {
               });
 
               return (
-                <div key={event.id} className="grid grid-cols-12 gap-2 px-4 py-4 font-mono text-xs items-center hover:bg-surface-container-low/50">
+                <div key={event.id} className="flex flex-col md:grid md:grid-cols-12 gap-3 md:gap-2 px-4 py-4 font-mono text-xs items-stretch md:items-center hover:bg-surface-container-low/50 border-b border-border last:border-b-0 md:border-b-0">
                   {/* Title & Category */}
-                  <div className="col-span-5 pr-4">
+                  <div className="md:col-span-5 pr-4 flex flex-col">
                     <span className="text-[10px] text-primary uppercase font-bold tracking-widest">{event.category}</span>
-                    <h4 className="font-sans text-sm font-bold text-foreground mt-0.5 line-clamp-1">{event.title}</h4>
+                    <h4 className="font-sans text-sm font-bold text-foreground mt-0.5 line-clamp-2">{event.title}</h4>
                     <span className="text-muted-foreground text-[10px] block mt-0.5">Location: {event.venue}</span>
                   </div>
 
-                  {/* Date */}
-                  <div className="col-span-2 text-muted-foreground uppercase">{dateStr}</div>
+                  {/* Mobile Meta Grid */}
+                  <div className="flex flex-wrap items-center justify-between gap-2 pt-2 border-t border-border/45 md:border-t-0 md:pt-0 md:col-span-6 md:grid md:grid-cols-6">
+                    {/* Date */}
+                    <div className="text-muted-foreground uppercase md:col-span-2">{dateStr}</div>
 
-                  {/* Status Badge */}
-                  <div className="col-span-2">
-                    <span className={`px-2 py-0.5 text-[9px] uppercase font-semibold border ${
-                      event.status === "UPCOMING"
-                        ? "bg-secondary-container text-on-secondary-container border-border"
-                        : event.status === "ONGOING"
-                        ? "bg-primary text-primary-foreground border-primary"
-                        : event.status === "COMPLETED"
-                        ? "bg-muted text-muted-foreground border-border"
-                        : "bg-surface-container text-muted-foreground border-border"
-                    }`}>
-                      {event.status}
-                    </span>
-                  </div>
+                    {/* Status Badge */}
+                    <div className="md:col-span-2">
+                      <span className={`px-2 py-0.5 text-[9px] uppercase font-semibold border ${
+                        event.status === "UPCOMING"
+                          ? "bg-secondary-container text-on-secondary-container border-border"
+                          : event.status === "ONGOING"
+                          ? "bg-primary text-primary-foreground border-primary"
+                          : event.status === "COMPLETED"
+                          ? "bg-muted text-muted-foreground border-border"
+                          : "bg-surface-container text-muted-foreground border-border"
+                      }`}>
+                        {event.status}
+                      </span>
+                    </div>
 
-                  {/* Registrations */}
-                  <div className="col-span-2 text-right text-foreground pr-2 font-semibold">
-                    {event._count.registrations} / {event.maxParticipants}
+                    {/* Registrations */}
+                    <div className="text-left md:text-right text-foreground font-semibold md:col-span-2 md:pr-2">
+                      <span className="inline md:hidden text-muted-foreground text-[10px] uppercase font-normal mr-1">RSVPs:</span>
+                      {event._count.registrations} / {event.maxParticipants}
+                    </div>
                   </div>
 
                   {/* Actions */}
-                  <div className="col-span-1 text-right flex items-center justify-end gap-1">
+                  <div className="md:col-span-1 text-right flex items-center justify-end gap-3 pt-2 border-t border-border/45 md:border-t-0 md:pt-0">
                     <Link
                       href={role === "ADMIN" ? `/admin/events/${event.id}` : `/volunteer/events/${event.id}`}
-                      className="p-1 hover:text-primary transition-colors flex items-center"
+                      className="flex-1 md:flex-none py-2.5 md:p-1 border border-border md:border-none hover:text-primary hover:bg-surface-container md:hover:bg-transparent transition-colors flex items-center justify-center gap-1.5 md:gap-0 font-mono text-[10px] md:text-xs uppercase h-10 md:h-auto min-h-[40px] md:min-h-0"
                       title="Manage Details"
                     >
                       <Pencil size={14} />
+                      <span className="inline md:hidden">Manage</span>
                     </Link>
 
                     {event.status !== "ARCHIVED" && (
                       <button
                         onClick={() => handleArchive(event.id)}
                         disabled={isPending}
-                        className="p-1 text-destructive hover:text-red-700 transition-colors flex items-center disabled:opacity-50"
+                        className="flex-1 md:flex-none py-2.5 md:p-1 border border-destructive/20 md:border-none text-destructive hover:text-red-700 hover:bg-destructive/5 md:hover:bg-transparent transition-colors flex items-center justify-center gap-1.5 md:gap-0 font-mono text-[10px] md:text-xs uppercase disabled:opacity-50 h-10 md:h-auto min-h-[40px] md:min-h-0 cursor-pointer"
                         title="Archive Event"
                       >
                         <Archive size={14} />
+                        <span className="inline md:hidden">Archive</span>
                       </button>
                     )}
                   </div>
