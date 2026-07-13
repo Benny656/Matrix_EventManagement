@@ -55,3 +55,6 @@ scripts/seed-test-data.ts
 scripts/verify-attendance-core.ts
 scripts/find-student.ts
 scripts/test-checkin.ts
+
+# Sentry Config File
+.env.sentry-build-plugin
