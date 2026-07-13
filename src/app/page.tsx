@@ -94,13 +94,13 @@ export default async function Home() {
       {/* Header */}
       <header className="w-full top-0 sticky bg-background/60 backdrop-blur-md border-b border-border z-50 transition-all">
         <div className="flex justify-between items-center px-6 py-3 w-full max-w-7xl mx-auto min-h-[64px]">
-          <div className="flex items-center gap-3">
+          <Link href="/" className="flex items-center gap-3 hover:opacity-90 transition-opacity">
             <img src="/logo.png" alt="Matrix Logo" className="h-8 w-8 object-contain opacity-95 hover:opacity-100 transition-all filter drop-shadow-[0_2px_4px_rgba(0,0,0,0.05)] dark:invert" />
             <div className="flex flex-col">
               <span className="font-heading text-lg font-bold tracking-tight text-foreground uppercase">MATRIX</span>
               <span className="font-mono text-[9px] uppercase tracking-widest text-muted-foreground -mt-0.5">AIML · Karunya University</span>
             </div>
-          </div>
+          </Link>
           <div className="flex items-center gap-2">
             <ThemeToggle />
             <Link

@@ -124,7 +124,7 @@ export default function DashboardLayout({ user, children }: DashboardLayoutProps
       {/* Sidebar (Desktop) */}
       <nav className="hidden md:flex flex-col h-full py-5 px-3 bg-surface-container border-r border-border w-60 fixed left-0 top-0 z-40">
         {/* Brand */}
-        <div className="mb-7 px-3 pb-5 border-b border-border flex items-center gap-3">
+        <Link href="/" className="mb-7 px-3 pb-5 border-b border-border flex items-center gap-3 hover:opacity-90 transition-opacity">
           <img src="/logo.png" alt="Matrix Logo" className="h-7 w-7 object-contain opacity-90 dark:invert" />
           <div>
             <span className="font-heading text-base font-bold text-foreground tracking-tighter uppercase">
@@ -134,7 +134,7 @@ export default function DashboardLayout({ user, children }: DashboardLayoutProps
               {roleLabel}
             </p>
           </div>
-        </div>
+        </Link>
 
         {/* Nav items */}
         <div className="flex-1 space-y-0.5">
@@ -292,13 +292,13 @@ export default function DashboardLayout({ user, children }: DashboardLayoutProps
                 onClick={(e) => e.stopPropagation()}
               >
                 <div className="mb-5 px-3 pb-5 border-b border-border flex justify-between items-center">
-                  <div className="flex items-center gap-3">
+                  <Link href="/" className="flex items-center gap-3 hover:opacity-90 transition-opacity">
                     <img src="/logo.png" alt="Matrix Logo" className="h-7 w-7 object-contain opacity-90 dark:invert" />
                     <div>
                       <span className="font-heading text-base font-bold text-foreground tracking-tighter uppercase">Matrix</span>
                       <p className="font-mono text-[9px] text-muted-foreground uppercase tracking-widest mt-0.5">{roleLabel}</p>
                     </div>
-                  </div>
+                  </Link>
                   <button onClick={() => setMobileMenuOpen(false)} className="text-muted-foreground hover:text-foreground p-1">
                     <X size={16} />
                   </button>
