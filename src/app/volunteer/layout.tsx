@@ -17,7 +17,7 @@ export default async function VolunteerLayout({
   }
 
   if (session.user.role !== "VOLUNTEER" && session.user.role !== "ADMIN") {
-    redirect("/login");
+    redirect("/unauthorized");
   }
 
   return (

@@ -3,6 +3,20 @@ import { NextRequest, NextResponse } from "next/server";
 export default async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
+  // ── 0. Check if this is a protected route or change-password route ──
+  const isProtectedRoute =
+    pathname.startsWith("/admin") ||
+    pathname.startsWith("/volunteer") ||
+    pathname.startsWith("/student") ||
+    pathname.startsWith("/profile");
+
+  const isChangePassword = pathname === "/change-password";
+
+  // Skip session fetch and parsing for public routes
+  if (!isProtectedRoute && !isChangePassword) {
+    return NextResponse.next();
+  }
+
   const cookieHeader = request.headers.get("cookie") || "";
 
   let sessionData: any = null;
@@ -22,8 +36,8 @@ export default async function proxy(request: NextRequest) {
   const session = sessionData?.session;
   const user = sessionData?.user;
 
-  // ── 0. /change-password — requires a session; skip if not logged in ──────
-  if (pathname === "/change-password") {
+  // ── 1. /change-password — requires a session; skip if not logged in ──────
+  if (isChangePassword) {
     if (!session) {
       return NextResponse.redirect(new URL("/login", request.url));
     }
@@ -37,41 +51,27 @@ export default async function proxy(request: NextRequest) {
     return NextResponse.next();
   }
 
-  // ── 1. Unauthenticated guard ──────────────────────────────────────────────
-  const isProtectedRoute =
-    pathname.startsWith("/admin") ||
-    pathname.startsWith("/volunteer") ||
-    pathname.startsWith("/student") ||
-    pathname.startsWith("/profile");
-
-  if (isProtectedRoute && !session) {
+  // ── 2. Unauthenticated guard ──────────────────────────────────────────────
+  if (!session) {
     return NextResponse.redirect(new URL("/login", request.url));
   }
 
-  // ── 2. mustChangePassword — intercept before any dashboard access ─────────
-  if (isProtectedRoute && user?.mustChangePassword) {
+  // ── 3. mustChangePassword — intercept before any dashboard access ─────────
+  if (user?.mustChangePassword) {
     return NextResponse.redirect(new URL("/change-password", request.url));
   }
 
-  // ── 3. Role-based checks ──────────────────────────────────────────────────
+  // ── 4. Role-based checks ──────────────────────────────────────────────────
   if (pathname.startsWith("/admin") && user?.role !== "ADMIN") {
-    if (user?.role === "VOLUNTEER") return NextResponse.redirect(new URL("/volunteer", request.url));
-    if (user?.role === "STUDENT") return NextResponse.redirect(new URL("/student", request.url));
-    return NextResponse.redirect(new URL("/login", request.url));
+    return NextResponse.redirect(new URL("/unauthorized", request.url));
   }
 
-  if (pathname.startsWith("/volunteer") && user?.role !== "VOLUNTEER") {
-    // Admins can access volunteer routes
-    if (user?.role === "ADMIN") return NextResponse.next();
-    if (user?.role === "STUDENT") return NextResponse.redirect(new URL("/student", request.url));
-    return NextResponse.redirect(new URL("/login", request.url));
+  if (pathname.startsWith("/volunteer") && user?.role !== "VOLUNTEER" && user?.role !== "ADMIN") {
+    return NextResponse.redirect(new URL("/unauthorized", request.url));
   }
 
-  if (pathname.startsWith("/student") && user?.role !== "STUDENT") {
-    // Admins can access student routes
-    if (user?.role === "ADMIN") return NextResponse.next();
-    if (user?.role === "VOLUNTEER") return NextResponse.redirect(new URL("/volunteer", request.url));
-    return NextResponse.redirect(new URL("/login", request.url));
+  if (pathname.startsWith("/student") && user?.role !== "STUDENT" && user?.role !== "ADMIN") {
+    return NextResponse.redirect(new URL("/unauthorized", request.url));
   }
 
   return NextResponse.next();

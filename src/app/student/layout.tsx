@@ -17,7 +17,7 @@ export default async function StudentLayout({
   }
 
   if (session.user.role !== "STUDENT" && session.user.role !== "ADMIN") {
-    redirect("/login");
+    redirect("/unauthorized");
   }
 
   return (

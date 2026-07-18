@@ -67,6 +67,17 @@ export default function DashboardLayout({ user, children }: DashboardLayoutProps
     return () => clearInterval(interval);
   }, [pathname]);
 
+  const isAuthorized = React.useMemo(() => {
+    if (pathname.startsWith("/admin") && user.role !== "ADMIN") return false;
+    if (pathname.startsWith("/volunteer") && user.role !== "VOLUNTEER" && user.role !== "ADMIN") return false;
+    if (pathname.startsWith("/student") && user.role !== "STUDENT" && user.role !== "ADMIN") return false;
+    return true;
+  }, [pathname, user.role]);
+
+  if (!isAuthorized) {
+    return null;
+  }
+
   const getNavItems = (): NavItem[] => {
     switch (user.role) {
       case "ADMIN":
