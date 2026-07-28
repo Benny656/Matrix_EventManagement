@@ -38,6 +38,7 @@ const securityHeaders = [
 const nextConfig: NextConfig = {
   poweredByHeader: false,
   transpilePackages: ["lucide-react"],
+  serverExternalPackages: ["firebase-admin"],
   async headers() {
     return [
       {

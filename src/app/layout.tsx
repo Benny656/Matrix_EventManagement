@@ -7,16 +7,19 @@ import { ThemeProvider } from "@/components/theme-provider";
 const inter = Inter({
   variable: "--font-inter",
   subsets: ["latin"],
+  display: "swap",
 });
 
 const geist = Geist({
   variable: "--font-geist",
   subsets: ["latin"],
+  display: "swap",
 });
 
 const jetbrainsMono = JetBrains_Mono({
   variable: "--font-mono",
   subsets: ["latin"],
+  display: "swap",
 });
 
 export const viewport: Viewport = {
@@ -43,7 +46,6 @@ export const metadata: Metadata = {
     apple: "/apple-touch-icon.png",
   },
 };
-
 
 export default function RootLayout({
   children,
@@ -80,4 +82,3 @@ export default function RootLayout({
     </html>
   );
 }
-
