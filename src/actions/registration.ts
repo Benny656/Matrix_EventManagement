@@ -1,180 +1,145 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { headers } from "next/headers";
-import { prisma } from "@/lib/db";
-import { auth } from "@/lib/auth";
+import { adminDb } from "@/lib/firebase-admin";
+import { getCurrentUser } from "@/lib/auth-session";
 
 async function verifyStudent() {
-  const session = await auth.api.getSession({
-    headers: await headers(),
-  });
-
-  if (!session || session.user.role !== "STUDENT") {
+  const currentUser = await getCurrentUser();
+  if (!currentUser || currentUser.role !== "STUDENT") {
     throw new Error("Unauthorized. Student credentials required.");
   }
-
-  return session.user;
+  return currentUser;
 }
 
 export async function registerForEventAction(eventId: string) {
   const user = await verifyStudent();
 
-  return await prisma.$transaction(async (tx) => {
-    // Lock the event row for updates to serialize concurrent registrations
-    await tx.$executeRaw`SELECT id FROM "Event" WHERE id = ${eventId} FOR UPDATE`;
+  const eventDoc = await adminDb.collection("events").doc(eventId).get();
+  if (!eventDoc.exists) throw new Error("Event not found");
 
-    // 1. Fetch Event details and capacity
-    const event = await tx.event.findUnique({
-      where: { id: eventId },
-      include: {
-        registrations: {
-          where: { status: "REGISTERED" },
-        },
-      },
+  const event = eventDoc.data() as any;
+  if (event.status === "ARCHIVED") {
+    throw new Error("Cannot register for an archived event.");
+  }
+
+  if (event.registrationDeadline && new Date() > new Date(event.registrationDeadline)) {
+    throw new Error("Registration deadline has passed.");
+  }
+
+  // Fetch all registrations for this event to count confirmed
+  const regSnapshot = await adminDb
+    .collection("registrations")
+    .where("eventId", "==", eventId)
+    .get();
+
+  const eventRegs = regSnapshot.docs.map((d) => d.data());
+  const existingRegDoc = regSnapshot.docs.find((d) => d.data().studentId === user.id);
+
+  if (existingRegDoc && existingRegDoc.data().status !== "CANCELLED") {
+    throw new Error("You are already registered or waitlisted for this event.");
+  }
+
+  const activeCount = eventRegs.filter((r) => r.status === "REGISTERED").length;
+  const isWaitlist = activeCount >= event.maxParticipants;
+  const newStatus = isWaitlist ? "WAITLISTED" : "REGISTERED";
+
+  if (existingRegDoc) {
+    await existingRegDoc.ref.update({
+      status: newStatus,
+      createdAt: new Date().toISOString(),
     });
-
-    if (!event) throw new Error("Event not found");
-
-    if (event.status === "ARCHIVED") {
-      throw new Error("Cannot register for an archived event.");
-    }
-
-    if (event.registrationDeadline && new Date() > new Date(event.registrationDeadline)) {
-      throw new Error("Registration deadline has passed.");
-    }
-
-    // Check if user already has a registration record
-    const existing = await tx.registration.findUnique({
-      where: {
-        studentId_eventId: {
-          studentId: user.id,
-          eventId: eventId,
-        },
-      },
+  } else {
+    const newRef = adminDb.collection("registrations").doc();
+    await newRef.set({
+      id: newRef.id,
+      studentId: user.id,
+      eventId: eventId,
+      status: newStatus,
+      createdAt: new Date().toISOString(),
     });
+  }
 
-    if (existing && existing.status !== "CANCELLED") {
-      throw new Error("You are already registered or waitlisted for this event.");
-    }
-
-    // Calculate if we need to waitlist
-    const activeCount = event.registrations.length;
-    const isWaitlist = activeCount >= event.maxParticipants;
-    const newStatus = isWaitlist ? ("WAITLISTED" as const) : ("REGISTERED" as const);
-
-    if (existing) {
-      // Re-activate cancelled registration
-      await tx.registration.update({
-        where: { id: existing.id },
-        data: {
-          status: newStatus,
-          createdAt: new Date(), // Reset timestamp for waitlist ordering
-        },
-      });
-    } else {
-      // Create new registration record
-      await tx.registration.create({
-        data: {
-          studentId: user.id,
-          eventId: eventId,
-          status: newStatus,
-        },
-      });
-    }
-
-    // Create Notification
-    await tx.notification.create({
-      data: {
-        userId: user.id,
-        type: isWaitlist ? "UPDATE_POSTED" : "REGISTRATION_CONFIRMED",
-        message: isWaitlist
-          ? `You have been added to the waitlist for ${event.title}.`
-          : `Registration confirmed for ${event.title}!`,
-        linkUrl: `/student/events/${eventId}`,
-      },
-    });
-
-    // Revalidate paths
-    revalidatePath("/student");
-    revalidatePath(`/student/events/${eventId}`);
-    revalidatePath("/student/registrations");
-    revalidatePath(`/volunteer/events/${eventId}`);
-    revalidatePath(`/admin/events/${eventId}`);
-
-    return { success: true, status: newStatus };
+  // Create notification
+  const notifRef = adminDb.collection("notifications").doc();
+  await notifRef.set({
+    id: notifRef.id,
+    userId: user.id,
+    type: isWaitlist ? "UPDATE_POSTED" : "REGISTRATION_CONFIRMED",
+    message: isWaitlist
+      ? `You have been added to the waitlist for ${event.title}.`
+      : `Registration confirmed for ${event.title}!`,
+    read: false,
+    linkUrl: `/student/events/${eventId}`,
+    createdAt: new Date().toISOString(),
   });
+
+  revalidatePath("/student");
+  revalidatePath(`/student/events/${eventId}`);
+  revalidatePath("/student/registrations");
+  revalidatePath(`/volunteer/events/${eventId}`);
+  revalidatePath(`/admin/events/${eventId}`);
+
+  return { success: true, status: newStatus };
 }
 
 export async function cancelRegistrationAction(eventId: string) {
   const user = await verifyStudent();
 
-  return await prisma.$transaction(async (tx) => {
-    // Lock the event row for updates
-    await tx.$executeRaw`SELECT id FROM "Event" WHERE id = ${eventId} FOR UPDATE`;
+  const regSnapshot = await adminDb
+    .collection("registrations")
+    .where("studentId", "==", user.id)
+    .where("eventId", "==", eventId)
+    .get();
 
-    const existing = await tx.registration.findUnique({
-      where: {
-        studentId_eventId: {
-          studentId: user.id,
-          eventId: eventId,
-        },
-      },
-      include: {
-        event: true,
-      },
-    });
+  if (regSnapshot.empty) {
+    throw new Error("No active registration found to cancel.");
+  }
 
-    if (!existing || existing.status === "CANCELLED") {
-      throw new Error("No active registration found to cancel.");
-    }
+  const regDoc = regSnapshot.docs[0];
+  const regData = regDoc.data();
+  if (regData.status === "CANCELLED") {
+    throw new Error("No active registration found to cancel.");
+  }
 
-    const previousStatus = existing.status;
+  const previousStatus = regData.status;
+  await regDoc.ref.update({ status: "CANCELLED" });
 
-    // Update status to CANCELLED
-    await tx.registration.update({
-      where: { id: existing.id },
-      data: { status: "CANCELLED" },
-    });
+  if (previousStatus === "REGISTERED") {
+    const eventDoc = await adminDb.collection("events").doc(eventId).get();
+    const eventTitle = eventDoc.exists ? eventDoc.data()?.title || "Event" : "Event";
 
-    // If student was confirmed, promote the first waitlisted student
-    if (previousStatus === "REGISTERED") {
-      const nextWaitlisted = await tx.registration.findFirst({
-        where: {
-          eventId: eventId,
-          status: "WAITLISTED",
-        },
-        orderBy: { createdAt: "asc" },
-        include: {
-          student: true,
-        },
+    const waitlistSnapshot = await adminDb
+      .collection("registrations")
+      .where("eventId", "==", eventId)
+      .where("status", "==", "WAITLISTED")
+      .get();
+
+    const waitlistedDocs = waitlistSnapshot.docs;
+    waitlistedDocs.sort((a, b) => (a.data().createdAt || "").localeCompare(b.data().createdAt || ""));
+
+    if (waitlistedDocs.length > 0) {
+      const promotedDoc = waitlistedDocs[0];
+      await promotedDoc.ref.update({ status: "REGISTERED" });
+
+      const notifRef = adminDb.collection("notifications").doc();
+      await notifRef.set({
+        id: notifRef.id,
+        userId: promotedDoc.data().studentId,
+        type: "REGISTRATION_CONFIRMED",
+        message: `Good news! You have been promoted from the waitlist and registered for ${eventTitle}.`,
+        read: false,
+        linkUrl: `/student/events/${eventId}`,
+        createdAt: new Date().toISOString(),
       });
-
-      if (nextWaitlisted) {
-        await tx.registration.update({
-          where: { id: nextWaitlisted.id },
-          data: { status: "REGISTERED" },
-        });
-
-        // Notify promoted student
-        await tx.notification.create({
-          data: {
-            userId: nextWaitlisted.studentId,
-            type: "REGISTRATION_CONFIRMED",
-            message: `Good news! You have been promoted from the waitlist and registered for ${existing.event.title}.`,
-            linkUrl: `/student/events/${eventId}`,
-          },
-        });
-      }
     }
+  }
 
-    // Revalidate paths
-    revalidatePath("/student");
-    revalidatePath(`/student/events/${eventId}`);
-    revalidatePath("/student/registrations");
-    revalidatePath(`/volunteer/events/${eventId}`);
-    revalidatePath(`/admin/events/${eventId}`);
+  revalidatePath("/student");
+  revalidatePath(`/student/events/${eventId}`);
+  revalidatePath("/student/registrations");
+  revalidatePath(`/volunteer/events/${eventId}`);
+  revalidatePath(`/admin/events/${eventId}`);
 
-    return { success: true };
-  });
+  return { success: true };
 }

@@ -1,7 +1,6 @@
-import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { auth } from "@/lib/auth";
+import { getCurrentUser } from "@/lib/auth-session";
 import {
   LayoutGrid,
   ChevronRight,
@@ -16,6 +15,8 @@ import ThemeToggle from "@/components/theme-toggle";
 import ShootingStarsGrid from "@/components/shooting-stars-grid";
 import { MATRIX_SOCIALS } from "@/lib/constants";
 import { LinkedInIcon, InstagramIcon, GitHubIcon } from "@/components/ui/brand-icons";
+
+export const dynamic = "force-dynamic";
 
 const socialLinks = [
   {
@@ -57,12 +58,10 @@ const socialLinks = [
 ];
 
 export default async function Home() {
-  const session = await auth.api.getSession({
-    headers: await headers(),
-  });
+  const user = await getCurrentUser();
 
-  if (session) {
-    const role = session.user.role;
+  if (user) {
+    const role = user.role;
     if (role === "ADMIN") {
       redirect("/admin");
     } else if (role === "VOLUNTEER") {
@@ -73,7 +72,7 @@ export default async function Home() {
   }
 
   return (
-    <div className="bg-gradient-to-b from-background via-surface-container-low to-background text-foreground font-sans min-h-screen flex flex-col relative overflow-hidden selection:bg-primary/20 selection:text-primary">
+    <div className="bg-gradient-to-b from-background via-surface-container-low to-background text-foreground font-sans min-h-screen flex flex-col relative overflow-hidden selection:bg-primary/10 selection:text-primary">
       {/* Glowing background shapes and animated shooting stars grid */}
       <ShootingStarsGrid 
         className="absolute inset-0 z-0 opacity-100 mix-blend-normal dark:mix-blend-screen" 

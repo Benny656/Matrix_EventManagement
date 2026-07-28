@@ -4,7 +4,8 @@ import React, { useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
-import { signOut } from "@/lib/auth-client";
+import { signOut as firebaseSignOut } from "firebase/auth";
+import { auth } from "@/lib/firebase";
 import { getUnreadNotificationCountAction } from "@/actions/notification";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import ThemeToggle from "@/components/theme-toggle";
@@ -25,7 +26,6 @@ import {
   Home,
   CalendarCheck,
   ScanLine,
-  PenLine,
   LogOut,
   Menu,
   X,
@@ -120,14 +120,14 @@ export default function DashboardLayout({ user, children }: DashboardLayoutProps
       : "/student/notifications";
 
   const handleSignOut = async () => {
-    await signOut({
-      fetchOptions: {
-        onSuccess: () => {
-          router.push("/login");
-          router.refresh();
-        },
-      },
-    });
+    try {
+      await firebaseSignOut(auth);
+    } catch (e) {
+      console.error("Sign out error", e);
+    }
+    await fetch("/api/auth/session", { method: "DELETE" });
+    router.push("/login");
+    router.refresh();
   };
 
   return (

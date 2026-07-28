@@ -10,7 +10,6 @@ import { Lock, ShieldCheck, AlertCircle } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { forceSetNewPasswordAction } from "@/actions/user";
-import { useSession } from "@/lib/auth-client";
 import ThemeToggle from "@/components/theme-toggle";
 
 const schema = z
@@ -31,7 +30,6 @@ type FormValues = z.infer<typeof schema>;
 
 export default function ChangePasswordPage() {
   const router = useRouter();
-  const { data: session } = useSession();
   const [serverError, setServerError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -47,11 +45,7 @@ export default function ChangePasswordPage() {
     try {
       const result = await forceSetNewPasswordAction(data.newPassword);
       if (result.success) {
-        // Redirect to the correct dashboard based on role
-        const role = session?.user?.role;
-        if (role === "ADMIN") router.push("/admin");
-        else if (role === "VOLUNTEER") router.push("/volunteer");
-        else router.push("/student");
+        router.push("/login");
       }
     } catch (err: any) {
       setServerError(err.message || "Something went wrong. Please try again.");

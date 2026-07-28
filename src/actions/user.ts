@@ -1,82 +1,47 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { headers } from "next/headers";
-import { prisma, Prisma } from "@/lib/db";
-import { auth } from "@/lib/auth";
-import { Role } from "@/lib/db";
+import { adminAuth, adminDb } from "@/lib/firebase-admin";
+import { verifyAdmin, verifyStaff, getCurrentUser, Role } from "@/lib/auth-session";
 import crypto from "crypto";
-import { hashPassword } from "@better-auth/utils/password";
-
-// ─── Auth helpers ─────────────────────────────────────────────────────────────
-
-async function verifyAdmin() {
-  const session = await auth.api.getSession({
-    headers: await headers(),
-  });
-
-  if (!session) {
-    throw new Error("Unauthorized. Active session required.");
-  }
-
-  if (session.user.role !== "ADMIN") {
-    throw new Error("Forbidden. Admin rights required.");
-  }
-
-  return session.user;
-}
-
-/** Admin or Volunteer — used for actions that both roles should be able to perform. */
-async function verifyStaff() {
-  const session = await auth.api.getSession({
-    headers: await headers(),
-  });
-
-  if (!session) {
-    throw new Error("Unauthorized. Active session required.");
-  }
-
-  const role = session.user.role;
-  if (role !== "ADMIN" && role !== "VOLUNTEER") {
-    throw new Error("Forbidden. Staff rights required.");
-  }
-
-  return session.user;
-}
 
 // ─── User listing ─────────────────────────────────────────────────────────────
 
 export async function getUsersAction(search?: string, roleFilter?: string) {
-  // Both admins and volunteers may list users (for password reset).
   await verifyStaff();
 
-  const whereClause: Prisma.UserWhereInput = {};
-
-  if (search) {
-    whereClause.OR = [
-      { name: { contains: search, mode: "insensitive" } },
-      { email: { contains: search, mode: "insensitive" } },
-      { rollNumber: { contains: search, mode: "insensitive" } },
-    ];
-  }
+  let query = adminDb.collection("users");
 
   if (roleFilter && roleFilter !== "ALL") {
-    whereClause.role = roleFilter as Role;
+    query = query.where("role", "==", roleFilter) as any;
   }
 
-  return await prisma.user.findMany({
-    where: whereClause,
-    orderBy: { name: "asc" },
-    select: {
-      id: true,
-      name: true,
-      email: true,
-      rollNumber: true,
-      role: true,
-      createdAt: true,
-      mustChangePassword: true,
-    },
+  const snapshot = await query.get();
+  let users = snapshot.docs.map((doc: any) => {
+    const data = doc.data();
+    return {
+      id: doc.id,
+      name: data.name || "",
+      email: data.email || "",
+      rollNumber: data.rollNumber || null,
+      role: (data.role as Role) || "STUDENT",
+      createdAt: data.createdAt || new Date().toISOString(),
+      mustChangePassword: data.mustChangePassword || false,
+    };
   });
+
+  if (search) {
+    const lowerSearch = search.toLowerCase();
+    users = users.filter(
+      (u: any) =>
+        u.name.toLowerCase().includes(lowerSearch) ||
+        u.email.toLowerCase().includes(lowerSearch) ||
+        (u.rollNumber && u.rollNumber.toLowerCase().includes(lowerSearch))
+    );
+  }
+
+  users.sort((a: any, b: any) => a.name.localeCompare(b.name));
+  return users;
 }
 
 // ─── Role management (Admin only) ─────────────────────────────────────────────
@@ -89,10 +54,17 @@ export async function updateUserRoleAction(userId: string, newRole: Role) {
     throw new Error("Safety lock: You cannot modify your own administrator role.");
   }
 
-  await prisma.user.update({
-    where: { id: userId },
-    data: { role: newRole },
+  await adminDb.collection("users").doc(userId).update({
+    role: newRole,
+    updatedAt: new Date().toISOString(),
   });
+
+  // Set custom claims in Firebase Auth as well
+  try {
+    await adminAuth.setCustomUserClaims(userId, { role: newRole });
+  } catch (err) {
+    console.error("Failed to set custom claims:", err);
+  }
 
   revalidatePath("/admin/users");
   return { success: true };
@@ -107,13 +79,11 @@ function generateTempPassword(): string {
   const digits = "23456789";
   const all = upper + lower + digits;
 
-  // Guarantee at least one from each class
   const pick = (chars: string) => chars[crypto.randomInt(chars.length)];
 
   const guaranteed = [pick(upper), pick(lower), pick(digits)];
   const rest = Array.from({ length: 9 }, () => pick(all));
 
-  // Shuffle with crypto-secure Fisher-Yates
   const chars = [...guaranteed, ...rest];
   for (let i = chars.length - 1; i > 0; i--) {
     const j = crypto.randomInt(i + 1);
@@ -123,51 +93,24 @@ function generateTempPassword(): string {
   return chars.join("");
 }
 
-/**
- * Generates a temporary password for a user and forces them to change it on next login.
- * Can be called by ADMIN or VOLUNTEER.
- * Returns the plaintext temp password — shown once on screen, not stored.
- */
 export async function resetUserPasswordAction(userId: string) {
   const caller = await verifyStaff();
 
-  // A user may not reset their own password this way (use profile settings instead).
   if (userId === caller.id) {
     throw new Error("Use the Profile settings to change your own password.");
   }
 
   const tempPassword = generateTempPassword();
 
-  // Hash using Better Auth's own hasher so the credential account row is valid.
-  const passwordHash = await hashPassword(tempPassword);
-
-  // Update-or-create the credential account for this user.
-  const existingAccount = await prisma.account.findFirst({
-    where: { userId, providerId: "credential" },
+  // Update password in Firebase Auth
+  await adminAuth.updateUser(userId, {
+    password: tempPassword,
   });
 
-  if (existingAccount) {
-    await prisma.account.update({
-      where: { id: existingAccount.id },
-      data: { password: passwordHash },
-    });
-  } else {
-    await prisma.account.create({
-      data: {
-        userId,
-        accountId: userId,
-        providerId: "credential",
-        password: passwordHash,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      },
-    });
-  }
-
-  // Mark the user as needing a password change on next login.
-  await prisma.user.update({
-    where: { id: userId },
-    data: { mustChangePassword: true },
+  // Mark the user as needing a password change on next login
+  await adminDb.collection("users").doc(userId).update({
+    mustChangePassword: true,
+    updatedAt: new Date().toISOString(),
   });
 
   revalidatePath("/admin/users");
@@ -178,16 +121,10 @@ export async function resetUserPasswordAction(userId: string) {
 
 // ─── Forced first-login password change ───────────────────────────────────────
 
-/**
- * Sets a new password for the currently logged-in user and clears the
- * mustChangePassword flag. Used on the /change-password page.
- */
 export async function forceSetNewPasswordAction(newPassword: string) {
-  const session = await auth.api.getSession({
-    headers: await headers(),
-  });
+  const currentUser = await getCurrentUser();
 
-  if (!session) {
+  if (!currentUser) {
     throw new Error("Unauthorized. You must be logged in.");
   }
 
@@ -195,33 +132,13 @@ export async function forceSetNewPasswordAction(newPassword: string) {
     throw new Error("Password must be at least 8 characters.");
   }
 
-  const passwordHash = await hashPassword(newPassword);
-
-  const existingAccount = await prisma.account.findFirst({
-    where: { userId: session.user.id, providerId: "credential" },
+  await adminAuth.updateUser(currentUser.id, {
+    password: newPassword,
   });
 
-  if (existingAccount) {
-    await prisma.account.update({
-      where: { id: existingAccount.id },
-      data: { password: passwordHash },
-    });
-  } else {
-    await prisma.account.create({
-      data: {
-        userId: session.user.id,
-        accountId: session.user.id,
-        providerId: "credential",
-        password: passwordHash,
-        createdAt: new Date(),
-        updatedAt: new Date(),
-      },
-    });
-  }
-
-  await prisma.user.update({
-    where: { id: session.user.id },
-    data: { mustChangePassword: false },
+  await adminDb.collection("users").doc(currentUser.id).update({
+    mustChangePassword: false,
+    updatedAt: new Date().toISOString(),
   });
 
   return { success: true };

@@ -1,6 +1,5 @@
 import "dotenv/config";
-import { auth } from "../src/lib/auth";
-import { prisma } from "../src/lib/db";
+import { adminAuth, adminDb } from "../src/lib/firebase-admin";
 
 const admins = [
   { name: "Matrix Karunya", email: "matrixkarunya@gmail.com", password: "matrixkits" },
@@ -8,42 +7,46 @@ const admins = [
 ];
 
 async function main() {
-  for (const admin of admins) {
+  for (const adminUser of admins) {
     try {
+      let uid: string;
       try {
-        // Creates the user + Better Auth account/session tables correctly
-        // (proper password hashing etc.) — do not insert into these tables by hand.
-        await auth.api.signUpEmail({
-          body: {
-            name: admin.name,
-            email: admin.email,
-            password: admin.password,
-          },
+        const existing = await adminAuth.getUserByEmail(adminUser.email);
+        uid = existing.uid;
+        console.log(`User ${adminUser.email} already exists in Firebase Auth.`);
+      } catch (err: any) {
+        const created = await adminAuth.createUser({
+          email: adminUser.email,
+          password: adminUser.password,
+          displayName: adminUser.name,
+          emailVerified: true,
         });
-        console.log(`Created auth account for ${admin.email}`);
-      } catch (signUpError: any) {
-        const errCode = signUpError.body?.code || "";
-        const errMsg = signUpError.message || "";
-        if (errCode === "USER_ALREADY_EXISTS_USE_ANOTHER_EMAIL" || errMsg.includes("already exists")) {
-          console.log(`User ${admin.email} already exists. Continuing to role update...`);
-        } else {
-          throw signUpError;
-        }
+        uid = created.uid;
+        console.log(`Created Firebase Auth user: ${adminUser.email}`);
       }
 
-      // Promote to Admin role
-      await prisma.user.update({
-        where: { email: admin.email },
-        data: { role: "ADMIN" },
-      });
+      await adminAuth.setCustomUserClaims(uid, { role: "ADMIN" });
 
-      console.log(`Promoted ${admin.email} to ADMIN`);
+      await adminDb.collection("users").doc(uid).set(
+        {
+          id: uid,
+          name: adminUser.name,
+          email: adminUser.email,
+          role: "ADMIN",
+          emailVerified: true,
+          mustChangePassword: false,
+          updatedAt: new Date().toISOString(),
+        },
+        { merge: true }
+      );
+
+      console.log(`Promoted ${adminUser.email} to ADMIN in Firestore.`);
     } catch (e: any) {
-      console.error(`Error processing ${admin.email}:`, e);
+      console.error(`Error seeding ${adminUser.email}:`, e);
     }
   }
 
-  console.log("Done.");
+  console.log("Seeding finished successfully.");
 }
 
 main()

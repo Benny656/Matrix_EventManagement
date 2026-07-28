@@ -1,18 +1,15 @@
 import React from "react";
-import { headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { auth } from "@/lib/auth";
+import { verifyStaff } from "@/lib/auth-session";
 import { getNotificationsAction } from "@/actions/notification";
 import NotificationsList from "@/components/notifications-list";
 
 export const dynamic = "force-dynamic";
 
 export default async function VolunteerNotificationsPage() {
-  const session = await auth.api.getSession({
-    headers: await headers(),
-  });
-
-  if (!session || (session.user.role !== "VOLUNTEER" && session.user.role !== "ADMIN")) {
+  try {
+    await verifyStaff();
+  } catch {
     redirect("/login");
   }
 

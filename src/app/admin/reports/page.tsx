@@ -1,9 +1,8 @@
 import React from "react";
-import { headers } from "next/headers";
 import { redirect } from "next/navigation";
 import Link from "next/link";
-import { auth } from "@/lib/auth";
-import { prisma } from "@/lib/db";
+import { verifyAdmin } from "@/lib/auth-session";
+import { adminDb } from "@/lib/firebase-admin";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 import { BarChart2, Users, History } from "lucide-react";
@@ -11,21 +10,25 @@ import { BarChart2, Users, History } from "lucide-react";
 export const dynamic = "force-dynamic";
 
 export default async function AdminReportsPage() {
-  const session = await auth.api.getSession({
-    headers: await headers(),
-  });
-
-  if (!session || session.user.role !== "ADMIN") {
+  try {
+    await verifyAdmin();
+  } catch {
     redirect("/login");
   }
 
-  const events = await prisma.event.findMany({
-    orderBy: { date: "desc" },
-    include: {
-      registrations: {
-        where: { NOT: { status: "CANCELLED" } },
-      },
-    },
+  const eventsSnapshot = await adminDb.collection("events").get();
+  const allEvents = eventsSnapshot.docs.map((d) => ({ id: d.id, ...d.data() })) as any[];
+  allEvents.sort((a, b) => (b.date || "").localeCompare(a.date || ""));
+
+  const regsSnapshot = await adminDb.collection("registrations").get();
+  const allRegs = regsSnapshot.docs.map((d) => d.data()) as any[];
+
+  const events = allEvents.map((evt) => {
+    const activeRegsCount = allRegs.filter((r) => r.eventId === evt.id && r.status === "REGISTERED").length;
+    return {
+      ...evt,
+      activeRegsCount,
+    };
   });
 
   return (
@@ -135,12 +138,11 @@ export default async function AdminReportsPage() {
               </thead>
               <tbody className="divide-y divide-border">
                 {events.map((evt) => {
-                  const dateStr = new Date(evt.date).toLocaleDateString("en-US", {
+                  const dateStr = evt.date ? new Date(evt.date).toLocaleDateString("en-US", {
                     month: "short",
                     day: "numeric",
                     year: "numeric",
-                  });
-                  const activeRegs = evt.registrations.filter((r) => r.status === "REGISTERED").length;
+                  }) : "TBD";
 
                   return (
                     <tr key={evt.id} className="hover:bg-surface-container/20 transition-colors">
@@ -159,7 +161,7 @@ export default async function AdminReportsPage() {
                         {dateStr}
                       </td>
                       <td className="py-3 px-4 font-mono text-xs text-muted-foreground">
-                        {activeRegs} / {evt.maxParticipants}
+                        {evt.activeRegsCount} / {evt.maxParticipants}
                       </td>
                       <td className="py-3 px-4">
                         <span className={`px-2 py-0.5 font-mono text-[9px] uppercase font-semibold border ${

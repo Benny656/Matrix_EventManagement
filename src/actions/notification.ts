@@ -1,49 +1,59 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { headers } from "next/headers";
-import { prisma } from "@/lib/db";
-import { auth } from "@/lib/auth";
+import { adminDb } from "@/lib/firebase-admin";
+import { getCurrentUser } from "@/lib/auth-session";
 
 async function verifyUser() {
-  const session = await auth.api.getSession({
-    headers: await headers(),
-  });
-
-  if (!session) {
+  const currentUser = await getCurrentUser();
+  if (!currentUser) {
     throw new Error("Unauthorized. Active session required.");
   }
-
-  return session.user;
+  return currentUser;
 }
 
 export async function getNotificationsAction() {
   const user = await verifyUser();
 
-  return await prisma.notification.findMany({
-    where: { userId: user.id },
-    orderBy: { createdAt: "desc" },
+  const snapshot = await adminDb
+    .collection("notifications")
+    .where("userId", "==", user.id)
+    .get();
+
+  const notifications = snapshot.docs.map((doc) => {
+    const data = doc.data() as any;
+    return {
+      ...data,
+      id: doc.id,
+      createdAt: data.createdAt ? new Date(data.createdAt) : new Date(),
+    };
   });
+
+  notifications.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+  return notifications;
 }
 
 export async function getUnreadNotificationCountAction() {
   const user = await verifyUser();
 
-  return await prisma.notification.count({
-    where: { userId: user.id, read: false },
-  });
+  const snapshot = await adminDb
+    .collection("notifications")
+    .where("userId", "==", user.id)
+    .where("read", "==", false)
+    .get();
+
+  return snapshot.size;
 }
 
 export async function markNotificationReadAction(id: string) {
   const user = await verifyUser();
 
-  await prisma.notification.update({
-    where: {
-      id,
-      userId: user.id,
-    },
-    data: { read: true },
-  });
+  const docRef = adminDb.collection("notifications").doc(id);
+  const doc = await docRef.get();
+
+  if (doc.exists && doc.data()?.userId === user.id) {
+    await docRef.update({ read: true });
+  }
 
   revalidatePath("/student");
   revalidatePath("/volunteer");
@@ -58,13 +68,19 @@ export async function markNotificationReadAction(id: string) {
 export async function markAllNotificationsReadAction() {
   const user = await verifyUser();
 
-  await prisma.notification.updateMany({
-    where: {
-      userId: user.id,
-      read: false,
-    },
-    data: { read: true },
-  });
+  const snapshot = await adminDb
+    .collection("notifications")
+    .where("userId", "==", user.id)
+    .where("read", "==", false)
+    .get();
+
+  if (!snapshot.empty) {
+    const batch = adminDb.batch();
+    snapshot.docs.forEach((doc) => {
+      batch.update(doc.ref, { read: true });
+    });
+    await batch.commit();
+  }
 
   revalidatePath("/student");
   revalidatePath("/volunteer");

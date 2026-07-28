@@ -1,34 +1,20 @@
 import React from "react";
 import Link from "next/link";
-import { headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { prisma } from "@/lib/db";
-import { auth } from "@/lib/auth";
+import { verifyStaff } from "@/lib/auth-session";
+import { getUpdatesAction } from "@/actions/update";
 import { Plus, User } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
 export default async function VolunteerUpdatesPage() {
-  const session = await auth.api.getSession({
-    headers: await headers(),
-  });
-
-  if (!session || (session.user.role !== "VOLUNTEER" && session.user.role !== "ADMIN")) {
+  try {
+    await verifyStaff();
+  } catch {
     redirect("/login");
   }
 
-  // Fetch all updates
-  const updates = await prisma.update.findMany({
-    include: {
-      author: {
-        select: { name: true, role: true },
-      },
-      event: {
-        select: { title: true },
-      },
-    },
-    orderBy: { createdAt: "desc" },
-  });
+  const updates = await getUpdatesAction();
 
   return (
     <div className="space-y-6 max-w-4xl">

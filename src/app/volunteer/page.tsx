@@ -1,48 +1,35 @@
 import React from "react";
 import Link from "next/link";
-import { headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { auth } from "@/lib/auth";
-import { prisma } from "@/lib/db";
-import { Button } from "@/components/ui/button";
+import { verifyStaff } from "@/lib/auth-session";
+import { adminDb } from "@/lib/firebase-admin";
 import { Plus, Megaphone } from "lucide-react";
 import VolunteerClock from "@/components/volunteer-clock";
 
 export const dynamic = "force-dynamic";
 
 export default async function VolunteerDashboardPage() {
-  const session = await auth.api.getSession({
-    headers: await headers(),
-  });
-
-  if (!session || (session.user.role !== "VOLUNTEER" && session.user.role !== "ADMIN")) {
+  let user;
+  try {
+    user = await verifyStaff();
+  } catch {
     redirect("/login");
   }
 
-  const userId = session.user.id;
+  const userId = user.id;
 
-  // Query real metrics from the database
-  const [eventsCreated, attendeesScanned] = await Promise.all([
-    prisma.event.count({
-      where: { createdById: userId },
-    }),
-    prisma.attendance.count({
-      where: { markedById: userId },
-    }),
-  ]);
+  const eventsSnapshot = await adminDb.collection("events").get();
+  const allEvents = eventsSnapshot.docs.map((d) => ({ id: d.id, ...d.data() })) as any[];
 
-  // Fetch active events (ongoing or upcoming)
-  const activeEvents = await prisma.event.findMany({
-    where: {
-      status: {
-        in: ["ONGOING", "UPCOMING"],
-      },
-    },
-    orderBy: {
-      date: "asc",
-    },
-    take: 4,
-  });
+  const eventsCreated = allEvents.filter((e) => e.createdById === userId).length;
+
+  const attsSnapshot = await adminDb.collection("attendances").get();
+  const attendeesScanned = attsSnapshot.docs.filter((d) => d.data().markedById === userId).length;
+
+  const activeEvents = allEvents
+    .filter((e) => e.status === "ONGOING" || e.status === "UPCOMING")
+    .sort((a, b) => (a.date || "").localeCompare(b.date || ""))
+    .slice(0, 4);
 
   return (
     <div className="space-y-6">
@@ -103,11 +90,12 @@ export default async function VolunteerDashboardPage() {
             ) : (
               activeEvents.map((event) => {
                 const eventCode = `EVT-${event.id.slice(0, 4).toUpperCase()}`;
-                const eventDateStr = new Date(event.date).toLocaleDateString("en-US", {
+                const dateObj = event.date ? new Date(event.date) : new Date();
+                const eventDateStr = dateObj.toLocaleDateString("en-US", {
                   month: "short",
                   day: "numeric",
                 });
-                const eventTimeStr = new Date(event.date).toLocaleTimeString("en-US", {
+                const eventTimeStr = dateObj.toLocaleTimeString("en-US", {
                   hour: "2-digit",
                   minute: "2-digit",
                   hour12: false,

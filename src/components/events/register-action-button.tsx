@@ -37,7 +37,7 @@ export default function RegisterActionButton({
       try {
         const res = await registerForEventAction(eventId);
         if (res.success) {
-          setStatus(res.status);
+          setStatus(res.status as any);
         }
       } catch (err: any) {
         setError(err.message || "Failed to register");

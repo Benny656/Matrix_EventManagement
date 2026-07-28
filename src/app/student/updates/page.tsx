@@ -1,50 +1,56 @@
 import React from "react";
-import { headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { prisma } from "@/lib/db";
-import { auth } from "@/lib/auth";
+import { getCurrentUser } from "@/lib/auth-session";
+import { adminDb } from "@/lib/firebase-admin";
 import { User } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
 export default async function StudentUpdatesPage() {
-  const session = await auth.api.getSession({
-    headers: await headers(),
-  });
+  const currentUser = await getCurrentUser();
 
-  if (!session || session.user.role !== "STUDENT") {
+  if (!currentUser || currentUser.role !== "STUDENT") {
     redirect("/login");
   }
 
-  // Fetch student's registrations
-  const registrations = await prisma.registration.findMany({
-    where: {
-      studentId: session.user.id,
-      NOT: { status: "CANCELLED" },
-    },
-    select: { eventId: true },
-  });
+  const regsSnapshot = await adminDb
+    .collection("registrations")
+    .where("studentId", "==", currentUser.id)
+    .get();
 
-  const registeredEventIds = registrations.map((r) => r.eventId);
+  const registeredEventIds = regsSnapshot.docs
+    .map((d) => d.data())
+    .filter((r) => r.status !== "CANCELLED")
+    .map((r) => r.eventId);
 
-  // Fetch updates (department-wide or for registered events)
-  const updates = await prisma.update.findMany({
-    where: {
-      OR: [
-        { scope: "DEPARTMENT" },
-        { eventId: { in: registeredEventIds } },
-      ],
-    },
-    include: {
-      author: {
-        select: { name: true, role: true },
-      },
-      event: {
-        select: { title: true },
-      },
-    },
-    orderBy: { createdAt: "desc" },
-  });
+  const updatesSnapshot = await adminDb.collection("updates").get();
+  const allUpdates = updatesSnapshot.docs.map((d) => ({ id: d.id, ...d.data() })) as any[];
+
+  const usersSnapshot = await adminDb.collection("users").get();
+  const userMap = new Map<string, any>();
+  usersSnapshot.docs.forEach((d) => userMap.set(d.id, d.data()));
+
+  const eventsSnapshot = await adminDb.collection("events").get();
+  const eventMap = new Map<string, any>();
+  eventsSnapshot.docs.forEach((d) => eventMap.set(d.id, d.data()));
+
+  const filteredUpdates = allUpdates
+    .filter((u) => u.scope === "DEPARTMENT" || (u.eventId && registeredEventIds.includes(u.eventId)))
+    .map((u) => {
+      const author = userMap.get(u.authorId) || { name: "Staff", role: "VOLUNTEER" };
+      const event = u.eventId ? eventMap.get(u.eventId) : null;
+      return {
+        ...u,
+        createdAt: u.createdAt ? new Date(u.createdAt) : new Date(),
+        author: {
+          name: author.name,
+          role: author.role,
+        },
+        event: event ? { title: event.title } : null,
+      };
+    });
+
+  filteredUpdates.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
 
   return (
     <div className="space-y-6 max-w-4xl">
@@ -57,14 +63,14 @@ export default async function StudentUpdatesPage() {
         </p>
       </div>
 
-      {updates.length === 0 ? (
+      {filteredUpdates.length === 0 ? (
         <div className="border border-border p-12 text-center text-muted-foreground font-mono text-xs uppercase bg-card">
           No announcements published yet.
         </div>
       ) : (
         <div className="space-y-6">
-          {updates.map((update) => {
-            const dateStr = new Date(update.createdAt).toLocaleString("en-US", {
+          {filteredUpdates.map((update) => {
+            const dateStr = update.createdAt.toLocaleString("en-US", {
               month: "short",
               day: "numeric",
               hour: "2-digit",

@@ -1,7 +1,6 @@
 import React from "react";
-import { headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { auth } from "@/lib/auth";
+import { verifyAdmin } from "@/lib/auth-session";
 import { getUsersAction } from "@/actions/user";
 import UsersListTable from "@/components/admin/users-list-table";
 
@@ -15,11 +14,10 @@ interface PageProps {
 }
 
 export default async function AdminUsersPage({ searchParams }: PageProps) {
-  const session = await auth.api.getSession({
-    headers: await headers(),
-  });
-
-  if (!session || session.user.role !== "ADMIN") {
+  let user;
+  try {
+    user = await verifyAdmin();
+  } catch {
     redirect("/login");
   }
 
@@ -37,7 +35,7 @@ export default async function AdminUsersPage({ searchParams }: PageProps) {
         </p>
       </div>
 
-      <UsersListTable initialUsers={users as any} currentUserId={session.user.id} />
+      <UsersListTable initialUsers={users as any} currentUserId={user.id} />
     </div>
   );
 }

@@ -1,9 +1,8 @@
 import React from "react";
 import Link from "next/link";
-import { headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { auth } from "@/lib/auth";
-import { prisma } from "@/lib/db";
+import { getCurrentUser } from "@/lib/auth-session";
+import { adminDb } from "@/lib/firebase-admin";
 import { Button } from "@/components/ui/button";
 import { CalendarDays, MapPin, TriangleAlert, RefreshCw } from "lucide-react";
 
@@ -34,10 +33,10 @@ const formatEventTime = (event: any) => {
     return `${dateStr} / ${startStr} – ${endStr}`;
   }
 
-  const dateStr = new Date(event.date).toLocaleDateString("en-US", {
+  const dateStr = event.date ? new Date(event.date).toLocaleDateString("en-US", {
     month: "short",
     day: "2-digit",
-  }).toUpperCase();
+  }).toUpperCase() : "TBD";
   return `${dateStr} / SCHEDULE TBD`;
 };
 
@@ -59,51 +58,68 @@ const formatUpdateDate = (date: Date) => {
 };
 
 export default async function StudentDashboardPage() {
-  const session = await auth.api.getSession({
-    headers: await headers(),
-  });
+  const currentUser = await getCurrentUser();
 
-  if (!session || (session.user.role !== "STUDENT" && session.user.role !== "ADMIN")) {
+  if (!currentUser || (currentUser.role !== "STUDENT" && currentUser.role !== "ADMIN")) {
     redirect("/login");
   }
 
-  // Fetch student's registrations
-  const registrations = await prisma.registration.findMany({
-    where: {
-      studentId: session.user.id,
-      NOT: { status: "CANCELLED" },
-    },
-    include: {
-      event: {
-        include: {
-          sessions: {
-            orderBy: { startTime: "asc" },
-          },
-        },
-      },
-    },
-    orderBy: {
-      createdAt: "desc",
-    },
-  });
+  // Fetch registrations
+  const regsSnapshot = await adminDb
+    .collection("registrations")
+    .where("studentId", "==", currentUser.id)
+    .get();
 
-  // Fetch active updates/announcements
-  const registeredEventIds = registrations.map((r) => r.eventId);
-  const updates = await prisma.update.findMany({
-    where: {
-      OR: [
-        { scope: "DEPARTMENT" },
-        { eventId: { in: registeredEventIds } },
-      ],
-    },
-    include: {
-      event: {
-        select: { title: true },
-      },
-    },
-    orderBy: { createdAt: "desc" },
-    take: 3,
-  });
+  const eventsSnapshot = await adminDb.collection("events").get();
+  const eventMap = new Map<string, any>();
+  eventsSnapshot.docs.forEach((d) => eventMap.set(d.id, d.data()));
+
+  const sessionsSnapshot = await adminDb.collection("sessions").get();
+  const allSessions = sessionsSnapshot.docs.map((d) => ({ id: d.id, ...d.data() })) as any[];
+
+  const registrations = regsSnapshot.docs
+    .map((doc) => {
+      const data = doc.data() as any;
+      const eventData = eventMap.get(data.eventId);
+      if (!eventData) return null;
+
+      const eventSessions = allSessions
+        .filter((s) => s.eventId === data.eventId)
+        .sort((a, b) => (a.startTime || "").localeCompare(b.startTime || ""));
+
+      return {
+        ...data,
+        id: doc.id,
+        createdAt: data.createdAt ? new Date(data.createdAt) : new Date(),
+        event: {
+          ...eventData,
+          id: data.eventId,
+          sessions: eventSessions,
+        },
+      };
+    })
+    .filter((r) => r && r.status !== "CANCELLED");
+
+  registrations.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+
+  // Fetch updates
+  const registeredEventIds = registrations.map((r: any) => r.eventId);
+  const updatesSnapshot = await adminDb.collection("updates").get();
+  const allUpdates = updatesSnapshot.docs.map((d) => ({ id: d.id, ...d.data() })) as any[];
+
+  const updates = allUpdates
+    .filter((u) => u.scope === "DEPARTMENT" || (u.eventId && registeredEventIds.includes(u.eventId)))
+    .map((u) => {
+      const eventData = u.eventId ? eventMap.get(u.eventId) : null;
+      return {
+        ...u,
+        createdAt: u.createdAt ? new Date(u.createdAt) : new Date(),
+        event: eventData ? { title: eventData.title } : null,
+      };
+    });
+
+  updates.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
+  const recentUpdates = updates.slice(0, 3);
 
   return (
     <div className="space-y-8">
@@ -125,7 +141,7 @@ export default async function StudentDashboardPage() {
           </div>
         ) : (
           <div className="flex overflow-x-auto gap-4 pb-2 hide-scrollbar">
-            {registrations.map((reg) => {
+            {registrations.map((reg: any) => {
               const event = reg.event;
               const eventCode = `EVT-${event.id.slice(0, 4).toUpperCase()}`;
               const statusLabel = reg.status === "REGISTERED" ? "Confirmed" : reg.status;
@@ -177,12 +193,12 @@ export default async function StudentDashboardPage() {
         </header>
 
         <div className="grid grid-cols-1 md:grid-cols-12 gap-4">
-          {updates.length === 0 ? (
+          {recentUpdates.length === 0 ? (
             <div className="col-span-full border border-border p-12 text-center text-muted-foreground font-mono text-xs uppercase bg-card">
               No recent updates posted.
             </div>
           ) : (
-            updates.map((update, idx) => {
+            recentUpdates.map((update, idx) => {
               const isDept = update.scope === "DEPARTMENT";
               const colSpan = idx === 0 ? "md:col-span-8" : "md:col-span-4";
 

@@ -6,7 +6,9 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { motion, AnimatePresence } from "framer-motion";
-import { authClient, signOut } from "@/lib/auth-client";
+import { updatePassword, updateProfile, signOut as firebaseSignOut, EmailAuthProvider, reauthenticateWithCredential } from "firebase/auth";
+import { doc, updateDoc } from "firebase/firestore";
+import { auth, db } from "@/lib/firebase";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -22,7 +24,6 @@ import {
   CheckCircle2,
   CalendarCheck,
   UserCheck,
-  Shield,
   Loader2,
 } from "lucide-react";
 
@@ -30,7 +31,6 @@ const profileSchema = z.object({
   name: z.string().min(2, "Full name must be at least 2 characters"),
   phoneNumber: z.string().refine((val) => {
     if (!val) return true;
-    // Basic phone number format validation
     return /^[+]?[0-9]{10,15}$/.test(val.replace(/[\s-()]/g, ""));
   }, "Enter a valid phone number (10-15 digits)"),
 });
@@ -63,13 +63,11 @@ interface ProfileFormProps {
 
 export default function ProfileForm({ user, stats }: ProfileFormProps) {
   const router = useRouter();
-  
-  // Profile form state
+
   const [profileLoading, setProfileLoading] = useState(false);
   const [profileError, setProfileError] = useState<string | null>(null);
   const [profileSuccess, setProfileSuccess] = useState<string | null>(null);
 
-  // Password form state
   const [passwordLoading, setPasswordLoading] = useState(false);
   const [passwordError, setPasswordError] = useState<string | null>(null);
   const [passwordSuccess, setPasswordSuccess] = useState<string | null>(null);
@@ -101,25 +99,22 @@ export default function ProfileForm({ user, stats }: ProfileFormProps) {
     setProfileSuccess(null);
 
     try {
-      await authClient.updateUser(
-        {
-          name: data.name,
-          phoneNumber: data.phoneNumber || undefined,
-        },
-        {
-          onRequest: () => setProfileLoading(true),
-          onResponse: () => setProfileLoading(false),
-          onError: (ctx) => {
-            setProfileError(ctx.error.message || "Failed to update profile.");
-          },
-          onSuccess: () => {
-            setProfileSuccess("Profile updated successfully!");
-            router.refresh();
-          },
-        }
-      );
+      if (auth.currentUser) {
+        await updateProfile(auth.currentUser, { displayName: data.name });
+      }
+
+      await updateDoc(doc(db, "users", user.id), {
+        name: data.name,
+        phoneNumber: data.phoneNumber || "",
+        updatedAt: new Date().toISOString(),
+      });
+
+      setProfileSuccess("Profile updated successfully!");
+      router.refresh();
     } catch (err: any) {
-      setProfileError(err?.message || "An unexpected error occurred.");
+      console.error(err);
+      setProfileError(err?.message || "Failed to update profile.");
+    } finally {
       setProfileLoading(false);
     }
   };
@@ -130,39 +125,32 @@ export default function ProfileForm({ user, stats }: ProfileFormProps) {
     setPasswordSuccess(null);
 
     try {
-      await authClient.changePassword(
-        {
-          currentPassword: data.currentPassword,
-          newPassword: data.newPassword,
-          revokeOtherSessions: true,
-        },
-        {
-          onRequest: () => setPasswordLoading(true),
-          onResponse: () => setPasswordLoading(false),
-          onError: (ctx) => {
-            setPasswordError(ctx.error.message || "Failed to update password.");
-          },
-          onSuccess: () => {
-            setPasswordSuccess("Password updated successfully! Other sessions revoked.");
-            resetPasswordForm();
-          },
-        }
-      );
+      const currentUser = auth.currentUser;
+      if (!currentUser || !currentUser.email) {
+        throw new Error("No active user session.");
+      }
+
+      const credential = EmailAuthProvider.credential(currentUser.email, data.currentPassword);
+      await reauthenticateWithCredential(currentUser, credential);
+      await updatePassword(currentUser, data.newPassword);
+
+      setPasswordSuccess("Password updated successfully!");
+      resetPasswordForm();
     } catch (err: any) {
-      setPasswordError(err?.message || "An unexpected error occurred.");
+      console.error(err);
+      setPasswordError(err?.message || "Failed to update password. Verify current password.");
+    } finally {
       setPasswordLoading(false);
     }
   };
 
   const handleSignOut = async () => {
-    await signOut({
-      fetchOptions: {
-        onSuccess: () => {
-          router.push("/login");
-          router.refresh();
-        },
-      },
-    });
+    try {
+      await firebaseSignOut(auth);
+    } catch (e) {}
+    await fetch("/api/auth/session", { method: "DELETE" });
+    router.push("/login");
+    router.refresh();
   };
 
   const getStatsIcon = (label: string) => {
@@ -174,9 +162,8 @@ export default function ProfileForm({ user, stats }: ProfileFormProps) {
 
   return (
     <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-      {/* Left Column - Read-only details and Stats */}
+      {/* Left Column */}
       <div className="md:col-span-1 space-y-6">
-        {/* Info card */}
         <div className="glass-panel p-5 rounded-xl flex flex-col gap-4">
           <div className="flex flex-col items-center text-center pb-4 border-b border-border">
             <div className="w-16 h-16 border border-border bg-surface-container-high overflow-hidden rounded-full mb-3 flex items-center justify-center">
@@ -221,7 +208,6 @@ export default function ProfileForm({ user, stats }: ProfileFormProps) {
           </div>
         </div>
 
-        {/* Stats card */}
         {stats.length > 0 && (
           <div className="glass-panel p-5 rounded-xl space-y-4">
             <h3 className="font-mono text-[10px] uppercase tracking-widest text-[#747686] border-b border-border pb-2">
@@ -248,7 +234,6 @@ export default function ProfileForm({ user, stats }: ProfileFormProps) {
           </div>
         )}
 
-        {/* Direct logout button */}
         <Button
           onClick={handleSignOut}
           variant="destructive"
@@ -259,9 +244,8 @@ export default function ProfileForm({ user, stats }: ProfileFormProps) {
         </Button>
       </div>
 
-      {/* Right Column - Editable forms */}
+      {/* Right Column */}
       <div className="md:col-span-2 space-y-6">
-        {/* Profile details form */}
         <div className="glass-panel p-6 rounded-xl flex flex-col gap-5">
           <div className="border-b border-border pb-3">
             <h3 className="font-sans text-sm font-semibold text-foreground">
@@ -300,7 +284,6 @@ export default function ProfileForm({ user, stats }: ProfileFormProps) {
 
           <form onSubmit={handleProfileSubmit(onUpdateProfile)} className="space-y-4">
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {/* Display name */}
               <div className="flex flex-col gap-1.5">
                 <Label className="font-sans text-xs font-medium text-foreground" htmlFor="name">
                   Full Name
@@ -322,7 +305,6 @@ export default function ProfileForm({ user, stats }: ProfileFormProps) {
                 )}
               </div>
 
-              {/* Phone number */}
               <div className="flex flex-col gap-1.5">
                 <Label className="font-sans text-xs font-medium text-foreground" htmlFor="phoneNumber">
                   Phone Number
@@ -365,7 +347,6 @@ export default function ProfileForm({ user, stats }: ProfileFormProps) {
           </form>
         </div>
 
-        {/* Change password form */}
         <div className="glass-panel p-6 rounded-xl flex flex-col gap-5">
           <div className="border-b border-border pb-3">
             <h3 className="font-sans text-sm font-semibold text-foreground">
@@ -403,7 +384,6 @@ export default function ProfileForm({ user, stats }: ProfileFormProps) {
           </AnimatePresence>
 
           <form onSubmit={handlePasswordSubmit(onChangePassword)} className="space-y-4">
-            {/* Current Password */}
             <div className="flex flex-col gap-1.5">
               <Label className="font-sans text-xs font-medium text-foreground" htmlFor="currentPassword">
                 Current Password
@@ -427,7 +407,6 @@ export default function ProfileForm({ user, stats }: ProfileFormProps) {
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-              {/* New Password */}
               <div className="flex flex-col gap-1.5">
                 <Label className="font-sans text-xs font-medium text-foreground" htmlFor="newPassword">
                   New Password
@@ -450,7 +429,6 @@ export default function ProfileForm({ user, stats }: ProfileFormProps) {
                 )}
               </div>
 
-              {/* Confirm New Password */}
               <div className="flex flex-col gap-1.5">
                 <Label className="font-sans text-xs font-medium text-foreground" htmlFor="confirmPassword">
                   Confirm New Password

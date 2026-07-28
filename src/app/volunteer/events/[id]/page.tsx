@@ -1,8 +1,7 @@
 import React from "react";
-import { headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
-import { prisma } from "@/lib/db";
-import { auth } from "@/lib/auth";
+import { verifyStaff } from "@/lib/auth-session";
+import { adminDb } from "@/lib/firebase-admin";
 import Link from "next/link";
 import { Download } from "lucide-react";
 import { buttonVariants } from "@/components/ui/button";
@@ -18,52 +17,74 @@ interface PageProps {
 }
 
 export default async function VolunteerEventDetailsPage({ params }: PageProps) {
-  const session = await auth.api.getSession({
-    headers: await headers(),
-  });
-
-  if (!session || (session.user.role !== "VOLUNTEER" && session.user.role !== "ADMIN")) {
+  try {
+    await verifyStaff();
+  } catch {
     redirect("/login");
   }
 
   const { id } = await params;
 
-  const event = await prisma.event.findUnique({
-    where: { id },
-    include: {
-      sessions: {
-        orderBy: { startTime: "asc" },
-        include: {
-          attendances: true,
-        },
-      },
-      registrations: {
-        where: { NOT: { status: "CANCELLED" } },
-        include: {
-          student: true,
-        },
-        orderBy: { createdAt: "asc" },
-      },
-    },
-  });
-
-  if (!event) {
+  const eventDoc = await adminDb.collection("events").doc(id).get();
+  if (!eventDoc.exists) {
     notFound();
   }
 
-  const confirmedCount = event.registrations.filter((r) => r.status === "REGISTERED").length;
-  const waitlistedCount = event.registrations.filter((r) => r.status === "WAITLISTED").length;
+  const event = { id: eventDoc.id, ...eventDoc.data() } as any;
 
-  // Calculate unique check-ins (unique students checked in across all sessions of this event)
-  const sessionIds = event.sessions.map((s) => s.id);
-  const checkedInStudents = await prisma.attendance.findMany({
-    where: {
-      sessionId: { in: sessionIds },
-    },
-    select: { studentId: true },
-    distinct: ["studentId"],
+  const sessionsSnapshot = await adminDb
+    .collection("sessions")
+    .where("eventId", "==", id)
+    .get();
+  const sessions = sessionsSnapshot.docs.map((d) => ({ id: d.id, ...d.data() })) as any[];
+  sessions.sort((a: any, b: any) => (a.startTime || "").localeCompare(b.startTime || ""));
+
+  const regsSnapshot = await adminDb
+    .collection("registrations")
+    .where("eventId", "==", id)
+    .get();
+
+  const usersSnapshot = await adminDb.collection("users").get();
+  const userMap = new Map<string, any>();
+  usersSnapshot.docs.forEach((d: any) => userMap.set(d.id, d.data()));
+
+  const registrations = regsSnapshot.docs
+    .map((d: any) => d.data())
+    .filter((r: any) => r.status !== "CANCELLED")
+    .map((r: any) => {
+      const student = userMap.get(r.studentId) || { name: "Unknown", email: "" };
+      return {
+        ...r,
+        student: {
+          id: r.studentId,
+          name: student.name,
+          email: student.email,
+          rollNumber: student.rollNumber || null,
+        },
+      };
+    });
+
+  const sessionIds = sessions.map((s: any) => s.id);
+  const attsSnapshot = await adminDb.collection("attendances").get();
+  const attendances = attsSnapshot.docs
+    .map((d: any) => d.data())
+    .filter((a: any) => sessionIds.includes(a.sessionId));
+
+  const sessionAttMap = new Map<string, number>();
+  attendances.forEach((a: any) => {
+    sessionAttMap.set(a.sessionId, (sessionAttMap.get(a.sessionId) || 0) + 1);
   });
-  const checkedInCount = checkedInStudents.length;
+
+  const checkedInStudentIds = new Set(attendances.map((a: any) => a.studentId));
+
+  const confirmedCount = registrations.filter((r: any) => r.status === "REGISTERED").length;
+  const waitlistedCount = registrations.filter((r: any) => r.status === "WAITLISTED").length;
+  const checkedInCount = checkedInStudentIds.size;
+
+  const sessionsWithCount = sessions.map((s: any) => ({
+    ...s,
+    attendances: Array(sessionAttMap.get(s.id) || 0).fill(true),
+  }));
 
   return (
     <div className="space-y-6">
@@ -119,14 +140,12 @@ export default async function VolunteerEventDetailsPage({ params }: PageProps) {
 
       {/* Main Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-        {/* Left Side: Sessions & Attendee list */}
         <div className="lg:col-span-8 space-y-6">
-          <AttendeeList registrations={event.registrations as any} />
+          <AttendeeList registrations={registrations as any} />
         </div>
 
-        {/* Right Side: Timeline & Settings */}
         <div className="lg:col-span-4 space-y-6">
-          <EditDeadlineForm eventId={event.id} initialDeadline={event.registrationDeadline} />
+          <EditDeadlineForm eventId={event.id} initialDeadline={event.registrationDeadline ? new Date(event.registrationDeadline) : null} />
           <EditCapacityForm eventId={event.id} initialCapacity={event.maxParticipants} />
           
           <div className="border border-border p-6 bg-card space-y-6">
@@ -134,13 +153,13 @@ export default async function VolunteerEventDetailsPage({ params }: PageProps) {
               Event Sessions Timeline
             </h3>
 
-            {event.sessions.length === 0 ? (
+            {sessionsWithCount.length === 0 ? (
               <p className="font-mono text-xs text-muted-foreground uppercase py-2">
                 No session blocks scheduled.
               </p>
             ) : (
               <div className="relative border-l border-border pl-6 ml-2 space-y-6">
-                {event.sessions.map((sess) => {
+                {sessionsWithCount.map((sess) => {
                   const startStr = new Date(sess.startTime).toLocaleTimeString("en-US", { hour12: false, hour: "2-digit", minute: "2-digit" });
                   const endStr = new Date(sess.endTime).toLocaleTimeString("en-US", { hour12: false, hour: "2-digit", minute: "2-digit" });
                   const dateStr = new Date(sess.startTime).toLocaleDateString("en-US", { month: "short", day: "numeric" });

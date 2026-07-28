@@ -1,9 +1,8 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
-import { headers } from "next/headers";
-import { prisma } from "@/lib/db";
-import { auth } from "@/lib/auth";
+import { adminDb } from "@/lib/firebase-admin";
+import { getCurrentUser } from "@/lib/auth-session";
 import * as z from "zod";
 
 const sessionSchema = z.object({
@@ -31,74 +30,92 @@ const eventSchema = z.object({
 
 export type EventInput = z.infer<typeof eventSchema>;
 
-// Helper to verify user permissions
 async function verifyAuth(allowedRoles: ("ADMIN" | "VOLUNTEER")[]) {
-  const session = await auth.api.getSession({
-    headers: await headers(),
-  });
-
-  if (!session || !allowedRoles.includes(session.user.role as any)) {
+  const currentUser = await getCurrentUser();
+  if (!currentUser || !allowedRoles.includes(currentUser.role as any)) {
     throw new Error("Unauthorized. Insufficient permissions.");
   }
-
-  return session.user;
+  return currentUser;
 }
 
 export async function createEventAction(input: EventInput) {
   const user = await verifyAuth(["ADMIN", "VOLUNTEER"]);
-  
   const validated = eventSchema.parse(input);
 
-  // Run in transaction to ensure all or nothing
-  const event = await prisma.$transaction(async (tx) => {
-    const newEvent = await tx.event.create({
-      data: {
-        title: validated.title,
-        description: validated.description,
-        posterUrl: validated.posterUrl,
-        venue: validated.venue,
-        date: validated.date,
-        registrationDeadline: validated.registrationDeadline,
-        maxParticipants: validated.maxParticipants,
-        category: validated.category,
-        coordinatorName: validated.coordinatorName,
-        createdById: user.id,
-        status: "UPCOMING",
-        sessions: {
-          create: validated.sessions.map((s) => ({
-            title: s.title,
-            venue: s.venue,
-            startTime: s.startTime,
-            endTime: s.endTime,
-          })),
-        },
-      },
-      include: {
-        sessions: true,
-      },
-    });
+  const eventRef = adminDb.collection("events").doc();
+  const eventId = eventRef.id;
 
+  const sessionList = validated.sessions.map((s) => {
+    const sRef = adminDb.collection("sessions").doc();
+    return {
+      id: sRef.id,
+      eventId,
+      title: s.title,
+      venue: s.venue,
+      startTime: s.startTime.toISOString(),
+      endTime: s.endTime.toISOString(),
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+  });
+
+  const batch = adminDb.batch();
+
+  batch.set(eventRef, {
+    id: eventId,
+    title: validated.title,
+    description: validated.description,
+    posterUrl: validated.posterUrl || null,
+    venue: validated.venue,
+    date: validated.date.toISOString(),
+    registrationDeadline: validated.registrationDeadline
+      ? validated.registrationDeadline.toISOString()
+      : null,
+    maxParticipants: validated.maxParticipants,
+    category: validated.category,
+    coordinatorName: validated.coordinatorName,
+    createdById: user.id,
+    status: "UPCOMING",
+    archivedAt: null,
+    createdAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
+  });
+
+  for (const session of sessionList) {
+    batch.set(adminDb.collection("sessions").doc(session.id), session);
+  }
+
+  await batch.commit();
+
+  // Create notifications for users
+  try {
+    const usersSnapshot = await adminDb.collection("users").get();
     const deadlineStr = validated.registrationDeadline
       ? ` Registration open until ${validated.registrationDeadline.toLocaleDateString()}.`
       : " No registration deadline.";
 
-    // Create a notification for department-wide updates
-    await tx.notification.createMany({
-      data: (await tx.user.findMany({ select: { id: true } })).map((u) => ({
-        userId: u.id,
+    const notifBatch = adminDb.batch();
+    usersSnapshot.docs.forEach((uDoc) => {
+      const nRef = adminDb.collection("notifications").doc();
+      notifBatch.set(nRef, {
+        id: nRef.id,
+        userId: uDoc.id,
         type: "NEW_EVENT",
         message: `New event published: ${validated.title}.${deadlineStr}`,
-        linkUrl: `/student/events/${newEvent.id}`,
-      })),
+        read: false,
+        linkUrl: `/student/events/${eventId}`,
+        createdAt: new Date().toISOString(),
+      });
     });
-
-    return newEvent;
-  });
+    await notifBatch.commit();
+  } catch (err) {
+    console.error("Failed to create new event notifications:", err);
+  }
 
   revalidatePath("/student");
   revalidatePath("/volunteer");
   revalidatePath("/admin");
-  return { success: true, eventId: event.id };
+  return { success: true, eventId };
 }
 
 export async function updateEventAction(id: string, input: Omit<EventInput, "sessions">) {
@@ -107,19 +124,19 @@ export async function updateEventAction(id: string, input: Omit<EventInput, "ses
   const baseSchema = eventSchema.omit({ sessions: true });
   const validated = baseSchema.parse(input);
 
-  await prisma.event.update({
-    where: { id },
-    data: {
-      title: validated.title,
-      description: validated.description,
-      posterUrl: validated.posterUrl,
-      venue: validated.venue,
-      date: validated.date,
-      registrationDeadline: validated.registrationDeadline,
-      maxParticipants: validated.maxParticipants,
-      category: validated.category,
-      coordinatorName: validated.coordinatorName,
-    },
+  await adminDb.collection("events").doc(id).update({
+    title: validated.title,
+    description: validated.description,
+    posterUrl: validated.posterUrl || null,
+    venue: validated.venue,
+    date: validated.date.toISOString(),
+    registrationDeadline: validated.registrationDeadline
+      ? validated.registrationDeadline.toISOString()
+      : null,
+    maxParticipants: validated.maxParticipants,
+    category: validated.category,
+    coordinatorName: validated.coordinatorName,
+    updatedAt: new Date().toISOString(),
   });
 
   revalidatePath(`/student/events/${id}`);
@@ -132,11 +149,9 @@ export async function updateEventAction(id: string, input: Omit<EventInput, "ses
 export async function updateEventDeadlineAction(id: string, registrationDeadline: Date | null) {
   await verifyAuth(["ADMIN", "VOLUNTEER"]);
 
-  await prisma.event.update({
-    where: { id },
-    data: {
-      registrationDeadline,
-    },
+  await adminDb.collection("events").doc(id).update({
+    registrationDeadline: registrationDeadline ? registrationDeadline.toISOString() : null,
+    updatedAt: new Date().toISOString(),
   });
 
   revalidatePath(`/student/events/${id}`);
@@ -154,71 +169,62 @@ export async function updateEventCapacityAction(id: string, maxParticipants: num
     throw new Error("Capacity must be at least 1.");
   }
 
-  await prisma.$transaction(async (tx) => {
-    // Lock the event row for safety
-    await tx.$executeRaw`SELECT id FROM "Event" WHERE id = ${id} FOR UPDATE`;
+  const eventDoc = await adminDb.collection("events").doc(id).get();
+  if (!eventDoc.exists) {
+    throw new Error("Event not found.");
+  }
 
-    // Fetch current confirmed registration count
-    const confirmedCount = await tx.registration.count({
-      where: {
-        eventId: id,
-        status: "REGISTERED",
-      },
-    });
+  const eventData = eventDoc.data() as any;
 
-    if (maxParticipants < confirmedCount) {
-      throw new Error(`Capacity cannot be set below the current confirmed registration count (${confirmedCount}).`);
-    }
+  // Fetch confirmed registration count
+  const regSnapshot = await adminDb
+    .collection("registrations")
+    .where("eventId", "==", id)
+    .where("status", "==", "REGISTERED")
+    .get();
 
-    // Update event capacity
-    const event = await tx.event.update({
-      where: { id },
-      data: {
-        maxParticipants,
-      },
-    });
+  const confirmedCount = regSnapshot.size;
 
-    // If capacity is increased, promote waitlisted students
-    const availableSpots = maxParticipants - confirmedCount;
-    if (availableSpots > 0) {
-      const waitlisted = await tx.registration.findMany({
-        where: {
-          eventId: id,
-          status: "WAITLISTED",
-        },
-        orderBy: {
-          createdAt: "asc",
-        },
-        take: availableSpots,
-      });
+  if (maxParticipants < confirmedCount) {
+    throw new Error(`Capacity cannot be set below current confirmed registrations (${confirmedCount}).`);
+  }
 
-      if (waitlisted.length > 0) {
-        // Promote to REGISTERED
-        await tx.registration.updateMany({
-          where: {
-            id: {
-              in: waitlisted.map((r) => r.id),
-            },
-          },
-          data: {
-            status: "REGISTERED",
-          },
-        });
-
-        // Create notification for each promoted student
-        for (const reg of waitlisted) {
-          await tx.notification.create({
-            data: {
-              userId: reg.studentId,
-              type: "REGISTRATION_CONFIRMED",
-              message: `Good news! You have been promoted from the waitlist and registered for ${event.title}.`,
-              linkUrl: `/student/events/${id}`,
-            },
-          });
-        }
-      }
-    }
+  await adminDb.collection("events").doc(id).update({
+    maxParticipants,
+    updatedAt: new Date().toISOString(),
   });
+
+  // Check waitlist promotion
+  const availableSpots = maxParticipants - confirmedCount;
+  if (availableSpots > 0) {
+    const waitlistSnapshot = await adminDb
+      .collection("registrations")
+      .where("eventId", "==", id)
+      .where("status", "==", "WAITLISTED")
+      .get();
+
+    const waitlistedDocs = waitlistSnapshot.docs;
+    waitlistedDocs.sort((a, b) => (a.data().createdAt || "").localeCompare(b.data().createdAt || ""));
+    const promoted = waitlistedDocs.slice(0, availableSpots);
+
+    if (promoted.length > 0) {
+      const batch = adminDb.batch();
+      promoted.forEach((rDoc) => {
+        batch.update(rDoc.ref, { status: "REGISTERED" });
+        const nRef = adminDb.collection("notifications").doc();
+        batch.set(nRef, {
+          id: nRef.id,
+          userId: rDoc.data().studentId,
+          type: "REGISTRATION_CONFIRMED",
+          message: `Good news! You have been promoted from the waitlist and registered for ${eventData.title}.`,
+          read: false,
+          linkUrl: `/student/events/${id}`,
+          createdAt: new Date().toISOString(),
+        });
+      });
+      await batch.commit();
+    }
+  }
 
   revalidatePath(`/student/events/${id}`);
   revalidatePath(`/volunteer/events/${id}`);
@@ -232,12 +238,10 @@ export async function updateEventCapacityAction(id: string, maxParticipants: num
 export async function archiveEventAction(id: string) {
   await verifyAuth(["ADMIN", "VOLUNTEER"]);
 
-  await prisma.event.update({
-    where: { id },
-    data: {
-      status: "ARCHIVED",
-      archivedAt: new Date(),
-    },
+  await adminDb.collection("events").doc(id).update({
+    status: "ARCHIVED",
+    archivedAt: new Date().toISOString(),
+    updatedAt: new Date().toISOString(),
   });
 
   revalidatePath("/student");
@@ -249,30 +253,53 @@ export async function archiveEventAction(id: string) {
 }
 
 export async function getEventsAction(includeArchived = false) {
-  const events = await prisma.event.findMany({
-    where: includeArchived ? {} : { NOT: { status: "ARCHIVED" } },
-    include: {
-      sessions: true,
+  let query = adminDb.collection("events");
+
+  const snapshot = await query.get();
+  const now = new Date();
+
+  const sessionsSnapshot = await adminDb.collection("sessions").get();
+  const allSessions = sessionsSnapshot.docs.map((d: any) => ({ id: d.id, ...d.data() })) as any[];
+
+  const registrationsSnapshot = await adminDb.collection("registrations").get();
+  const allRegistrations = registrationsSnapshot.docs.map((d: any) => d.data()) as any[];
+
+  let events = snapshot.docs.map((doc: any) => {
+    const data = doc.data() as any;
+    const eventSessions = allSessions.filter((s: any) => s.eventId === doc.id);
+    const regCount = allRegistrations.filter((r: any) => r.eventId === doc.id && r.status === "REGISTERED").length;
+
+    return {
+      ...data,
+      id: doc.id,
+      date: new Date(data.date),
+      registrationDeadline: data.registrationDeadline ? new Date(data.registrationDeadline) : null,
+      sessions: eventSessions.map((s: any) => ({
+        ...s,
+        startTime: new Date(s.startTime),
+        endTime: new Date(s.endTime),
+      })),
       _count: {
-        select: { registrations: true },
+        registrations: regCount,
       },
-    },
-    orderBy: { date: "asc" },
+    };
   });
 
+  if (!includeArchived) {
+    events = events.filter((e: any) => e.status !== "ARCHIVED");
+  }
+
   // Dynamically update status based on current time
-  const now = new Date();
   const updatedEvents = await Promise.all(
-    events.map(async (event) => {
+    events.map(async (event: any) => {
       if (event.status === "ARCHIVED") return event;
 
       let newStatus: "UPCOMING" | "ONGOING" | "COMPLETED" = "UPCOMING";
 
-      // If registrations are active but event date has passed
       const hasOngoingSession = event.sessions.some(
-        (s) => now >= s.startTime && now <= s.endTime
+        (s: any) => now >= s.startTime && now <= s.endTime
       );
-      const allSessionsFinished = event.sessions.every((s) => now > s.endTime);
+      const allSessionsFinished = event.sessions.every((s: any) => now > s.endTime);
 
       if (hasOngoingSession) {
         newStatus = "ONGOING";
@@ -281,9 +308,9 @@ export async function getEventsAction(includeArchived = false) {
       }
 
       if (newStatus !== event.status) {
-        await prisma.event.update({
-          where: { id: event.id },
-          data: { status: newStatus },
+        await adminDb.collection("events").doc(event.id).update({
+          status: newStatus,
+          updatedAt: new Date().toISOString(),
         });
         event.status = newStatus;
       }
@@ -292,5 +319,6 @@ export async function getEventsAction(includeArchived = false) {
     })
   );
 
+  updatedEvents.sort((a: any, b: any) => a.date.getTime() - b.date.getTime());
   return updatedEvents;
 }

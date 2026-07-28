@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
-import { headers } from "next/headers";
-import { auth } from "@/lib/auth";
-import { prisma } from "@/lib/db";
+import { getCurrentUser } from "@/lib/auth-session";
+import { adminDb } from "@/lib/firebase-admin";
 
 function escapeCSV(val: any) {
   if (val === null || val === undefined) return "";
@@ -13,15 +12,13 @@ function escapeCSV(val: any) {
 }
 
 export async function GET(req: NextRequest) {
-  const session = await auth.api.getSession({
-    headers: await headers(),
-  });
+  const currentUser = await getCurrentUser();
 
-  if (!session) {
+  if (!currentUser) {
     return new NextResponse("Unauthorized", { status: 401 });
   }
 
-  const role = session.user.role;
+  const role = currentUser.role;
   if (role !== "ADMIN" && role !== "VOLUNTEER") {
     return new NextResponse("Forbidden", { status: 403 });
   }
@@ -43,44 +40,48 @@ export async function GET(req: NextRequest) {
         return new NextResponse("Bad Request: Missing eventId", { status: 400 });
       }
 
-      const event = await prisma.event.findUnique({
-        where: { id: eventId },
-        include: {
-          sessions: {
-            orderBy: { startTime: "asc" },
-          },
-          registrations: {
-            include: {
-              student: true,
-            },
-            orderBy: { createdAt: "asc" },
-          },
-        },
-      });
-
-      if (!event) {
+      const eventDoc = await adminDb.collection("events").doc(eventId).get();
+      if (!eventDoc.exists) {
         return new NextResponse("Event not found", { status: 404 });
       }
+      const event = eventDoc.data() as any;
 
-      // Fetch all attendance for these sessions
-      const sessionIds = event.sessions.map((s) => s.id);
-      const attendances = await prisma.attendance.findMany({
-        where: { sessionId: { in: sessionIds } },
-        include: { session: true },
-      });
+      const sessionsSnapshot = await adminDb
+        .collection("sessions")
+        .where("eventId", "==", eventId)
+        .get();
+      const sessions = sessionsSnapshot.docs.map((d: any) => ({ id: d.id, ...d.data() })) as any[];
 
-      // Map studentId -> list of session titles they attended
+      const regsSnapshot = await adminDb
+        .collection("registrations")
+        .where("eventId", "==", eventId)
+        .get();
+      const registrations = regsSnapshot.docs.map((d: any) => d.data()) as any[];
+
+      const usersSnapshot = await adminDb.collection("users").get();
+      const userMap = new Map<string, any>();
+      usersSnapshot.docs.forEach((d: any) => userMap.set(d.id, d.data()));
+
+      const sessionIds = sessions.map((s) => s.id);
+      const attsSnapshot = await adminDb.collection("attendances").get();
+      const attendances = attsSnapshot.docs
+        .map((d: any) => d.data())
+        .filter((a: any) => sessionIds.includes(a.sessionId));
+
+      const sessionTitleMap = new Map<string, string>();
+      sessions.forEach((s) => sessionTitleMap.set(s.id, s.title));
+
       const attendanceMap: Record<string, string[]> = {};
-      attendances.forEach((att) => {
+      attendances.forEach((att: any) => {
         if (!attendanceMap[att.studentId]) {
           attendanceMap[att.studentId] = [];
         }
-        attendanceMap[att.studentId].push(att.session.title);
+        const title = sessionTitleMap.get(att.sessionId) || "Session";
+        attendanceMap[att.studentId].push(title);
       });
 
-      filename = `event_${event.title.replace(/\s+/g, "_")}_attendance.csv`;
+      filename = `event_${(event.title || "event").replace(/\s+/g, "_")}_attendance.csv`;
 
-      // Headers
       const headersList = [
         "Student Name",
         "Roll Number",
@@ -92,14 +93,15 @@ export async function GET(req: NextRequest) {
       ];
       csvContent += headersList.map(escapeCSV).join(",") + "\n";
 
-      event.registrations.forEach((reg) => {
+      registrations.forEach((reg: any) => {
+        const student = userMap.get(reg.studentId) || { name: "Unknown", email: "" };
         const studentSessions = attendanceMap[reg.studentId] || [];
         const row = [
-          reg.student.name,
-          reg.student.rollNumber || "N/A",
-          reg.student.email,
-          reg.status,
-          reg.createdAt.toISOString(),
+          student.name || "Unknown",
+          student.rollNumber || "N/A",
+          student.email || "",
+          reg.status || "REGISTERED",
+          reg.createdAt || "",
           studentSessions.join("; "),
           studentSessions.length,
         ];
@@ -110,17 +112,17 @@ export async function GET(req: NextRequest) {
         return new NextResponse("Forbidden", { status: 403 });
       }
 
-      const events = await prisma.event.findMany({
-        include: {
-          sessions: {
-            include: {
-              attendances: true,
-            },
-          },
-          registrations: true,
-        },
-        orderBy: { date: "asc" },
-      });
+      const eventsSnapshot = await adminDb.collection("events").get();
+      const events = eventsSnapshot.docs.map((d: any) => ({ id: d.id, ...d.data() })) as any[];
+
+      const sessionsSnapshot = await adminDb.collection("sessions").get();
+      const allSessions = sessionsSnapshot.docs.map((d: any) => ({ id: d.id, ...d.data() })) as any[];
+
+      const regsSnapshot = await adminDb.collection("registrations").get();
+      const allRegs = regsSnapshot.docs.map((d: any) => d.data()) as any[];
+
+      const attsSnapshot = await adminDb.collection("attendances").get();
+      const allAtts = attsSnapshot.docs.map((d: any) => d.data()) as any[];
 
       filename = "events_summary_report.csv";
 
@@ -141,18 +143,20 @@ export async function GET(req: NextRequest) {
       ];
       csvContent += headersList.map(escapeCSV).join(",") + "\n";
 
-      events.forEach((evt) => {
-        const rsvps = evt.registrations.filter((r) => r.status === "REGISTERED").length;
-        const waitlisted = evt.registrations.filter((r) => r.status === "WAITLISTED").length;
-        const cancelled = evt.registrations.filter((r) => r.status === "CANCELLED").length;
+      events.forEach((evt: any) => {
+        const eventRegs = allRegs.filter((r: any) => r.eventId === evt.id);
+        const rsvps = eventRegs.filter((r: any) => r.status === "REGISTERED").length;
+        const waitlisted = eventRegs.filter((r: any) => r.status === "WAITLISTED").length;
+        const cancelled = eventRegs.filter((r: any) => r.status === "CANCELLED").length;
 
-        // Unique check-ins across all sessions of the event
+        const eventSessionIds = allSessions.filter((s: any) => s.eventId === evt.id).map((s: any) => s.id);
         const checkedInStudentIds = new Set<string>();
-        evt.sessions.forEach((sess) => {
-          sess.attendances.forEach((att) => {
+        allAtts.forEach((att: any) => {
+          if (eventSessionIds.includes(att.sessionId)) {
             checkedInStudentIds.add(att.studentId);
-          });
+          }
         });
+
         const uniqueCheckIns = checkedInStudentIds.size;
         const rate = rsvps > 0 ? ((uniqueCheckIns / rsvps) * 100).toFixed(1) : "0.0";
 
@@ -160,7 +164,7 @@ export async function GET(req: NextRequest) {
           evt.id,
           evt.title,
           evt.category,
-          evt.date.toISOString(),
+          evt.date,
           evt.venue,
           evt.coordinatorName,
           evt.status,
@@ -178,13 +182,14 @@ export async function GET(req: NextRequest) {
         return new NextResponse("Forbidden", { status: 403 });
       }
 
-      const volunteers = await prisma.user.findMany({
-        where: { role: "VOLUNTEER" },
-        include: {
-          markedAttendances: true,
-        },
-        orderBy: { name: "asc" },
-      });
+      const usersSnapshot = await adminDb
+        .collection("users")
+        .where("role", "==", "VOLUNTEER")
+        .get();
+
+      const volunteers = usersSnapshot.docs.map((d: any) => ({ id: d.id, ...d.data() })) as any[];
+      const attsSnapshot = await adminDb.collection("attendances").get();
+      const allAtts = attsSnapshot.docs.map((d: any) => d.data()) as any[];
 
       filename = "volunteers_performance_report.csv";
 
@@ -196,12 +201,13 @@ export async function GET(req: NextRequest) {
       ];
       csvContent += headersList.map(escapeCSV).join(",") + "\n";
 
-      volunteers.forEach((v) => {
+      volunteers.forEach((v: any) => {
+        const validatedCount = allAtts.filter((a: any) => a.markedById === v.id).length;
         const row = [
-          v.name,
-          v.email,
-          v.createdAt.toISOString(),
-          v.markedAttendances.length,
+          v.name || "Volunteer",
+          v.email || "",
+          v.createdAt || "",
+          validatedCount,
         ];
         csvContent += row.map(escapeCSV).join(",") + "\n";
       });
@@ -210,13 +216,16 @@ export async function GET(req: NextRequest) {
         return new NextResponse("Forbidden", { status: 403 });
       }
 
-      const registrations = await prisma.registration.findMany({
-        include: {
-          student: true,
-          event: true,
-        },
-        orderBy: { createdAt: "desc" },
-      });
+      const regsSnapshot = await adminDb.collection("registrations").get();
+      const registrations = regsSnapshot.docs.map((d: any) => d.data()) as any[];
+
+      const usersSnapshot = await adminDb.collection("users").get();
+      const userMap = new Map<string, any>();
+      usersSnapshot.docs.forEach((d: any) => userMap.set(d.id, d.data()));
+
+      const eventsSnapshot = await adminDb.collection("events").get();
+      const eventMap = new Map<string, any>();
+      eventsSnapshot.docs.forEach((d: any) => eventMap.set(d.id, d.data()));
 
       filename = "students_registration_log.csv";
 
@@ -232,16 +241,19 @@ export async function GET(req: NextRequest) {
       ];
       csvContent += headersList.map(escapeCSV).join(",") + "\n";
 
-      registrations.forEach((reg) => {
+      registrations.forEach((reg: any) => {
+        const student = userMap.get(reg.studentId) || { name: "Unknown", email: "" };
+        const event = eventMap.get(reg.eventId) || { title: "Unknown", category: "", date: "" };
+
         const row = [
-          reg.student.name,
-          reg.student.rollNumber || "N/A",
-          reg.student.email,
-          reg.event.title,
-          reg.event.category,
-          reg.event.date.toISOString(),
-          reg.status,
-          reg.createdAt.toISOString(),
+          student.name || "Unknown",
+          student.rollNumber || "N/A",
+          student.email || "",
+          event.title || "",
+          event.category || "",
+          event.date || "",
+          reg.status || "REGISTERED",
+          reg.createdAt || "",
         ];
         csvContent += row.map(escapeCSV).join(",") + "\n";
       });

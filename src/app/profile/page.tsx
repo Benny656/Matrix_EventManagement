@@ -1,73 +1,61 @@
 import React from "react";
-import { headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { auth } from "@/lib/auth";
-import { prisma } from "@/lib/db";
+import { getCurrentUser } from "@/lib/auth-session";
+import { adminDb } from "@/lib/firebase-admin";
 import DashboardLayout from "@/components/dashboard-layout";
 import ProfileForm from "./profile-form";
 
 export const dynamic = "force-dynamic";
 
 export default async function ProfilePage() {
-  const session = await auth.api.getSession({
-    headers: await headers(),
-  });
+  const currentUser = await getCurrentUser();
 
-  if (!session) {
-    redirect("/login");
-  }
-
-  // Fetch the full/latest user details to get display name and phoneNumber
-  const dbUser = await prisma.user.findUnique({
-    where: { id: session.user.id },
-  });
-
-  if (!dbUser) {
+  if (!currentUser) {
     redirect("/login");
   }
 
   // Fetch role-specific statistics
   let stats: { label: string; value: number }[] = [];
-  if (dbUser.role === "STUDENT") {
-    const totalEvents = await prisma.registration.count({
-      where: {
-        studentId: dbUser.id,
-        status: "REGISTERED",
-      },
-    });
-    const sessionsAttended = await prisma.attendance.count({
-      where: {
-        studentId: dbUser.id,
-      },
-    });
+  if (currentUser.role === "STUDENT") {
+    const regSnapshot = await adminDb
+      .collection("registrations")
+      .where("studentId", "==", currentUser.id)
+      .where("status", "==", "REGISTERED")
+      .get();
+
+    const attSnapshot = await adminDb
+      .collection("attendances")
+      .where("studentId", "==", currentUser.id)
+      .get();
+
     stats = [
-      { label: "Events Registered", value: totalEvents },
-      { label: "Sessions Attended", value: sessionsAttended },
+      { label: "Events Registered", value: regSnapshot.size },
+      { label: "Sessions Attended", value: attSnapshot.size },
     ];
-  } else if (dbUser.role === "VOLUNTEER") {
-    const eventsOrganized = await prisma.event.count({
-      where: {
-        createdById: dbUser.id,
-      },
-    });
-    const attendeesScanned = await prisma.attendance.count({
-      where: {
-        markedById: dbUser.id,
-        checkInMethod: "SCANNED",
-      },
-    });
+  } else if (currentUser.role === "VOLUNTEER") {
+    const evtSnapshot = await adminDb
+      .collection("events")
+      .where("createdById", "==", currentUser.id)
+      .get();
+
+    const attSnapshot = await adminDb
+      .collection("attendances")
+      .where("markedById", "==", currentUser.id)
+      .where("checkInMethod", "==", "SCANNED")
+      .get();
+
     stats = [
-      { label: "Events Organized", value: eventsOrganized },
-      { label: "Attendees Scanned", value: attendeesScanned },
+      { label: "Events Organized", value: evtSnapshot.size },
+      { label: "Attendees Scanned", value: attSnapshot.size },
     ];
   }
 
   return (
     <DashboardLayout
       user={{
-        name: dbUser.name,
-        email: dbUser.email,
-        role: dbUser.role as "ADMIN" | "VOLUNTEER" | "STUDENT",
+        name: currentUser.name,
+        email: currentUser.email,
+        role: currentUser.role,
       }}
     >
       <div className="max-w-4xl mx-auto space-y-6">
@@ -82,12 +70,12 @@ export default async function ProfilePage() {
 
         <ProfileForm
           user={{
-            id: dbUser.id,
-            name: dbUser.name,
-            email: dbUser.email,
-            role: dbUser.role,
-            rollNumber: dbUser.rollNumber || null,
-            phoneNumber: dbUser.phoneNumber || "",
+            id: currentUser.id,
+            name: currentUser.name,
+            email: currentUser.email,
+            role: currentUser.role,
+            rollNumber: currentUser.rollNumber || null,
+            phoneNumber: currentUser.phoneNumber || "",
           }}
           stats={stats}
         />

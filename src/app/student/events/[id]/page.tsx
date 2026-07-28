@@ -1,8 +1,7 @@
 import React from "react";
-import { headers } from "next/headers";
 import { notFound, redirect } from "next/navigation";
-import { prisma } from "@/lib/db";
-import { auth } from "@/lib/auth";
+import { getCurrentUser } from "@/lib/auth-session";
+import { adminDb } from "@/lib/firebase-admin";
 import RegisterActionButton from "@/components/events/register-action-button";
 
 export const dynamic = "force-dynamic";
@@ -12,44 +11,37 @@ interface PageProps {
 }
 
 export default async function StudentEventDetailsPage({ params }: PageProps) {
-  const session = await auth.api.getSession({
-    headers: await headers(),
-  });
+  const currentUser = await getCurrentUser();
 
-  if (!session || session.user.role !== "STUDENT") {
+  if (!currentUser || currentUser.role !== "STUDENT") {
     redirect("/login");
   }
 
   const { id } = await params;
 
-  // Fetch event details and student's registration status in parallel
-  const [event, userRegistration] = await Promise.all([
-    prisma.event.findUnique({
-      where: { id },
-      include: {
-        sessions: {
-          orderBy: { startTime: "asc" },
-        },
-        registrations: {
-          where: { NOT: { status: "CANCELLED" } },
-        },
-      },
-    }),
-    prisma.registration.findUnique({
-      where: {
-        studentId_eventId: {
-          studentId: session.user.id,
-          eventId: id,
-        },
-      },
-    }),
-  ]);
-
-  if (!event) {
+  const eventDoc = await adminDb.collection("events").doc(id).get();
+  if (!eventDoc.exists) {
     notFound();
   }
 
-  const activeRegistrationsCount = event.registrations.filter((r) => r.status === "REGISTERED").length;
+  const event = { id: eventDoc.id, ...eventDoc.data() } as any;
+
+  const sessionsSnapshot = await adminDb
+    .collection("sessions")
+    .where("eventId", "==", id)
+    .get();
+  const sessions = sessionsSnapshot.docs.map((d) => ({ id: d.id, ...d.data() })) as any[];
+  sessions.sort((a, b) => (a.startTime || "").localeCompare(b.startTime || ""));
+
+  const regsSnapshot = await adminDb
+    .collection("registrations")
+    .where("eventId", "==", id)
+    .get();
+
+  const registrations = regsSnapshot.docs.map((d) => d.data());
+  const userRegistration = registrations.find((r) => r.studentId === currentUser.id);
+
+  const activeRegistrationsCount = registrations.filter((r) => r.status === "REGISTERED").length;
   const isFull = activeRegistrationsCount >= event.maxParticipants;
   const isDeadlinePassed = event.registrationDeadline ? new Date() > new Date(event.registrationDeadline) : false;
 
@@ -101,20 +93,19 @@ export default async function StudentEventDetailsPage({ params }: PageProps) {
               Scheduled Blocks / Sessions
             </h3>
 
-            {event.sessions.length === 0 ? (
+            {sessions.length === 0 ? (
               <p className="font-mono text-xs text-muted-foreground uppercase py-2">
                 No session blocks scheduled for this event.
               </p>
             ) : (
               <div className="relative border-l border-border pl-6 ml-2 space-y-6">
-                {event.sessions.map((sess, idx) => {
+                {sessions.map((sess) => {
                   const startStr = new Date(sess.startTime).toLocaleTimeString("en-US", { hour12: false, hour: "2-digit", minute: "2-digit" });
                   const endStr = new Date(sess.endTime).toLocaleTimeString("en-US", { hour12: false, hour: "2-digit", minute: "2-digit" });
                   const dateStr = new Date(sess.startTime).toLocaleDateString("en-US", { month: "short", day: "numeric" });
 
                   return (
                     <div key={sess.id} className="relative">
-                      {/* Timeline Dot */}
                       <span className="absolute -left-[31px] top-1.5 w-2 h-2 bg-primary rounded-full ring-4 ring-background"></span>
                       <div>
                         <span className="font-mono text-[10px] text-primary uppercase font-bold tracking-wider">{dateStr} / {startStr} - {endStr}</span>
@@ -148,7 +139,7 @@ export default async function StudentEventDetailsPage({ params }: PageProps) {
               <div className="flex justify-between border-b border-border pb-2 border-dashed">
                 <span className="text-muted-foreground">Waitlisted:</span>
                 <span className="text-foreground font-semibold">
-                  {event.registrations.filter((r) => r.status === "WAITLISTED").length} Students
+                  {registrations.filter((r) => r.status === "WAITLISTED").length} Students
                 </span>
               </div>
               <div className="flex justify-between border-b border-border pb-2 border-dashed">
@@ -157,7 +148,6 @@ export default async function StudentEventDetailsPage({ params }: PageProps) {
               </div>
             </div>
 
-            {/* Action button */}
             <RegisterActionButton
               eventId={event.id}
               initialStatus={registrationStatus as any}

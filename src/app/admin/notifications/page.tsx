@@ -1,18 +1,15 @@
 import React from "react";
-import { headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { auth } from "@/lib/auth";
+import { verifyAdmin } from "@/lib/auth-session";
 import { getNotificationsAction } from "@/actions/notification";
 import NotificationsList from "@/components/notifications-list";
 
 export const dynamic = "force-dynamic";
 
 export default async function AdminNotificationsPage() {
-  const session = await auth.api.getSession({
-    headers: await headers(),
-  });
-
-  if (!session || session.user.role !== "ADMIN") {
+  try {
+    await verifyAdmin();
+  } catch {
     redirect("/login");
   }
 

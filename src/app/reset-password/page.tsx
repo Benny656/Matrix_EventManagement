@@ -7,7 +7,8 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { motion, AnimatePresence } from "framer-motion";
-import { authClient } from "@/lib/auth-client";
+import { confirmPasswordReset } from "firebase/auth";
+import { auth } from "@/lib/firebase";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Lock, AlertCircle, ArrowLeft, Loader2, CheckCircle2 } from "lucide-react";
@@ -27,7 +28,7 @@ function ResetPasswordContent() {
   const router = useRouter();
   const searchParams = useSearchParams();
   
-  const token = searchParams.get("token");
+  const oobCode = searchParams.get("oobCode") || searchParams.get("token");
   const errorParam = searchParams.get("error");
 
   const [loading, setLoading] = useState(false);
@@ -49,7 +50,7 @@ function ResetPasswordContent() {
   });
 
   const onSubmit = async (data: ResetPasswordValues) => {
-    if (!token) {
+    if (!oobCode) {
       setError("Reset token is missing. Please request a new link.");
       return;
     }
@@ -57,32 +58,20 @@ function ResetPasswordContent() {
     setLoading(true);
     setError(null);
     try {
-      await authClient.resetPassword(
-        {
-          newPassword: data.password,
-          token: token,
-        },
-        {
-          onRequest: () => setLoading(true),
-          onResponse: () => setLoading(false),
-          onSuccess: () => {
-            setSuccess(true);
-            setTimeout(() => {
-              router.push("/login");
-            }, 3000);
-          },
-          onError: (ctx) => {
-            setError(ctx.error.message || "Failed to reset password. The link may have expired.");
-          },
-        }
-      );
+      await confirmPasswordReset(auth, oobCode, data.password);
+      setSuccess(true);
+      setTimeout(() => {
+        router.push("/login");
+      }, 3000);
     } catch (err: any) {
-      setError(err?.message || "An unexpected error occurred");
+      console.error(err);
+      setError(err?.message || "Failed to reset password. The link may have expired.");
+    } finally {
       setLoading(false);
     }
   };
 
-  const isInvalidTokenState = !token || errorParam === "INVALID_TOKEN";
+  const isInvalidTokenState = !oobCode || errorParam === "INVALID_TOKEN";
 
   return (
     <div className="min-h-screen flex items-center justify-center p-6 bg-gradient-to-br from-background to-surface-container relative selection:bg-primary/10 selection:text-primary">

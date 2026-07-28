@@ -1,35 +1,46 @@
 import React from "react";
 import Link from "next/link";
 import { GraduationCap, Zap, ClipboardCheck, Heart } from "lucide-react";
-import { prisma } from "@/lib/db";
+import { adminDb } from "@/lib/firebase-admin";
 import { buttonVariants } from "@/components/ui/button";
 import { cn } from "@/lib/utils";
 
 // --- StatsGrid Component ---
 export async function StatsGrid() {
-  const [totalStudents, totalVolunteers, activeEvents, completedEvents] = await Promise.all([
-    prisma.user.count({ where: { role: "STUDENT" } }),
-    prisma.user.count({ where: { role: "VOLUNTEER" } }),
-    prisma.event.count({ where: { status: { in: ["UPCOMING", "ONGOING"] } } }),
-    prisma.event.findMany({
-      where: { status: "COMPLETED" },
-      include: {
-        registrations: { where: { status: "REGISTERED" } },
-        sessions: { include: { attendances: true } },
-      },
-    }),
-  ]);
+  const usersSnapshot = await adminDb.collection("users").get();
+  const users = usersSnapshot.docs.map((d: any) => d.data());
+
+  const totalStudents = users.filter((u: any) => u.role === "STUDENT").length;
+  const totalVolunteers = users.filter((u: any) => u.role === "VOLUNTEER").length;
+
+  const eventsSnapshot = await adminDb.collection("events").get();
+  const events = eventsSnapshot.docs.map((d: any) => ({ id: d.id, ...d.data() })) as any[];
+
+  const activeEvents = events.filter((e: any) => e.status === "UPCOMING" || e.status === "ONGOING").length;
+  const completedEvents = events.filter((e: any) => e.status === "COMPLETED");
+
+  const sessionsSnapshot = await adminDb.collection("sessions").get();
+  const allSessions = sessionsSnapshot.docs.map((d: any) => ({ id: d.id, ...d.data() })) as any[];
+
+  const regsSnapshot = await adminDb.collection("registrations").get();
+  const allRegs = regsSnapshot.docs.map((d: any) => d.data()) as any[];
+
+  const attsSnapshot = await adminDb.collection("attendances").get();
+  const allAtts = attsSnapshot.docs.map((d: any) => d.data()) as any[];
 
   let totalRsvps = 0;
   let totalUniqueCheckedIn = 0;
 
-  completedEvents.forEach((evt) => {
-    totalRsvps += evt.registrations.length;
+  completedEvents.forEach((evt: any) => {
+    const rsvps = allRegs.filter((r: any) => r.eventId === evt.id && r.status === "REGISTERED").length;
+    totalRsvps += rsvps;
+
+    const eventSessionIds = allSessions.filter((s: any) => s.eventId === evt.id).map((s: any) => s.id);
     const checkedInStudentIds = new Set<string>();
-    evt.sessions.forEach((sess) => {
-      sess.attendances.forEach((att) => {
+    allAtts.forEach((att: any) => {
+      if (eventSessionIds.includes(att.sessionId)) {
         checkedInStudentIds.add(att.studentId);
-      });
+      }
     });
     totalUniqueCheckedIn += checkedInStudentIds.size;
   });
@@ -93,29 +104,38 @@ export async function StatsGrid() {
 
 // --- EventHistoryChart Component ---
 export async function EventHistoryChart() {
-  const chartEventsRaw = await prisma.event.findMany({
-    take: 6,
-    orderBy: { date: "desc" },
-    include: {
-      registrations: { where: { status: "REGISTERED" } },
-      sessions: { include: { attendances: true } },
-    },
-  });
+  const eventsSnapshot = await adminDb.collection("events").get();
+  const allEvents = eventsSnapshot.docs.map((d: any) => ({ id: d.id, ...d.data() })) as any[];
+  allEvents.sort((a: any, b: any) => (b.date || "").localeCompare(a.date || ""));
 
+  const chartEventsRaw = allEvents.slice(0, 6);
   const chartEvents = [...chartEventsRaw].reverse();
-  const chartData = chartEvents.map((evt) => {
-    const rsvps = evt.registrations.length;
+
+  const sessionsSnapshot = await adminDb.collection("sessions").get();
+  const allSessions = sessionsSnapshot.docs.map((d: any) => ({ id: d.id, ...d.data() })) as any[];
+
+  const regsSnapshot = await adminDb.collection("registrations").get();
+  const allRegs = regsSnapshot.docs.map((d: any) => d.data()) as any[];
+
+  const attsSnapshot = await adminDb.collection("attendances").get();
+  const allAtts = attsSnapshot.docs.map((d: any) => d.data()) as any[];
+
+  const chartData = chartEvents.map((evt: any) => {
+    const rsvps = allRegs.filter((r: any) => r.eventId === evt.id && r.status === "REGISTERED").length;
+
+    const eventSessionIds = allSessions.filter((s: any) => s.eventId === evt.id).map((s: any) => s.id);
     const checkedInStudentIds = new Set<string>();
-    evt.sessions.forEach((sess) => {
-      sess.attendances.forEach((att) => {
+    allAtts.forEach((att: any) => {
+      if (eventSessionIds.includes(att.sessionId)) {
         checkedInStudentIds.add(att.studentId);
-      });
+      }
     });
+
     const uniqueCheckIns = checkedInStudentIds.size;
-    return { id: evt.id, title: evt.title, uniqueCheckIns, rsvps, status: evt.status };
+    return { id: evt.id, title: evt.title || "Event", uniqueCheckIns, rsvps, status: evt.status };
   });
 
-  const maxVal = Math.max(...chartData.map((d) => d.uniqueCheckIns), 10);
+  const maxVal = Math.max(...chartData.map((d: any) => d.uniqueCheckIns), 10);
 
   return (
     <div className="border border-border bg-card flex flex-col h-full">
@@ -141,7 +161,7 @@ export async function EventHistoryChart() {
           </div>
         ) : (
           <div className="flex items-end justify-between h-56 gap-4 px-2">
-            {chartData.map((d) => {
+            {chartData.map((d: any) => {
               const percentage = Math.min(Math.round((d.uniqueCheckIns / maxVal) * 100), 100);
               const isCurrent = d.status === "ONGOING" || d.status === "UPCOMING";
               
@@ -173,7 +193,6 @@ export async function EventHistoryChart() {
           </div>
         )}
 
-        {/* Divider */}
         <div className="w-full h-[1px] bg-border mt-4 animate-pulse-slow"></div>
         <div className="mt-4 flex flex-wrap justify-between gap-2 font-mono text-[11px] text-muted-foreground">
           <div className="flex items-center gap-2">
@@ -191,49 +210,63 @@ export async function EventHistoryChart() {
 
 // --- SystemFeed Component ---
 export async function SystemFeed() {
-  const [recentRegistrations, recentAttendances, recentUpdates] = await Promise.all([
-    prisma.registration.findMany({
-      take: 5,
-      orderBy: { createdAt: "desc" },
-      include: { student: true, event: true },
-    }),
-    prisma.attendance.findMany({
-      take: 5,
-      orderBy: { createdAt: "desc" },
-      include: { student: true, session: { include: { event: true } } },
-    }),
-    prisma.update.findMany({
-      take: 5,
-      orderBy: { createdAt: "desc" },
-      include: { author: true },
-    }),
-  ]);
+  const usersSnapshot = await adminDb.collection("users").get();
+  const userMap = new Map<string, any>();
+  usersSnapshot.docs.forEach((d: any) => userMap.set(d.id, d.data()));
 
-  // Merge and sort activities
+  const eventsSnapshot = await adminDb.collection("events").get();
+  const eventMap = new Map<string, any>();
+  eventsSnapshot.docs.forEach((d: any) => eventMap.set(d.id, d.data()));
+
+  const sessionsSnapshot = await adminDb.collection("sessions").get();
+  const sessionMap = new Map<string, any>();
+  sessionsSnapshot.docs.forEach((d: any) => sessionMap.set(d.id, d.data()));
+
+  const regsSnapshot = await adminDb.collection("registrations").get();
+  const recentRegistrations = regsSnapshot.docs.map((d: any) => d.data());
+
+  const attsSnapshot = await adminDb.collection("attendances").get();
+  const recentAttendances = attsSnapshot.docs.map((d: any) => d.data());
+
+  const updatesSnapshot = await adminDb.collection("updates").get();
+  const recentUpdates = updatesSnapshot.docs.map((d: any) => d.data());
+
   const activities = [
-    ...recentRegistrations.map((r) => ({
-      type: "Registration",
-      color: "text-primary",
-      text: `${r.student.name} RSVP'd for ${r.event.title}`,
-      time: r.createdAt,
-      user: r.student.name,
-    })),
-    ...recentAttendances.map((a) => ({
-      type: "Attendance",
-      color: "text-secondary",
-      text: `${a.student.name} checked in for ${a.session.event.title}`,
-      time: a.createdAt,
-      user: "Scanner",
-    })),
-    ...recentUpdates.map((u) => ({
-      type: "Announcement",
-      color: "text-muted-foreground",
-      text: `Update posted: "${u.content.length > 40 ? u.content.substring(0, 40) + "..." : u.content}"`,
-      time: u.createdAt,
-      user: u.author.name,
-    })),
+    ...recentRegistrations.map((r: any) => {
+      const student = userMap.get(r.studentId) || { name: "Student" };
+      const event = eventMap.get(r.eventId) || { title: "Event" };
+      return {
+        type: "Registration",
+        color: "text-primary",
+        text: `${student.name} RSVP'd for ${event.title}`,
+        time: r.createdAt ? new Date(r.createdAt) : new Date(),
+        user: student.name,
+      };
+    }),
+    ...recentAttendances.map((a: any) => {
+      const student = userMap.get(a.studentId) || { name: "Student" };
+      const session = sessionMap.get(a.sessionId);
+      const event = session ? eventMap.get(session.eventId) : null;
+      return {
+        type: "Attendance",
+        color: "text-secondary",
+        text: `${student.name} checked in for ${event?.title || "Session"}`,
+        time: a.createdAt ? new Date(a.createdAt) : new Date(),
+        user: "Scanner",
+      };
+    }),
+    ...recentUpdates.map((u: any) => {
+      const author = userMap.get(u.authorId) || { name: "Staff" };
+      return {
+        type: "Announcement",
+        color: "text-muted-foreground",
+        text: `Update posted: "${(u.content || "").length > 40 ? u.content.substring(0, 40) + "..." : u.content}"`,
+        time: u.createdAt ? new Date(u.createdAt) : new Date(),
+        user: author.name,
+      };
+    }),
   ]
-    .sort((a, b) => b.time.getTime() - a.time.getTime())
+    .sort((a: any, b: any) => b.time.getTime() - a.time.getTime())
     .slice(0, 8);
 
   return (
@@ -247,8 +280,8 @@ export async function SystemFeed() {
             No recent activity.
           </div>
         ) : (
-          activities.map((act, i) => {
-            const dateStr = new Date(act.time).toLocaleString("en-US", {
+          activities.map((act: any, i: number) => {
+            const dateStr = act.time.toLocaleString("en-US", {
               hour: "2-digit",
               minute: "2-digit",
               hour12: false,
@@ -274,7 +307,6 @@ export async function SystemFeed() {
   );
 }
 
-// --- Loading skeleton components for dashboard sections ---
 export function SectionSkeleton() {
   return (
     <div className="border border-border bg-card p-6 min-h-[350px] flex flex-col justify-center items-center font-mono text-[11px] text-muted-foreground tracking-widest animate-pulse">

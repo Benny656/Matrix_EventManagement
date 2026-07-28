@@ -6,7 +6,8 @@ import { useForm } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { motion, AnimatePresence } from "framer-motion";
-import { authClient } from "@/lib/auth-client";
+import { sendPasswordResetEmail } from "firebase/auth";
+import { auth } from "@/lib/firebase";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { AtSign, MailCheck, AlertCircle, ArrowLeft, Loader2 } from "lucide-react";
@@ -35,24 +36,12 @@ export default function ForgotPasswordPage() {
     setLoading(true);
     setError(null);
     try {
-      await authClient.requestPasswordReset(
-        {
-          email: data.email.toLowerCase().trim(),
-          redirectTo: "/reset-password",
-        },
-        {
-          onRequest: () => setLoading(true),
-          onResponse: () => setLoading(false),
-          onSuccess: () => {
-            setSuccess(true);
-          },
-          onError: (ctx) => {
-            setError(ctx.error.message || "Failed to process request. Please try again.");
-          },
-        }
-      );
+      await sendPasswordResetEmail(auth, data.email.toLowerCase().trim());
+      setSuccess(true);
     } catch (err: any) {
-      setError(err?.message || "An unexpected error occurred");
+      console.error(err);
+      setError(err?.message || "Failed to process request. Please try again.");
+    } finally {
       setLoading(false);
     }
   };

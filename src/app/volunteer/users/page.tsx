@@ -1,7 +1,6 @@
 import React from "react";
-import { headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { auth } from "@/lib/auth";
+import { verifyStaff } from "@/lib/auth-session";
 import { getUsersAction } from "@/actions/user";
 import UsersListTable from "@/components/admin/users-list-table";
 
@@ -15,11 +14,10 @@ interface PageProps {
 }
 
 export default async function VolunteerUsersPage({ searchParams }: PageProps) {
-  const session = await auth.api.getSession({
-    headers: await headers(),
-  });
-
-  if (!session || (session.user.role !== "VOLUNTEER" && session.user.role !== "ADMIN")) {
+  let user;
+  try {
+    user = await verifyStaff();
+  } catch {
     redirect("/login");
   }
 
@@ -37,10 +35,9 @@ export default async function VolunteerUsersPage({ searchParams }: PageProps) {
         </p>
       </div>
 
-      {/* canEditRole=false — Volunteers can only reset passwords, not change roles */}
       <UsersListTable
         initialUsers={users as any}
-        currentUserId={session.user.id}
+        currentUserId={user.id}
         canEditRole={false}
       />
     </div>

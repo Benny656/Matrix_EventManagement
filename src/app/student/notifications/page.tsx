@@ -1,18 +1,15 @@
 import React from "react";
-import { headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { auth } from "@/lib/auth";
+import { getCurrentUser } from "@/lib/auth-session";
 import { getNotificationsAction } from "@/actions/notification";
 import NotificationsList from "@/components/notifications-list";
 
 export const dynamic = "force-dynamic";
 
 export default async function StudentNotificationsPage() {
-  const session = await auth.api.getSession({
-    headers: await headers(),
-  });
+  const user = await getCurrentUser();
 
-  if (!session || session.user.role !== "STUDENT") {
+  if (!user || user.role !== "STUDENT") {
     redirect("/login");
   }
 

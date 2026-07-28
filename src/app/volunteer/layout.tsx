@@ -1,6 +1,5 @@
-import { headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { auth } from "@/lib/auth";
+import { getCurrentUser } from "@/lib/auth-session";
 import DashboardLayout from "@/components/dashboard-layout";
 
 export default async function VolunteerLayout({
@@ -8,24 +7,22 @@ export default async function VolunteerLayout({
 }: {
   children: React.ReactNode;
 }) {
-  const session = await auth.api.getSession({
-    headers: await headers(),
-  });
+  const user = await getCurrentUser();
 
-  if (!session) {
+  if (!user) {
     redirect("/login");
   }
 
-  if (session.user.role !== "VOLUNTEER" && session.user.role !== "ADMIN") {
+  if (user.role !== "VOLUNTEER" && user.role !== "ADMIN") {
     redirect("/unauthorized");
   }
 
   return (
     <DashboardLayout
       user={{
-        name: session.user.name,
-        email: session.user.email,
-        role: session.user.role as "ADMIN" | "VOLUNTEER" | "STUDENT",
+        name: user.name,
+        email: user.email,
+        role: user.role,
       }}
     >
       {children}

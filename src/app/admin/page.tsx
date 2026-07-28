@@ -1,7 +1,6 @@
 import React, { Suspense } from "react";
-import { headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { auth } from "@/lib/auth";
+import { verifyAdmin } from "@/lib/auth-session";
 import {
   StatsGrid,
   EventHistoryChart,
@@ -12,11 +11,9 @@ import {
 export const dynamic = "force-dynamic";
 
 export default async function AdminDashboardPage() {
-  const session = await auth.api.getSession({
-    headers: await headers(),
-  });
-
-  if (!session || session.user.role !== "ADMIN") {
+  try {
+    await verifyAdmin();
+  } catch {
     redirect("/login");
   }
 

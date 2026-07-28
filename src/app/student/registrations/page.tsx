@@ -1,28 +1,43 @@
 import React from "react";
-import { headers } from "next/headers";
 import { redirect } from "next/navigation";
-import { prisma } from "@/lib/db";
-import { auth } from "@/lib/auth";
+import { getCurrentUser } from "@/lib/auth-session";
+import { adminDb } from "@/lib/firebase-admin";
 import StudentRegistrations from "@/components/events/student-registrations";
 
 export const dynamic = "force-dynamic";
 
 export default async function StudentRegistrationsPage() {
-  const session = await auth.api.getSession({
-    headers: await headers(),
-  });
+  const currentUser = await getCurrentUser();
 
-  if (!session || session.user.role !== "STUDENT") {
+  if (!currentUser || currentUser.role !== "STUDENT") {
     redirect("/login");
   }
 
-  const registrations = await prisma.registration.findMany({
-    where: { studentId: session.user.id },
-    include: {
-      event: true,
-    },
-    orderBy: { createdAt: "desc" },
+  const regsSnapshot = await adminDb
+    .collection("registrations")
+    .where("studentId", "==", currentUser.id)
+    .get();
+
+  const eventsSnapshot = await adminDb.collection("events").get();
+  const eventMap = new Map<string, any>();
+  eventsSnapshot.docs.forEach((d) => eventMap.set(d.id, d.data()));
+
+  const registrations = regsSnapshot.docs.map((doc) => {
+    const data = doc.data() as any;
+    const event = eventMap.get(data.eventId) || { title: "Unknown Event", venue: "", date: "" };
+    return {
+      ...data,
+      id: doc.id,
+      createdAt: data.createdAt ? new Date(data.createdAt) : new Date(),
+      event: {
+        ...event,
+        id: data.eventId,
+        date: event.date ? new Date(event.date) : new Date(),
+      },
+    };
   });
+
+  registrations.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
 
   return (
     <div className="space-y-6">
