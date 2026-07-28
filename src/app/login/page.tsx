@@ -7,6 +7,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { GoogleAuthProvider, signInWithPopup, signOut } from "firebase/auth";
 import { doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
+import { AlertCircle, Loader2, ShieldCheck, ArrowLeft } from "lucide-react";
 import ThemeToggle from "@/components/theme-toggle";
 
 function GoogleIcon() {
@@ -16,31 +17,6 @@ function GoogleIcon() {
       <path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z" />
       <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.06H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.94l2.85-2.22.81-.63z" />
       <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.06l3.66 2.84c.87-2.6 3.3-4.52 6.16-4.52z" />
-    </svg>
-  );
-}
-
-function ShieldIcon() {
-  return (
-    <svg className="w-3.5 h-3.5 shrink-0 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M9 12l2 2 4-4m5.618-4.016A11.955 11.955 0 0112 2.944a11.955 11.955 0 01-8.618 3.04A12.02 12.02 0 003 9c0 5.591 3.824 10.29 9 11.622 5.176-1.332 9-6.03 9-11.622 0-1.042-.133-2.052-.382-3.016z" />
-    </svg>
-  );
-}
-
-function AlertIcon() {
-  return (
-    <svg className="w-4 h-4 shrink-0 mt-0.5 text-destructive" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z" />
-    </svg>
-  );
-}
-
-function SpinnerIcon() {
-  return (
-    <svg className="w-4 h-4 animate-spin text-primary shrink-0" fill="none" viewBox="0 0 24 24">
-      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z" />
     </svg>
   );
 }
@@ -108,8 +84,11 @@ function LoginContent() {
       else if (role === "VOLUNTEER") router.push("/volunteer");
       else router.push("/student");
     } catch (err: any) {
+      console.error("Google auth error:", err);
       if (err.code === "auth/popup-closed-by-user") {
-        setError("Sign-in was cancelled. Please try again.");
+        setError("Sign-in popup closed before completion. Please try again.");
+      } else if (err.code === "auth/internal-error" || err.code === "auth/operation-not-allowed") {
+        setError("Google Sign-In is not enabled in Firebase Console. Go to Firebase Console -> Authentication -> Sign-in method and enable Google.");
       } else if (err.code !== "auth/cancelled-popup-request") {
         setError(err.message || "Failed to sign in with Google.");
       }
@@ -118,15 +97,16 @@ function LoginContent() {
   };
 
   return (
-    <div className="min-h-screen w-full flex flex-col items-center justify-center p-5 bg-background relative selection:bg-primary/20 selection:text-primary">
+    <div className="min-h-screen w-full flex flex-col items-center justify-center p-4 bg-background relative selection:bg-primary/20 selection:text-primary">
       {/* Fixed top-right theme toggle */}
       <div className="fixed top-5 right-5 z-50">
         <ThemeToggle />
       </div>
 
-      {/* Main Centered Login Container (Strict Max Width 380px) */}
+      {/* Main Centered Login Container (Guaranteed Strict Max Width 380px) */}
       <motion.div
-        className="w-full max-w-[380px] mx-auto flex flex-col items-center gap-6"
+        className="w-full max-w-sm mx-auto flex flex-col items-center gap-6"
+        style={{ maxWidth: "380px", width: "100%" }}
         initial={{ opacity: 0, y: 14 }}
         animate={{ opacity: 1, y: 0 }}
         transition={{ duration: 0.3, ease: [0.16, 1, 0.3, 1] }}
@@ -149,7 +129,10 @@ function LoginContent() {
         </div>
 
         {/* Solid Compact Card */}
-        <div className="w-full bg-card border border-border rounded-2xl shadow-xl overflow-hidden flex flex-col">
+        <div
+          className="w-full bg-card border border-border rounded-2xl shadow-xl overflow-hidden flex flex-col"
+          style={{ maxWidth: "380px", width: "100%" }}
+        >
           {/* Card Top Accent Bar */}
           <div className="h-1 w-full bg-primary" />
 
@@ -171,9 +154,9 @@ function LoginContent() {
                   initial={{ opacity: 0, y: -6 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -6 }}
-                  className="flex items-start gap-2 bg-destructive/10 border border-destructive/20 p-3 rounded-xl text-destructive text-xs font-sans text-left leading-relaxed"
+                  className="flex items-start gap-2.5 bg-destructive/10 border border-destructive/20 p-3 rounded-xl text-destructive text-xs font-sans text-left leading-relaxed"
                 >
-                  <AlertIcon />
+                  <AlertCircle size={16} className="shrink-0 mt-0.5" />
                   <span>{error}</span>
                 </motion.div>
               )}
@@ -189,7 +172,7 @@ function LoginContent() {
             >
               {loading ? (
                 <>
-                  <SpinnerIcon />
+                  <Loader2 size={16} className="animate-spin text-primary shrink-0" />
                   <span className="text-xs text-muted-foreground font-medium">Authenticating...</span>
                 </>
               ) : (
@@ -203,7 +186,7 @@ function LoginContent() {
 
           {/* Card Security Footer */}
           <div className="bg-muted/40 border-t border-border px-6 py-3 flex items-center justify-center gap-2 font-mono text-[10px] text-muted-foreground text-center">
-            <ShieldIcon />
+            <ShieldCheck size={14} className="text-primary shrink-0" />
             <span>Restricted to @karunya.edu.in accounts</span>
           </div>
         </div>
@@ -211,9 +194,10 @@ function LoginContent() {
         {/* Back Link */}
         <Link
           href="/"
-          className="font-sans text-xs text-muted-foreground hover:text-foreground transition-colors"
+          className="font-sans text-xs text-muted-foreground hover:text-foreground transition-colors inline-flex items-center gap-1.5"
         >
-          ← Back to home
+          <ArrowLeft size={13} />
+          <span>Back to home</span>
         </Link>
       </motion.div>
     </div>
