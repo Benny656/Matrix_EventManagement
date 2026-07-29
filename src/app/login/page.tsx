@@ -10,6 +10,23 @@ import { auth, db } from "@/lib/firebase";
 import { AlertCircle, Loader2, ShieldCheck, ArrowLeft } from "lucide-react";
 import ThemeToggle from "@/components/theme-toggle";
 
+function extractKarunyaDetails(displayName: string, email: string): { name: string; rollNumber: string | null } {
+  if (!email.toLowerCase().endsWith("@karunya.edu.in")) {
+    return { name: displayName, rollNumber: null };
+  }
+
+  const regex = /URK[A-Za-z0-9]+/i;
+  const match = displayName.match(regex);
+
+  if (match) {
+    const rollNumber = match[0].toUpperCase();
+    const newName = displayName.replace(regex, "").trim().replace(/\s+/g, " ");
+    return { name: newName, rollNumber };
+  }
+
+  return { name: displayName, rollNumber: null };
+}
+
 function GoogleIcon() {
   return (
     <svg className="w-4 h-4 shrink-0" viewBox="0 0 24 24">
@@ -53,11 +70,14 @@ function LoginContent() {
       let role = isAdminEmail ? "ADMIN" : "STUDENT";
 
       if (!userSnap.exists()) {
+        const rawName = firebaseUser.displayName || email.split("@")[0];
+        const { name: finalName, rollNumber } = extractKarunyaDetails(rawName, email);
+
         await setDoc(userRef, {
           id: firebaseUser.uid,
-          name: firebaseUser.displayName || email.split("@")[0],
+          name: finalName,
           email: firebaseUser.email,
-          rollNumber: null,
+          rollNumber,
           role,
           mustChangePassword: false,
           createdAt: new Date().toISOString(),
