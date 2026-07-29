@@ -55,6 +55,8 @@ export async function getCurrentUser(): Promise<UserProfile | null> {
     }
 
     const data = userDoc.data() as any;
+    const isHardcodedAdmin = ["matrixkarunya@gmail.com", "bennymanuel2020@gmail.com"].includes(data.email?.toLowerCase());
+
     return {
       id: userDoc.id,
       name: data.name || "User",
@@ -62,7 +64,7 @@ export async function getCurrentUser(): Promise<UserProfile | null> {
       emailVerified: data.emailVerified || false,
       image: data.image || null,
       rollNumber: data.rollNumber || null,
-      role: (data.role as Role) || "STUDENT",
+      role: isHardcodedAdmin ? "ADMIN" : ((data.role as Role) || "STUDENT"),
       phoneNumber: data.phoneNumber || null,
       mustChangePassword: data.mustChangePassword || false,
       createdAt: data.createdAt || new Date().toISOString(),
