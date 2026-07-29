@@ -11,9 +11,10 @@ export default async function proxy(request: NextRequest) {
     pathname.startsWith("/profile");
 
   const isChangePassword = pathname === "/change-password";
+  const isOnboarding = pathname === "/onboarding";
 
   // Skip session fetch and parsing for public routes
-  if (!isProtectedRoute && !isChangePassword) {
+  if (!isProtectedRoute && !isChangePassword && !isOnboarding) {
     return NextResponse.next();
   }
 
@@ -51,6 +52,21 @@ export default async function proxy(request: NextRequest) {
     return NextResponse.next();
   }
 
+  // ── 1.5 /onboarding — requires a session; skip if not logged in ─────
+  if (isOnboarding) {
+    if (!session) {
+      return NextResponse.redirect(new URL("/login", request.url));
+    }
+    // If they have completed onboarding, send them home.
+    if (user?.onboardingCompleted) {
+      const role = user?.role;
+      if (role === "ADMIN") return NextResponse.redirect(new URL("/admin", request.url));
+      if (role === "VOLUNTEER") return NextResponse.redirect(new URL("/volunteer", request.url));
+      return NextResponse.redirect(new URL("/student", request.url));
+    }
+    return NextResponse.next();
+  }
+
   // ── 2. Unauthenticated guard ──────────────────────────────────────────────
   if (!session) {
     return NextResponse.redirect(new URL("/login", request.url));
@@ -59,6 +75,11 @@ export default async function proxy(request: NextRequest) {
   // ── 3. mustChangePassword — intercept before any dashboard access ─────────
   if (user?.mustChangePassword) {
     return NextResponse.redirect(new URL("/change-password", request.url));
+  }
+
+  // ── 3.5 Onboarding — intercept before any dashboard access ───────────────
+  if (user?.onboardingCompleted === false) {
+    return NextResponse.redirect(new URL("/onboarding", request.url));
   }
 
   // ── 4. Role-based checks ──────────────────────────────────────────────────
@@ -84,5 +105,6 @@ export const config = {
     "/student/:path*",
     "/profile",
     "/change-password",
+    "/onboarding",
   ],
 };

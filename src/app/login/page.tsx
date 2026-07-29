@@ -79,6 +79,7 @@ function LoginContent() {
           email: firebaseUser.email,
           rollNumber,
           role,
+          onboardingCompleted: false,
           mustChangePassword: false,
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),

@@ -10,6 +10,9 @@ export interface UserProfile {
   emailVerified?: boolean;
   image?: string | null;
   rollNumber?: string | null;
+  department?: string | null;
+  yearOfStudy?: string | null;
+  onboardingCompleted?: boolean;
   role: Role;
   phoneNumber?: string | null;
   mustChangePassword?: boolean;
@@ -64,6 +67,9 @@ export async function getCurrentUser(): Promise<UserProfile | null> {
       emailVerified: data.emailVerified || false,
       image: data.image || null,
       rollNumber: data.rollNumber || null,
+      department: data.department || null,
+      yearOfStudy: data.yearOfStudy || null,
+      onboardingCompleted: data.onboardingCompleted ?? undefined,
       role: isHardcodedAdmin ? "ADMIN" : ((data.role as Role) || "STUDENT"),
       phoneNumber: data.phoneNumber || null,
       mustChangePassword: data.mustChangePassword || false,
