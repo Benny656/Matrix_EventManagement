@@ -54,7 +54,7 @@ interface ProfileFormProps {
     id: string;
     name: string;
     email: string;
-    role: "ADMIN" | "VOLUNTEER" | "STUDENT";
+    role: "ADMIN" | "VOLUNTEER" | "STUDENT" | "FACULTY" | "FACULTY_ADMIN";
     rollNumber: string | null;
     phoneNumber: string;
   };

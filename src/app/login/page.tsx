@@ -55,10 +55,11 @@ function LoginContent() {
       const email = (firebaseUser.email || "").toLowerCase();
 
       const allowedAdmins = ["matrixkarunya@gmail.com", "bennymanuel2020@gmail.com"];
-      const isKarunyaEmail = email.endsWith("@karunya.edu.in") || email.endsWith("@karunya.edu");
+      const isStudentEmail = email.endsWith("@karunya.edu.in");
+      const isFacultyEmail = email.endsWith("@karunya.edu");
       const isAdminEmail = allowedAdmins.includes(email);
 
-      if (!isKarunyaEmail && !isAdminEmail) {
+      if (!isStudentEmail && !isFacultyEmail && !isAdminEmail) {
         await signOut(auth);
         setError("Only Karunya Google accounts (@karunya.edu.in) or authorized admins are allowed.");
         setLoading(false);
@@ -67,7 +68,10 @@ function LoginContent() {
 
       const userRef = doc(db, "users", firebaseUser.uid);
       const userSnap = await getDoc(userRef);
-      let role = isAdminEmail ? "ADMIN" : "STUDENT";
+      
+      let role = "STUDENT";
+      if (isAdminEmail) role = "ADMIN";
+      else if (isFacultyEmail) role = "FACULTY";
 
       if (!userSnap.exists()) {
         const rawName = firebaseUser.displayName || email.split("@")[0];
@@ -90,7 +94,7 @@ function LoginContent() {
           await updateDoc(userRef, { role: "ADMIN" });
           role = "ADMIN";
         } else {
-          role = existingData.role || "STUDENT";
+          role = existingData.role || (isFacultyEmail ? "FACULTY" : "STUDENT");
         }
       }
 
@@ -101,8 +105,8 @@ function LoginContent() {
         body: JSON.stringify({ token }),
       });
 
-      if (role === "ADMIN") router.push("/admin");
-      else if (role === "VOLUNTEER") router.push("/volunteer");
+      if (role === "ADMIN" || role === "FACULTY_ADMIN") router.push("/admin");
+      else if (role === "FACULTY") router.push("/faculty");
       else router.push("/student");
     } catch (err: any) {
       console.error("Google auth error:", err);

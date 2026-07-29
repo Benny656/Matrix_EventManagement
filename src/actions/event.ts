@@ -18,10 +18,7 @@ const eventSchema = z.object({
   posterUrl: z.string().optional().nullable(),
   venue: z.string().min(2, "Event venue is required"),
   date: z.string().or(z.date()).transform((val) => new Date(val)),
-  registrationDeadline: z.preprocess(
-    (val) => (val === "" || val === undefined || val === null ? null : val),
-    z.union([z.string(), z.date()]).nullable().optional()
-  ).transform((val) => (val ? new Date(val) : null)),
+  registrationOpen: z.boolean().default(true),
   maxParticipants: z.number().min(1, "Capacity must be at least 1"),
   category: z.string().min(2, "Category is required"),
   coordinatorName: z.string().min(2, "Coordinator name is required"),
@@ -68,9 +65,7 @@ export async function createEventAction(input: EventInput) {
     posterUrl: validated.posterUrl || null,
     venue: validated.venue,
     date: validated.date.toISOString(),
-    registrationDeadline: validated.registrationDeadline
-      ? validated.registrationDeadline.toISOString()
-      : null,
+    registrationOpen: validated.registrationOpen,
     maxParticipants: validated.maxParticipants,
     category: validated.category,
     coordinatorName: validated.coordinatorName,
@@ -90,9 +85,9 @@ export async function createEventAction(input: EventInput) {
   // Create notifications for users
   try {
     const usersSnapshot = await adminDb.collection("users").get();
-    const deadlineStr = validated.registrationDeadline
-      ? ` Registration open until ${validated.registrationDeadline.toLocaleDateString()}.`
-      : " No registration deadline.";
+    const registrationStr = validated.registrationOpen
+      ? " Registration is open."
+      : " Registration is currently closed.";
 
     const notifBatch = adminDb.batch();
     usersSnapshot.docs.forEach((uDoc) => {
@@ -101,7 +96,7 @@ export async function createEventAction(input: EventInput) {
         id: nRef.id,
         userId: uDoc.id,
         type: "NEW_EVENT",
-        message: `New event published: ${validated.title}.${deadlineStr}`,
+        message: `New event published: ${validated.title}.${registrationStr}`,
         read: false,
         linkUrl: `/student/events/${eventId}`,
         createdAt: new Date().toISOString(),
@@ -130,9 +125,7 @@ export async function updateEventAction(id: string, input: Omit<EventInput, "ses
     posterUrl: validated.posterUrl || null,
     venue: validated.venue,
     date: validated.date.toISOString(),
-    registrationDeadline: validated.registrationDeadline
-      ? validated.registrationDeadline.toISOString()
-      : null,
+    registrationOpen: validated.registrationOpen,
     maxParticipants: validated.maxParticipants,
     category: validated.category,
     coordinatorName: validated.coordinatorName,
@@ -146,18 +139,18 @@ export async function updateEventAction(id: string, input: Omit<EventInput, "ses
   return { success: true };
 }
 
-export async function updateEventDeadlineAction(id: string, registrationDeadline: Date | null) {
+export async function updateEventRegistrationStatusAction(id: string, registrationOpen: boolean) {
   await verifyAuth(["ADMIN"]);
 
   await adminDb.collection("events").doc(id).update({
-    registrationDeadline: registrationDeadline ? registrationDeadline.toISOString() : null,
+    registrationOpen: registrationOpen,
     updatedAt: new Date().toISOString(),
   });
 
   revalidatePath(`/student/events/${id}`);
-  revalidatePath(`/volunteer/events/${id}`);
+  revalidatePath(`/faculty/events/${id}`);
   revalidatePath(`/admin/events/${id}`);
-  revalidatePath("/volunteer/events");
+  revalidatePath("/faculty/events");
   revalidatePath("/admin/events");
   return { success: true };
 }
@@ -273,7 +266,7 @@ export async function getEventsAction(includeArchived = false) {
       ...data,
       id: doc.id,
       date: new Date(data.date),
-      registrationDeadline: data.registrationDeadline ? new Date(data.registrationDeadline) : null,
+      registrationOpen: data.registrationOpen ?? true,
       sessions: eventSessions.map((s: any) => ({
         ...s,
         startTime: new Date(s.startTime),

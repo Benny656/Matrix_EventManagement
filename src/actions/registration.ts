@@ -4,16 +4,16 @@ import { revalidatePath } from "next/cache";
 import { adminDb } from "@/lib/firebase-admin";
 import { getCurrentUser } from "@/lib/auth-session";
 
-async function verifyStudent() {
+async function verifyParticipant() {
   const currentUser = await getCurrentUser();
-  if (!currentUser || currentUser.role !== "STUDENT") {
-    throw new Error("Unauthorized. Student credentials required.");
+  if (!currentUser || !["STUDENT", "FACULTY", "FACULTY_ADMIN", "ADMIN"].includes(currentUser.role)) {
+    throw new Error("Unauthorized. Participant credentials required.");
   }
   return currentUser;
 }
 
 export async function registerForEventAction(eventId: string) {
-  const user = await verifyStudent();
+  const user = await verifyParticipant();
 
   const eventDoc = await adminDb.collection("events").doc(eventId).get();
   if (!eventDoc.exists) throw new Error("Event not found");
@@ -23,8 +23,8 @@ export async function registerForEventAction(eventId: string) {
     throw new Error("Cannot register for an archived event.");
   }
 
-  if (event.registrationDeadline && new Date() > new Date(event.registrationDeadline)) {
-    throw new Error("Registration deadline has passed.");
+  if (event.registrationOpen === false) {
+    throw new Error("Registration is closed.");
   }
 
   // Fetch all registrations for this event to count confirmed
@@ -47,13 +47,15 @@ export async function registerForEventAction(eventId: string) {
   if (existingRegDoc) {
     await existingRegDoc.ref.update({
       status: newStatus,
+      participantRole: user.role,
       createdAt: new Date().toISOString(),
     });
   } else {
     const newRef = adminDb.collection("registrations").doc();
     await newRef.set({
       id: newRef.id,
-      studentId: user.id,
+      studentId: user.id, // Keeping studentId for backward compatibility
+      participantRole: user.role,
       eventId: eventId,
       status: newStatus,
       createdAt: new Date().toISOString(),
@@ -70,13 +72,16 @@ export async function registerForEventAction(eventId: string) {
       ? `You have been added to the waitlist for ${event.title}.`
       : `Registration confirmed for ${event.title}!`,
     read: false,
-    linkUrl: `/student/events/${eventId}`,
+    linkUrl: `/${user.role.startsWith("FACULTY") ? "faculty" : "student"}/events/${eventId}`,
     createdAt: new Date().toISOString(),
   });
 
   revalidatePath("/student");
   revalidatePath(`/student/events/${eventId}`);
   revalidatePath("/student/registrations");
+  revalidatePath("/faculty");
+  revalidatePath(`/faculty/events/${eventId}`);
+  revalidatePath("/faculty/registrations");
   revalidatePath(`/volunteer/events/${eventId}`);
   revalidatePath(`/admin/events/${eventId}`);
 
@@ -84,7 +89,7 @@ export async function registerForEventAction(eventId: string) {
 }
 
 export async function cancelRegistrationAction(eventId: string) {
-  const user = await verifyStudent();
+  const user = await verifyParticipant();
 
   const regSnapshot = await adminDb
     .collection("registrations")
@@ -129,7 +134,7 @@ export async function cancelRegistrationAction(eventId: string) {
         type: "REGISTRATION_CONFIRMED",
         message: `Good news! You have been promoted from the waitlist and registered for ${eventTitle}.`,
         read: false,
-        linkUrl: `/student/events/${eventId}`,
+        linkUrl: `/${user.role.startsWith("FACULTY") ? "faculty" : "student"}/events/${eventId}`,
         createdAt: new Date().toISOString(),
       });
     }
@@ -138,6 +143,9 @@ export async function cancelRegistrationAction(eventId: string) {
   revalidatePath("/student");
   revalidatePath(`/student/events/${eventId}`);
   revalidatePath("/student/registrations");
+  revalidatePath("/faculty");
+  revalidatePath(`/faculty/events/${eventId}`);
+  revalidatePath("/faculty/registrations");
   revalidatePath(`/volunteer/events/${eventId}`);
   revalidatePath(`/admin/events/${eventId}`);
 

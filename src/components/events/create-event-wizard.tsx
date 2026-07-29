@@ -20,16 +20,7 @@ const basicInfoSchema = z.object({
   category: z.string().min(1, "Please select a category"),
   venue: z.string().min(2, "Venue is required"),
   maxParticipants: z.coerce.number().min(1, "Capacity must be at least 1"),
-  noDeadline: z.boolean().default(false),
-  registrationDeadline: z.string().optional(),
-}).refine((data) => {
-  if (!data.noDeadline && (!data.registrationDeadline || data.registrationDeadline.trim() === "")) {
-    return false;
-  }
-  return true;
-}, {
-  message: "Registration cutoff date is required",
-  path: ["registrationDeadline"],
+  registrationOpen: z.boolean().default(true),
 });
 
 type BasicInfoValues = z.infer<typeof basicInfoSchema>;
@@ -65,14 +56,11 @@ export default function CreateEventWizard({ role }: { role: "ADMIN" | "VOLUNTEER
   } = useForm<BasicInfoValues>({
     resolver: zodResolver(basicInfoSchema) as any,
     defaultValues: {
-      noDeadline: false,
-      registrationDeadline: "",
+      registrationOpen: true,
       eventDate: "",
       ...basicInfo,
     } as any,
   });
-
-  const watchNoDeadline = watchBasic("noDeadline");
 
   const nextStepBasic = (data: BasicInfoValues) => {
     setBasicInfo(data);
@@ -123,7 +111,7 @@ export default function CreateEventWizard({ role }: { role: "ADMIN" | "VOLUNTEER
       const result = await createEventAction({
         ...basicInfo,
         date: earliestDate,
-        registrationDeadline: basicInfo.noDeadline ? null : new Date(basicInfo.registrationDeadline!),
+        registrationOpen: basicInfo.registrationOpen,
         posterUrl: null, // Scoped out for now
         coordinatorName: role === "ADMIN" ? "Admin Team" : "Volunteer Coordinator",
         sessions: sessions.map((s) => ({
@@ -280,30 +268,20 @@ export default function CreateEventWizard({ role }: { role: "ADMIN" | "VOLUNTEER
                 )}
               </div>
 
-              {/* Deadline */}
+              {/* Registration Toggle */}
               <div className="flex flex-col gap-1">
-                <div className="flex items-center justify-between">
-                  <Label className="font-mono text-[11px] text-muted-foreground uppercase tracking-wider" htmlFor="registrationDeadline">Registration Cutoff</Label>
-                  <div className="flex items-center gap-2">
-                    <input
-                      type="checkbox"
-                      id="noDeadline"
-                      {...registerBasic("noDeadline")}
-                      className="h-4 w-4 border-border rounded-none text-primary bg-background focus:ring-primary"
-                    />
-                    <Label className="font-mono text-[11px] text-muted-foreground uppercase tracking-wider cursor-pointer" htmlFor="noDeadline">No Cutoff</Label>
-                  </div>
+                <Label className="font-mono text-[11px] text-muted-foreground uppercase tracking-wider" htmlFor="registrationOpen">Registration Status</Label>
+                <div className="flex items-center gap-3 pt-4">
+                  <input
+                    type="checkbox"
+                    id="registrationOpen"
+                    {...registerBasic("registrationOpen")}
+                    className="h-5 w-5 border-border rounded-sm text-primary bg-background focus:ring-primary cursor-pointer"
+                  />
+                  <Label className="font-mono text-[13px] text-foreground cursor-pointer" htmlFor="registrationOpen">
+                    Open for Registration
+                  </Label>
                 </div>
-                <Input
-                  {...registerBasic("registrationDeadline")}
-                  className="w-full bg-background border border-border text-foreground px-3 py-6 font-mono text-sm focus-visible:ring-1 focus-visible:ring-primary rounded-none shadow-none disabled:opacity-50"
-                  id="registrationDeadline"
-                  type="date"
-                  disabled={watchNoDeadline}
-                />
-                {basicErrors.registrationDeadline && (
-                  <span className="font-mono text-[10px] text-destructive uppercase mt-1">{basicErrors.registrationDeadline.message}</span>
-                )}
               </div>
             </div>
 
@@ -501,9 +479,9 @@ export default function CreateEventWizard({ role }: { role: "ADMIN" | "VOLUNTEER
                   <span className="font-semibold text-foreground">{basicInfo?.maxParticipants} Attendees</span>
                 </div>
                 <div>
-                  <span className="text-muted-foreground block uppercase">Registration Deadline</span>
+                  <span className="text-muted-foreground block uppercase">Registration Status</span>
                   <span className="font-semibold text-foreground">
-                    {basicInfo?.noDeadline ? "No Deadline" : basicInfo?.registrationDeadline}
+                    {basicInfo?.registrationOpen ? "Open" : "Closed"}
                   </span>
                 </div>
               </div>

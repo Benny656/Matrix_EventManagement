@@ -28,7 +28,7 @@ interface User {
   name: string;
   email: string;
   rollNumber: string | null;
-  role: "ADMIN" | "VOLUNTEER" | "STUDENT";
+  role: "ADMIN" | "VOLUNTEER" | "STUDENT" | "FACULTY" | "FACULTY_ADMIN";
   createdAt: Date;
   mustChangePassword: boolean;
 }
@@ -82,7 +82,7 @@ export default function UsersListTable({
     router.push(canEditRole ? "/admin/users" : "/volunteer/users");
   };
 
-  const handleRoleChange = (userId: string, newRole: "ADMIN" | "VOLUNTEER" | "STUDENT") => {
+  const handleRoleChange = (userId: string, newRole: "ADMIN" | "VOLUNTEER" | "STUDENT" | "FACULTY" | "FACULTY_ADMIN") => {
     setError(null);
     setSuccess(null);
 
@@ -266,6 +266,8 @@ export default function UsersListTable({
             >
               <option value="ALL">All Roles</option>
               <option value="ADMIN">Admin</option>
+              <option value="FACULTY_ADMIN">Faculty Admin</option>
+              <option value="FACULTY">Faculty</option>
               <option value="VOLUNTEER">Volunteer</option>
               <option value="STUDENT">Student</option>
             </select>
@@ -349,9 +351,9 @@ export default function UsersListTable({
                         <td className="py-3 px-4">
                           <span
                             className={`px-2 py-0.5 font-mono text-[9px] uppercase font-semibold border ${
-                              user.role === "ADMIN"
+                              ["ADMIN", "FACULTY_ADMIN"].includes(user.role)
                                 ? "bg-primary/10 text-primary border-primary/30"
-                                : user.role === "VOLUNTEER"
+                                : ["VOLUNTEER", "FACULTY"].includes(user.role)
                                 ? "bg-secondary-container text-on-secondary-container border-border"
                                 : "bg-muted text-muted-foreground border-border"
                             }`}
@@ -403,6 +405,18 @@ export default function UsersListTable({
                                       className="cursor-pointer hover:bg-surface-container"
                                     >
                                       Make Volunteer
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem
+                                      onClick={() => handleRoleChange(user.id, "FACULTY")}
+                                      className="cursor-pointer hover:bg-surface-container"
+                                    >
+                                      Make Faculty
+                                    </DropdownMenuItem>
+                                    <DropdownMenuItem
+                                      onClick={() => handleRoleChange(user.id, "FACULTY_ADMIN")}
+                                      className="cursor-pointer hover:bg-surface-container"
+                                    >
+                                      Make Faculty Admin
                                     </DropdownMenuItem>
                                     <DropdownMenuItem
                                       onClick={() => handleRoleChange(user.id, "ADMIN")}

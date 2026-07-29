@@ -1,83 +1,56 @@
 "use client";
 
 import React, { useState, useTransition } from "react";
-import { updateEventDeadlineAction } from "@/actions/event";
-import { Input } from "@/components/ui/input";
+import { updateEventRegistrationStatusAction } from "@/actions/event";
 import { Label } from "@/components/ui/label";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { AlertCircle, Calendar, Pencil, X, Check } from "lucide-react";
+import { AlertCircle, Pencil, X, Check } from "lucide-react";
 
-interface EditDeadlineFormProps {
+interface EditRegistrationStatusFormProps {
   eventId: string;
-  initialDeadline: Date | null;
+  initialRegistrationOpen: boolean;
 }
 
-export default function EditDeadlineForm({ eventId, initialDeadline }: EditDeadlineFormProps) {
+export default function EditRegistrationStatusForm({ eventId, initialRegistrationOpen }: EditRegistrationStatusFormProps) {
   const [isEditing, setIsEditing] = useState(false);
-  const [noDeadline, setNoDeadline] = useState(!initialDeadline);
+  const [registrationOpen, setRegistrationOpen] = useState(initialRegistrationOpen);
   
-  // Format initial date for input field
-  const getLocalDateString = (date: Date | null) => {
-    if (!date) return "";
-    const d = new Date(date);
-    const year = d.getFullYear();
-    const month = String(d.getMonth() + 1).padStart(2, '0');
-    const day = String(d.getDate()).padStart(2, '0');
-    return `${year}-${month}-${day}`;
-  };
-
-  const [deadlineStr, setDeadlineStr] = useState(getLocalDateString(initialDeadline));
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 
   const handleSave = () => {
     setError(null);
-    
-    if (!noDeadline && !deadlineStr) {
-      setError("Please select a date or check 'No Cutoff'.");
-      return;
-    }
-
     startTransition(async () => {
       try {
-        const targetDate = noDeadline ? null : new Date(deadlineStr);
-        const res = await updateEventDeadlineAction(eventId, targetDate);
+        const res = await updateEventRegistrationStatusAction(eventId, registrationOpen);
         if (res.success) {
           setIsEditing(false);
         }
       } catch (err: any) {
-        setError(err.message || "Failed to update deadline");
+        setError(err.message || "Failed to update registration status");
       }
     });
   };
 
   const handleCancel = () => {
-    setNoDeadline(!initialDeadline);
-    setDeadlineStr(getLocalDateString(initialDeadline));
+    setRegistrationOpen(initialRegistrationOpen);
     setError(null);
     setIsEditing(false);
   };
 
-  const formattedCurrentDeadline = initialDeadline
-    ? new Date(initialDeadline).toLocaleDateString("en-US", {
-        weekday: "short",
-        year: "numeric",
-        month: "short",
-        day: "numeric",
-      })
-    : "No registration cutoff (Open indefinitely)";
+  const formattedStatus = initialRegistrationOpen ? "Open" : "Closed";
 
   return (
     <div className="border border-border p-6 bg-card space-y-4">
       <div className="flex justify-between items-center border-b border-border pb-1">
         <h3 className="font-mono text-xs uppercase tracking-widest text-muted-foreground font-semibold">
-          Registration Cutoff
+          Registration Status
         </h3>
         {!isEditing && (
           <button
             onClick={() => setIsEditing(true)}
             className="text-primary hover:text-primary-container p-1 font-mono text-[10px] uppercase flex items-center gap-1 active:scale-95 transition-all cursor-pointer"
-            title="Edit deadline"
+            title="Edit status"
           >
             <Pencil size={12} />
             Modify
@@ -94,47 +67,27 @@ export default function EditDeadlineForm({ eventId, initialDeadline }: EditDeadl
 
       {!isEditing ? (
         <div className="flex items-center gap-3 py-1">
-          <Calendar size={16} className="text-muted-foreground shrink-0" />
           <div className="font-mono text-xs text-foreground font-medium">
-            {formattedCurrentDeadline}
+            {formattedStatus}
           </div>
         </div>
       ) : (
         <div className="space-y-4 pt-1">
-          {/* Checkbox for No Cutoff */}
-          <div className="flex items-center gap-2">
+          <div className="flex items-center gap-3">
             <input
               type="checkbox"
-              id="editNoDeadline"
-              checked={noDeadline}
-              onChange={(e) => setNoDeadline(e.target.checked)}
+              id="editRegistrationOpen"
+              checked={registrationOpen}
+              onChange={(e) => setRegistrationOpen(e.target.checked)}
               disabled={isPending}
-              className="h-4 w-4 border-border rounded-none text-primary bg-background focus:ring-primary"
+              className="h-5 w-5 border-border rounded-sm text-primary bg-background focus:ring-primary cursor-pointer"
             />
             <Label
-              className="font-mono text-[11px] text-muted-foreground uppercase tracking-wider cursor-pointer"
-              htmlFor="editNoDeadline"
+              className="font-mono text-[13px] text-foreground tracking-wider cursor-pointer"
+              htmlFor="editRegistrationOpen"
             >
-              No cutoff (open registration)
+              Open for Registration
             </Label>
-          </div>
-
-          {/* Date Picker Input */}
-          <div className="flex flex-col gap-1">
-            <Label
-              className="font-mono text-[10px] text-muted-foreground uppercase"
-              htmlFor="editDeadlineInput"
-            >
-              Cutoff Date
-            </Label>
-            <Input
-              id="editDeadlineInput"
-              type="date"
-              value={deadlineStr}
-              onChange={(e) => setDeadlineStr(e.target.value)}
-              disabled={noDeadline || isPending}
-              className="w-full bg-background border border-border text-foreground px-3 py-2 font-mono text-xs focus-visible:ring-1 focus-visible:ring-primary rounded-none shadow-none disabled:opacity-50 h-9"
-            />
           </div>
 
           {/* Actions */}

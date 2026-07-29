@@ -1,7 +1,7 @@
 import { cookies, headers } from "next/headers";
 import { adminAuth, adminDb } from "./firebase-admin";
 
-export type Role = "ADMIN" | "VOLUNTEER" | "STUDENT";
+export type Role = "ADMIN" | "FACULTY_ADMIN" | "FACULTY" | "STUDENT" | "VOLUNTEER";
 
 export interface UserProfile {
   id: string;
@@ -87,8 +87,30 @@ export async function verifyAdmin(): Promise<UserProfile> {
   if (!user) {
     throw new Error("Unauthorized. Active session required.");
   }
-  if (user.role !== "ADMIN") {
+  if (user.role !== "ADMIN" && user.role !== "FACULTY_ADMIN") {
     throw new Error("Forbidden. Admin rights required.");
+  }
+  return user;
+}
+
+export async function verifyFacultyAdmin(): Promise<UserProfile> {
+  const user = await getCurrentUser();
+  if (!user) {
+    throw new Error("Unauthorized. Active session required.");
+  }
+  if (user.role !== "ADMIN" && user.role !== "FACULTY_ADMIN") {
+    throw new Error("Forbidden. Admin rights required.");
+  }
+  return user;
+}
+
+export async function verifyFaculty(): Promise<UserProfile> {
+  const user = await getCurrentUser();
+  if (!user) {
+    throw new Error("Unauthorized. Active session required.");
+  }
+  if (user.role !== "FACULTY" && user.role !== "FACULTY_ADMIN" && user.role !== "ADMIN") {
+    throw new Error("Forbidden. Faculty rights required.");
   }
   return user;
 }
@@ -98,7 +120,7 @@ export async function verifyStaff(): Promise<UserProfile> {
   if (!user) {
     throw new Error("Unauthorized. Active session required.");
   }
-  if (user.role !== "ADMIN" && user.role !== "VOLUNTEER") {
+  if (user.role !== "ADMIN" && user.role !== "FACULTY_ADMIN" && user.role !== "VOLUNTEER") {
     throw new Error("Forbidden. Staff rights required.");
   }
   return user;

@@ -10,14 +10,14 @@ interface RegisterActionButtonProps {
   eventId: string;
   initialStatus: "REGISTERED" | "CANCELLED" | "WAITLISTED" | null;
   isFull: boolean;
-  isDeadlinePassed: boolean;
+  isRegistrationOpen: boolean;
 }
 
 export default function RegisterActionButton({
   eventId,
   initialStatus,
   isFull,
-  isDeadlinePassed,
+  isRegistrationOpen,
 }: RegisterActionButtonProps) {
   const [status, setStatus] = useState(initialStatus);
   const [isPending, startTransition] = useTransition();
@@ -62,10 +62,10 @@ export default function RegisterActionButton({
     });
   };
 
-  if (isDeadlinePassed && optimisticStatus !== "REGISTERED" && optimisticStatus !== "WAITLISTED") {
+  if (!isRegistrationOpen && optimisticStatus !== "REGISTERED" && optimisticStatus !== "WAITLISTED") {
     return (
       <div className="border border-border p-4 bg-surface-container text-center font-mono text-xs uppercase text-muted-foreground">
-        Registration cutoff date has passed.
+        Registration is closed.
       </div>
     );
   }

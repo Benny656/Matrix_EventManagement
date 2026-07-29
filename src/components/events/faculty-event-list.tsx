@@ -27,7 +27,7 @@ interface EventWithCount {
   };
 }
 
-export default function StudentEventList({ events }: { events: EventWithCount[] }) {
+export default function FacultyEventList({ events }: { events: EventWithCount[] }) {
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("ALL");
 
@@ -130,7 +130,7 @@ export default function StudentEventList({ events }: { events: EventWithCount[] 
 
                 <div className="px-4 py-3 border-t border-border bg-surface-container-low">
                   <Link
-                    href={`/student/events/${event.id}`}
+                    href={`/Faculty/events/${event.id}`}
                     className="w-full bg-background border border-border text-foreground hover:bg-surface-container font-mono text-xs uppercase tracking-wider py-2 flex items-center justify-center gap-1 active:scale-98 transition-all"
                   >
                     View & Register

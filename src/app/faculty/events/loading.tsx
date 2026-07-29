@@ -1,5 +1,5 @@
 import LoadingSkeleton from "@/components/ui/loading-skeleton";
 
 export default function Loading() {
-  return <LoadingSkeleton message="Fetching system notices..." />;
+  return <LoadingSkeleton message="Retrieving active event catalogue..." />;
 }

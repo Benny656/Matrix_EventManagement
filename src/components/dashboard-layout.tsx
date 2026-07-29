@@ -7,16 +7,9 @@ import { motion, AnimatePresence } from "framer-motion";
 import { signOut as firebaseSignOut } from "firebase/auth";
 import { auth } from "@/lib/firebase";
 import { getUnreadNotificationCountAction } from "@/actions/notification";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+
 import ThemeToggle from "@/components/theme-toggle";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+
 import {
   BarChart2,
   CalendarDays,
@@ -42,7 +35,7 @@ interface DashboardLayoutProps {
   user: {
     name: string;
     email: string;
-    role: "ADMIN" | "VOLUNTEER" | "STUDENT";
+    role: "ADMIN" | "VOLUNTEER" | "STUDENT" | "FACULTY" | "FACULTY_ADMIN";
   };
   children: React.ReactNode;
 }
@@ -68,9 +61,10 @@ export default function DashboardLayout({ user, children }: DashboardLayoutProps
   }, [pathname]);
 
   const isAuthorized = React.useMemo(() => {
-    if (pathname.startsWith("/admin") && user.role !== "ADMIN") return false;
-    if (pathname.startsWith("/volunteer") && user.role !== "VOLUNTEER" && user.role !== "ADMIN") return false;
-    if (pathname.startsWith("/student") && user.role !== "STUDENT" && user.role !== "ADMIN") return false;
+    if (pathname.startsWith("/admin") && user.role !== "ADMIN" && user.role !== "FACULTY_ADMIN") return false;
+    if (pathname.startsWith("/volunteer") && user.role !== "VOLUNTEER" && user.role !== "ADMIN" && user.role !== "FACULTY_ADMIN") return false;
+    if (pathname.startsWith("/student") && user.role !== "STUDENT" && user.role !== "ADMIN" && user.role !== "FACULTY_ADMIN") return false;
+    if (pathname.startsWith("/faculty") && !["FACULTY", "FACULTY_ADMIN", "ADMIN"].includes(user.role)) return false;
     return true;
   }, [pathname, user.role]);
 
@@ -81,12 +75,12 @@ export default function DashboardLayout({ user, children }: DashboardLayoutProps
   const getNavItems = (): NavItem[] => {
     switch (user.role) {
       case "ADMIN":
+      case "FACULTY_ADMIN":
         return [
           { label: "Overview", href: "/admin", icon: BarChart2 },
           { label: "All Events", href: "/admin/events", icon: CalendarDays },
           { label: "Attendance", href: "/volunteer/attendance", icon: ScanLine },
           { label: "Users", href: "/admin/users", icon: Users },
-          { label: "Updates", href: "/admin/updates", icon: BellRing },
           { label: "Reports", href: "/admin/reports", icon: FileText },
         ];
       case "VOLUNTEER":
@@ -94,7 +88,12 @@ export default function DashboardLayout({ user, children }: DashboardLayoutProps
           { label: "Overview", href: "/volunteer", icon: Home },
           { label: "Events", href: "/volunteer/events", icon: CalendarCheck },
           { label: "Attendance", href: "/volunteer/attendance", icon: ScanLine },
-          { label: "Updates", href: "/volunteer/updates", icon: BellRing },
+        ];
+      case "FACULTY":
+        return [
+          { label: "Home", href: "/faculty", icon: Home },
+          { label: "Events", href: "/faculty/events", icon: CalendarDays },
+          { label: "Registrations", href: "/faculty/registrations", icon: CalendarCheck },
         ];
       case "STUDENT":
       default:
@@ -102,20 +101,21 @@ export default function DashboardLayout({ user, children }: DashboardLayoutProps
           { label: "Home", href: "/student", icon: Home },
           { label: "Events", href: "/student/events", icon: CalendarDays },
           { label: "Registrations", href: "/student/registrations", icon: CalendarCheck },
-          { label: "Updates", href: "/student/updates", icon: BellRing },
         ];
     }
   };
 
   const navItems = getNavItems();
 
-  const roleLabel = user.role === "ADMIN" ? "Admin" : user.role === "VOLUNTEER" ? "Volunteer" : "Student";
+  const roleLabel = ["ADMIN", "FACULTY_ADMIN"].includes(user.role) ? "Admin" : user.role === "VOLUNTEER" ? "Volunteer" : user.role === "FACULTY" ? "Faculty" : "Student";
 
   const notificationsHref =
-    user.role === "ADMIN"
+    ["ADMIN", "FACULTY_ADMIN"].includes(user.role)
       ? "/admin/notifications"
       : user.role === "VOLUNTEER"
       ? "/volunteer/notifications"
+      : user.role === "FACULTY"
+      ? "/faculty/notifications"
       : "/student/notifications";
 
   const handleSignOut = async () => {
@@ -150,10 +150,8 @@ export default function DashboardLayout({ user, children }: DashboardLayoutProps
         <div className="flex-1 space-y-0.5">
           {navItems.map((item) => {
             const Icon = item.icon;
-            const isActive = pathname === item.href || (item.href !== "/admin" && item.href !== "/volunteer" && item.href !== "/student" && pathname.startsWith(item.href + "/"));
-            const isRoot = ["/admin", "/volunteer", "/student"].includes(item.href);
-            const isActiveRoot = isRoot && pathname === item.href;
-            const active = isActiveRoot || (!isRoot && isActive);
+            const isRoot = ["/admin", "/volunteer", "/student", "/faculty"].includes(item.href);
+            const active = isRoot ? pathname === item.href : pathname === item.href || pathname.startsWith(item.href + "/");
             const isUpdatesTab = item.label === "Updates";
 
             return (
@@ -233,50 +231,20 @@ export default function DashboardLayout({ user, children }: DashboardLayoutProps
               )}
             </Link>
 
-            <DropdownMenu>
-              <DropdownMenuTrigger
-                className="w-7 h-7 ml-1 border border-border bg-surface-container-high overflow-hidden rounded-sm cursor-pointer hover:bg-surface-container-high/80 transition-colors focus-visible:outline-hidden focus-visible:ring-1 focus-visible:ring-primary active:scale-95 duration-100"
-                aria-label="User menu"
-              >
-                <Avatar className="w-full h-full rounded-sm">
-                  <AvatarImage
-                    src={`https://api.dicebear.com/7.x/initials/svg?seed=${encodeURIComponent(user.name)}&backgroundColor=c0573e,8a726c`}
-                    className="w-full h-full object-cover"
-                  />
-                  <AvatarFallback className="rounded-sm text-[10px]">
-                    {user.name.slice(0, 2).toUpperCase()}
-                  </AvatarFallback>
-                </Avatar>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent
-                align="end"
-                className="w-56 font-mono text-[10px] uppercase tracking-widest bg-surface-container border border-border mt-1.5"
-              >
-                <DropdownMenuLabel className="px-2.5 py-2 flex flex-col gap-1 normal-case font-sans">
-                  <span className="font-semibold text-foreground text-xs leading-none">
-                    {user.name}
-                  </span>
-                  <span className="text-[10px] text-muted-foreground leading-none font-mono tracking-widest uppercase mt-0.5">
-                    {roleLabel}
-                  </span>
-                </DropdownMenuLabel>
-                <DropdownMenuSeparator className="-mx-1 my-1 h-px bg-border" />
-                <DropdownMenuItem
-                  render={<Link href="/profile" />}
-                  className="w-full flex items-center gap-2 px-2.5 py-2 cursor-pointer text-foreground hover:bg-surface-container-high hover:text-foreground font-sans text-xs normal-case tracking-normal rounded-md"
-                >
-                  Profile / Settings
-                </DropdownMenuItem>
-                <DropdownMenuSeparator className="-mx-1 my-1 h-px bg-border" />
-                <DropdownMenuItem
-                  onClick={handleSignOut}
-                  className="w-full flex items-center gap-2 px-2.5 py-2 cursor-pointer text-destructive focus:bg-destructive/10 focus:text-destructive dark:focus:bg-destructive/20 font-sans text-xs normal-case tracking-normal rounded-md"
-                >
-                  <LogOut size={14} className="text-destructive shrink-0" />
-                  <span>Log out</span>
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            <div
+              className="w-7 h-7 ml-1 border border-border bg-surface-container-high overflow-hidden rounded-sm flex items-center justify-center select-none"
+              aria-label="User initials"
+            >
+              <span className="font-mono text-[10px] font-bold text-foreground uppercase leading-none">
+                {user.name
+                  .split(" ")
+                  .filter(Boolean)
+                  .map((n) => n[0])
+                  .join("")
+                  .slice(0, 2)
+                  .toUpperCase()}
+              </span>
+            </div>
           </div>
         </header>
 
@@ -317,7 +285,7 @@ export default function DashboardLayout({ user, children }: DashboardLayoutProps
                 <div className="flex-1 overflow-y-auto space-y-0.5">
                   {navItems.map((item) => {
                     const Icon = item.icon;
-                    const isRoot = ["/admin", "/volunteer", "/student"].includes(item.href);
+                    const isRoot = ["/admin", "/volunteer", "/student", "/faculty"].includes(item.href);
                     const active = isRoot ? pathname === item.href : pathname === item.href || pathname.startsWith(item.href + "/");
                     const isUpdatesTab = item.label === "Updates";
 
@@ -371,7 +339,7 @@ export default function DashboardLayout({ user, children }: DashboardLayoutProps
         <nav className="fixed bottom-0 left-0 right-0 z-30 md:hidden flex justify-around items-center h-[calc(4rem+env(safe-area-inset-bottom))] pb-[env(safe-area-inset-bottom)] border-t border-border/80 bg-background/80 backdrop-blur-md px-2">
           {navItems.slice(0, 3).map((item) => {
             const Icon = item.icon;
-            const isRoot = ["/admin", "/volunteer", "/student"].includes(item.href);
+            const isRoot = ["/admin", "/volunteer", "/student", "/faculty"].includes(item.href);
             const active = isRoot ? pathname === item.href : pathname === item.href || pathname.startsWith(item.href + "/");
             return (
               <Link

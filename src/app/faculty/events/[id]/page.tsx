@@ -10,10 +10,10 @@ interface PageProps {
   params: Promise<{ id: string }>;
 }
 
-export default async function StudentEventDetailsPage({ params }: PageProps) {
+export default async function FacultyEventDetailsPage({ params }: PageProps) {
   const currentUser = await getCurrentUser();
 
-  if (!currentUser || currentUser.role !== "STUDENT") {
+  if (!currentUser || currentUser.role !== "FACULTY") {
     redirect("/login");
   }
 
@@ -39,7 +39,7 @@ export default async function StudentEventDetailsPage({ params }: PageProps) {
     .get();
 
   const registrations = regsSnapshot.docs.map((d) => d.data());
-  const userRegistration = registrations.find((r) => r.studentId === currentUser.id);
+  const userRegistration = registrations.find((r) => r.FacultyId === currentUser.id);
 
   const activeRegistrationsCount = registrations.filter((r) => r.status === "REGISTERED").length;
   const isFull = activeRegistrationsCount >= event.maxParticipants;
@@ -134,12 +134,12 @@ export default async function StudentEventDetailsPage({ params }: PageProps) {
               </div>
               <div className="flex justify-between border-b border-border pb-2 border-dashed">
                 <span className="text-muted-foreground">Registered:</span>
-                <span className="text-foreground font-semibold">{activeRegistrationsCount} Students</span>
+                <span className="text-foreground font-semibold">{activeRegistrationsCount} Facultys</span>
               </div>
               <div className="flex justify-between border-b border-border pb-2 border-dashed">
                 <span className="text-muted-foreground">Waitlisted:</span>
                 <span className="text-foreground font-semibold">
-                  {registrations.filter((r) => r.status === "WAITLISTED").length} Students
+                  {registrations.filter((r) => r.status === "WAITLISTED").length} Facultys
                 </span>
               </div>
               <div className="flex justify-between border-b border-border pb-2 border-dashed">
