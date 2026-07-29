@@ -59,10 +59,14 @@ interface AttendanceScannerProps {
 // which is the canonical prefix for all Karunya roll numbers.
 // Returns null when no "URK" is found, signalling an invalid scan.
 //
-function normalizeRollNumber(raw: string): string | null {
-  const idx = raw.indexOf("URK");
-  if (idx === -1) return null;
-  return raw.slice(idx);
+function normalizeRollNumber(raw: string): string {
+  const trimmed = raw.trim();
+  const upper = trimmed.toUpperCase();
+  const idx = upper.indexOf("URK");
+  if (idx === -1) return trimmed;
+  // User asked for "URK25CS7035", we can preserve the rest of the string case or uppercase it.
+  // Slicing from idx ensures we drop everything before URK.
+  return trimmed.slice(idx);
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -84,21 +88,15 @@ export default function AttendanceScanner({ sessions }: AttendanceScannerProps) 
   const [searchQuery, setSearchQuery] = useState("");
 
   // ── Camera / scanner state ─────────────────────────────────────────────────
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const canvasRef = useRef<HTMLCanvasElement>(null);
-  const streamRef = useRef<MediaStream | null>(null);
-  const rafRef = useRef<number | null>(null);
-
-  // Consecutive-frame debounce buffer
-  const recentReadsRef = useRef<string[]>([]);
   // Prevents a second scan firing while a check-in is in-flight / cooling down
   const processingRef = useRef(false);
+  const scannerRef = useRef<any>(null);
 
   const [scannerReady, setScannerReady] = useState(false);
   const [cameraError, setCameraError] = useState<string | null>(null);
 
   // ── Camera Selection states ───────────────────────────────────────────────
-  const [devices, setDevices] = useState<MediaDeviceInfo[]>([]);
+  const [devices, setDevices] = useState<any[]>([]);
   const [activeDeviceId, setActiveDeviceId] = useState<string>("");
 
   // ── Scan-result alert state (with optimistic) ──────────────────────────────
@@ -131,41 +129,20 @@ export default function AttendanceScanner({ sessions }: AttendanceScannerProps) 
     })();
   }, [selectedSessionId]);
 
-  // ── Camera + zxing-wasm decode loop ───────────────────────────────────────
-  //
-  // This effect:
-  //   1. Opens the camera via getUserMedia (rear-camera preferred on mobile).
-  //   2. Wires the <video> element to the stream.
-  //   3. Dynamically imports zxing-wasm's WebAssembly reader.
-  //   4. Runs a requestAnimationFrame decode loop that:
-  //        a. Captures each video frame into an off-screen canvas.
-  //        b. Passes the ImageData to the WASM decoder.
-  //        c. Accumulates consecutive identical reads — only triggers a check-in
-  //           once CONFIRM_FRAMES frames all decode to the same string.
-  //   5. Checks for torch capability and sets the torchSupported flag.
-  //
-  // The entire effect is re-run whenever selectedSessionId changes so that the
-  // camera restarts cleanly (and the closure always has the fresh session ID).
-  //
+  // ── Camera + html5-qrcode loop ───────────────────────────────────────
   useEffect(() => {
     if (!selectedSessionId) return;
-
-    let stopped = false;
 
     // Reset per-session state
     setScannerReady(false);
     setCameraError(null);
-    recentReadsRef.current = [];
     processingRef.current = false;
 
-    // ── onConfirmedScan ──────────────────────────────────────────────────────
-    // Defined inside the effect so it closes over the stable `selectedSessionId`
-    // value for this effect run, avoiding stale-closure bugs across session changes.
+    // We must lazily import html5-qrcode to avoid SSR issues
+    let Html5Qrcode: any;
+
     const onConfirmedScan = async (decodedText: string) => {
       setScanResult(null);
-
-      // Strip any barcode preamble (e.g. CODE-128 Symbology Identifier "C1").
-      // Extract the substring from the first "URK" onward.
       const rollNumber = normalizeRollNumber(decodedText);
       if (!rollNumber) {
         setScanResult({
@@ -174,10 +151,8 @@ export default function AttendanceScanner({ sessions }: AttendanceScannerProps) 
         });
         return;
       }
-
       try {
         const result = await markAttendanceByScan(selectedSessionId, rollNumber);
-
         if (result.status === "success") {
           setScanResult({
             type: "SUCCESS",
@@ -213,226 +188,87 @@ export default function AttendanceScanner({ sessions }: AttendanceScannerProps) 
       }
     };
 
-    // ── Main async setup ─────────────────────────────────────────────────────
-    const start = async () => {
-      // Tear down any previous stream / RAF loop
-      if (rafRef.current !== null) {
-        cancelAnimationFrame(rafRef.current);
-        rafRef.current = null;
-      }
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach((t) => t.stop());
-        streamRef.current = null;
-      }
-
-      // 1. Open camera — try exact activeDeviceId if selected, otherwise try exact rear camera first,
-      //    falling back to ideal if the device rejects the exact constraint.
-      let stream: MediaStream;
+    const startScanner = async () => {
       try {
-        const videoConstraints: MediaTrackConstraints = activeDeviceId
-          ? { deviceId: { exact: activeDeviceId } }
-          : { facingMode: { exact: "environment" } };
-
-        stream = await navigator.mediaDevices.getUserMedia({
-          video: {
-            ...videoConstraints,
-            width: { ideal: 1280 },
-            height: { ideal: 720 },
-          },
-          audio: false,
-        });
-      } catch {
-        // exact constraint rejected (desktop, front-camera-only device, or exact deviceId not matching) —
-        // fall back to ideal so the scanner still works.
-        try {
-          const videoConstraints: MediaTrackConstraints = activeDeviceId
-            ? { deviceId: activeDeviceId }
-            : { facingMode: { ideal: "environment" } };
-
-          stream = await navigator.mediaDevices.getUserMedia({
-            video: {
-              ...videoConstraints,
-              width: { ideal: 1280 },
-              height: { ideal: 720 },
-            },
-            audio: false,
-          });
-        } catch (err: any) {
-          if (!stopped) {
-            setCameraError(
-              "Camera access denied. Please allow camera permissions and try again."
-            );
-          }
-          return;
-        }
-      }
-
-      if (stopped) {
-        stream.getTracks().forEach((t) => t.stop());
+        const h5q = await import("html5-qrcode");
+        Html5Qrcode = h5q.Html5Qrcode;
+      } catch (e) {
+        setCameraError("Failed to load barcode decoder.");
         return;
       }
 
-      streamRef.current = stream;
-
-      // 2. Wire video element
-      const video = videoRef.current;
-      if (video) {
-        video.srcObject = stream;
-        try { await video.play(); } catch { /* play may fail gracefully */ }
-      }
-
-      // 3. Populate devices list once stream has started (and permissions are granted)
       try {
-        const allDevices = await navigator.mediaDevices.enumerateDevices();
-        const videoInputs = allDevices.filter((d) => d.kind === "videoinput");
-        if (!stopped) {
-          setDevices(videoInputs);
-          // If activeDeviceId isn't set, set it to the track's current deviceId to highlight it in the list
-          const activeTrack = stream.getVideoTracks()[0];
-          if (activeTrack && !activeDeviceId) {
-            const currentId = activeTrack.getSettings().deviceId;
-            if (currentId) {
-              setActiveDeviceId(currentId);
-            }
+        const allDevices = await Html5Qrcode.getCameras();
+        if (allDevices && allDevices.length > 0) {
+          setDevices(allDevices);
+          if (!activeDeviceId) {
+            // Prefer a back camera if available based on label, else take the first
+            const backCamera = allDevices.find((d: any) => d.label.toLowerCase().includes("back"));
+            setActiveDeviceId(backCamera ? backCamera.id : allDevices[0].id);
           }
         }
       } catch (err) {
         console.warn("Failed to enumerate camera devices:", err);
       }
 
-      // 4. Load zxing-wasm reader (WASM bundle, fetched once and cached)
-      let readBarcodes: typeof import("zxing-wasm/reader").readBarcodes;
-      try {
-        const mod = await import("zxing-wasm/reader");
-        readBarcodes = mod.readBarcodes;
-      } catch (err) {
-        if (!stopped) setCameraError("Failed to load barcode decoder.");
-        return;
-      }
-
-      if (stopped) return;
-
-      // 5. Wait for video to be ready
-      if (video && video.readyState < 2) {
-        await new Promise<void>((resolve) => {
-          video.addEventListener("canplay", () => resolve(), { once: true });
-        });
-      }
-
-      if (stopped) return;
-
-      setScannerReady(true);
-
-      // 6. RAF decode loop
-      const canvas = canvasRef.current;
-
-      const decodeTick = async () => {
-        if (stopped) return;
-
-        const v = videoRef.current;
-        const c = canvasRef.current;
-
-        // Skip tick if not ready or currently cooling down
-        if (!v || !c || v.readyState < 2 || v.videoWidth === 0 || processingRef.current) {
-          rafRef.current = requestAnimationFrame(() => void decodeTick());
-          return;
-        }
-
-        // Resize canvas to match video (only when dimensions change, cheap check)
-        if (c.width !== v.videoWidth || c.height !== v.videoHeight) {
-          c.width = v.videoWidth;
-          c.height = v.videoHeight;
-        }
-
-        const ctx = c.getContext("2d", { willReadFrequently: true });
-        if (!ctx) {
-          rafRef.current = requestAnimationFrame(() => void decodeTick());
-          return;
-        }
-
-        ctx.drawImage(v, 0, 0);
-        const imageData = ctx.getImageData(0, 0, c.width, c.height);
-
+      if (scannerRef.current) {
         try {
-          const results = await readBarcodes(imageData, {
-            // Canonical format names accepted by zxing-wasm
-            formats: ["QRCode", "Code128", "Code39"],
-            tryHarder: true,
-            tryRotate: true,
-            tryInvert: true,
-            // Limit to 1 symbol per frame for speed; we only need the first hit
-            maxNumberOfSymbols: 1,
-          });
+          await scannerRef.current.stop();
+          scannerRef.current.clear();
+        } catch (e) {}
+      }
 
-          if (results.length > 0 && results[0].isValid) {
-            const decoded = results[0].text.trim();
+      const html5QrCode = new Html5Qrcode("reader-container");
+      scannerRef.current = html5QrCode;
 
-            // ── Consecutive-frame confirmation (debouncing) ───────────────────
-            // If the new read differs from the last, restart the buffer.
-            // No-decode frames don't touch the buffer at all (handled below).
-            const buf = recentReadsRef.current;
-            if (buf.length > 0 && buf[buf.length - 1] !== decoded) {
-              recentReadsRef.current = [decoded];
-            } else {
-              buf.push(decoded);
-            }
+      try {
+        const config = { fps: 10, qrbox: { width: 250, height: 250 } };
+        const cameraIdOrConfig = activeDeviceId ? activeDeviceId : { facingMode: "environment" };
 
-            // Fire only once we have CONFIRM_FRAMES identical consecutive reads
-            if (buf.length >= CONFIRM_FRAMES && !processingRef.current) {
+        await html5QrCode.start(
+          cameraIdOrConfig,
+          config,
+          async (decodedText: string) => {
+            if (!processingRef.current) {
               processingRef.current = true;
-              recentReadsRef.current = [];
-
-              // Await check-in, then unblock after cooldown
-              await onConfirmedScan(decoded);
+              await onConfirmedScan(decodedText);
               setTimeout(() => {
                 processingRef.current = false;
-                recentReadsRef.current = [];
               }, COOLDOWN_MS);
             }
+          },
+          (errorMessage: string) => {
+            // Ignore parse errors (fired repeatedly when no barcode is present)
           }
-          // If no valid decode this frame, leave the buffer unchanged.
-          // This allows a momentary blur/occlusion mid-sequence without resetting.
-        } catch {
-          // Decode threw (shouldn't happen but guard anyway) — continue loop
-        }
-
-        if (!stopped) {
-          rafRef.current = requestAnimationFrame(() => void decodeTick());
-        }
-      };
-
-      rafRef.current = requestAnimationFrame(() => void decodeTick());
+        );
+        setScannerReady(true);
+      } catch (err: any) {
+        console.error("Scanner start error:", err);
+        setCameraError("Camera access denied or unavailable.");
+      }
     };
 
-    start().catch((err) => {
-      console.error("Scanner start error:", err);
-      if (!stopped) setCameraError("Failed to start scanner.");
-    });
+    startScanner();
 
     return () => {
-      stopped = true;
-      if (rafRef.current !== null) {
-        cancelAnimationFrame(rafRef.current);
-        rafRef.current = null;
-      }
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach((t) => t.stop());
-        streamRef.current = null;
+      if (scannerRef.current) {
+        scannerRef.current.stop().then(() => {
+          scannerRef.current.clear();
+        }).catch((e: any) => console.log("Stop error:", e));
+        scannerRef.current = null;
       }
       setScannerReady(false);
     };
   }, [selectedSessionId, activeDeviceId]); // eslint-disable-line react-hooks/exhaustive-deps
 
-
-
   // ── Switch Camera ──────────────────────────────────────────────────────────
   const switchCamera = () => {
     if (devices.length <= 1) return;
-    const currentIndex = devices.findIndex((d) => d.deviceId === activeDeviceId);
+    const currentIndex = devices.findIndex((d: any) => d.id === activeDeviceId);
     const nextIndex = (currentIndex + 1) % devices.length;
     const nextDevice = devices[nextIndex];
     if (nextDevice) {
-      setActiveDeviceId(nextDevice.deviceId);
+      setActiveDeviceId(nextDevice.id);
     }
   };
 
@@ -575,8 +411,7 @@ export default function AttendanceScanner({ sessions }: AttendanceScannerProps) 
   return (
     <div className="flex flex-col gap-4 max-w-2xl mx-auto w-full pb-12">
 
-      {/* Hidden canvas for frame capture — never visible */}
-      <canvas ref={canvasRef} className="hidden" aria-hidden />
+
 
       {/* ── Top status bar ────────────────────────────────────────────────── */}
       <div className="flex items-center justify-between border border-border bg-card px-4 py-3">
@@ -599,14 +434,8 @@ export default function AttendanceScanner({ sessions }: AttendanceScannerProps) 
       {/* ── Camera viewfinder ──────────────────────────────────────────────── */}
       <div className="relative w-full bg-black overflow-hidden" style={{ aspectRatio: "1 / 1" }}>
 
-        {/* Live video — the browser's own <video> element, styled to fill the container */}
-        <video
-          ref={videoRef}
-          className="absolute inset-0 w-full h-full object-cover"
-          autoPlay
-          muted
-          playsInline
-        />
+        {/* Live video — html5-qrcode will mount inside here */}
+        <div id="reader-container" className="absolute inset-0 w-full h-full object-cover [&>video]:object-cover [&>video]:w-full [&>video]:h-full border-none outline-none" />
 
 
 
