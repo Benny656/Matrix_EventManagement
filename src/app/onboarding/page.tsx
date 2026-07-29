@@ -50,7 +50,7 @@ export default async function OnboardingPage() {
               </p>
             </div>
             
-            <OnboardingForm initialName={user.name} />
+            <OnboardingForm initialName={user.name} initialRollNumber={user.rollNumber || ""} />
           </div>
         </div>
       </div>

@@ -9,9 +9,10 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { completeOnboardingAction } from "@/actions/onboarding";
 
-export default function OnboardingForm({ initialName }: { initialName: string }) {
+export default function OnboardingForm({ initialName, initialRollNumber }: { initialName: string, initialRollNumber: string }) {
   const router = useRouter();
   const [name, setName] = useState(initialName || "");
+  const [rollNumber, setRollNumber] = useState(initialRollNumber || "");
   const [department, setDepartment] = useState("");
   const [yearOfStudy, setYearOfStudy] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -24,6 +25,11 @@ export default function OnboardingForm({ initialName }: { initialName: string })
     const trimmedName = name.trim();
     if (!trimmedName) {
       setError("Name is required.");
+      return;
+    }
+    const trimmedRoll = rollNumber.trim().toUpperCase();
+    if (!trimmedRoll) {
+      setError("Roll Number is required.");
       return;
     }
     if (!department) {
@@ -40,6 +46,7 @@ export default function OnboardingForm({ initialName }: { initialName: string })
     try {
       const res = await completeOnboardingAction({
         name: trimmedName,
+        rollNumber: trimmedRoll,
         department,
         yearOfStudy,
       });
@@ -81,6 +88,19 @@ export default function OnboardingForm({ initialName }: { initialName: string })
           value={name}
           onChange={(e) => setName(e.target.value)}
           placeholder="Your full name"
+          required
+        />
+      </div>
+
+      <div className="flex flex-col gap-1.5">
+        <Label htmlFor="rollNumber" className="text-xs">
+          Roll Number <span className="text-destructive">*</span>
+        </Label>
+        <Input
+          id="rollNumber"
+          value={rollNumber}
+          onChange={(e) => setRollNumber(e.target.value)}
+          placeholder="e.g. URK25CS7102"
           required
         />
       </div>
