@@ -48,25 +48,43 @@ interface AttendanceScannerProps {
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
+// Type Declarations for Browser Native BarcodeDetector API
+// ──────────────────────────────────────────────────────────────────────────────
+
+declare global {
+  interface Window {
+    BarcodeDetector?: {
+      new (options?: { formats?: string[] }): {
+        detect: (image: ImageBitmapSource) => Promise<Array<{ rawValue: string; format: string }>>;
+      };
+      getSupportedFormats: () => Promise<string[]>;
+    };
+  }
+}
+
+// ──────────────────────────────────────────────────────────────────────────────
 // Roll-number normalisation
 // ──────────────────────────────────────────────────────────────────────────────
 //
 // ID-card barcodes often encode extra preamble bytes before the actual roll
-// number (e.g. CODE-128 Symbology Identifier "C1" → the raw decoded string
-// arrives as "C1URK25CS7025" instead of "URK25CS7025").
+// number (e.g. CODE-128 Symbology Identifier "c1" or "c2" → raw decoded string
+// arrives as "c1URK25CS7035" or "c2URK25CS7035" instead of "URK25CS7035").
 //
-// This helper extracts the substring starting at the first "URK" occurrence,
-// which is the canonical prefix for all Karunya roll numbers.
-// Returns null when no "URK" is found, signalling an invalid scan.
+// Normalization steps:
+// 1. Trim whitespace.
+// 2. Convert scanned text to uppercase.
+// 3. Find first occurrence of "URK".
+// 4. Discard everything before "URK".
+// 5. Use normalized roll number. Fall back to original scanned value if "URK" not found.
 //
 function normalizeRollNumber(raw: string): string {
   const trimmed = raw.trim();
   const upper = trimmed.toUpperCase();
   const idx = upper.indexOf("URK");
-  if (idx === -1) return trimmed;
-  // User asked for "URK25CS7035", we can preserve the rest of the string case or uppercase it.
-  // Slicing from idx ensures we drop everything before URK.
-  return trimmed.slice(idx);
+  if (idx === -1) {
+    return upper || trimmed;
+  }
+  return upper.slice(idx);
 }
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -91,12 +109,15 @@ export default function AttendanceScanner({ sessions }: AttendanceScannerProps) 
   // Prevents a second scan firing while a check-in is in-flight / cooling down
   const processingRef = useRef(false);
   const scannerRef = useRef<any>(null);
+  const mediaStreamRef = useRef<MediaStream | null>(null);
+  const animFrameRef = useRef<number | null>(null);
+  const detectorRef = useRef<any>(null);
 
   const [scannerReady, setScannerReady] = useState(false);
   const [cameraError, setCameraError] = useState<string | null>(null);
 
   // ── Camera Selection states ───────────────────────────────────────────────
-  const [devices, setDevices] = useState<any[]>([]);
+  const [devices, setDevices] = useState<{ id: string; label: string }[]>([]);
   const [activeDeviceId, setActiveDeviceId] = useState<string>("");
 
   // ── Scan-result alert state (with optimistic) ──────────────────────────────
@@ -129,7 +150,7 @@ export default function AttendanceScanner({ sessions }: AttendanceScannerProps) 
     })();
   }, [selectedSessionId]);
 
-  // ── Camera + html5-qrcode loop ───────────────────────────────────────
+  // ── Camera + Barcode Scanning loop ─────────────────────────────────────────
   useEffect(() => {
     if (!selectedSessionId) return;
 
@@ -139,9 +160,6 @@ export default function AttendanceScanner({ sessions }: AttendanceScannerProps) 
     setScannerReady(false);
     setCameraError(null);
     processingRef.current = false;
-
-    // We must lazily import html5-qrcode to avoid SSR issues
-    let Html5Qrcode: any;
 
     const onConfirmedScan = async (decodedText: string) => {
       setScanResult(null);
@@ -192,7 +210,130 @@ export default function AttendanceScanner({ sessions }: AttendanceScannerProps) 
       }
     };
 
-    const startScanner = async () => {
+    // Helper: Native BarcodeDetector scanner
+    const startNativeScanner = async () => {
+      let formats = ["code_128", "qr_code"];
+      if (typeof window.BarcodeDetector?.getSupportedFormats === "function") {
+        try {
+          const supported = await window.BarcodeDetector.getSupportedFormats();
+          const filtered = formats.filter((f) => supported.includes(f));
+          if (filtered.length > 0) formats = filtered;
+          else if (supported.length > 0) formats = supported;
+        } catch (e) {
+          // keep default formats
+        }
+      }
+
+      try {
+        const devicesList = await navigator.mediaDevices.enumerateDevices();
+        const videoInputs = devicesList.filter((d) => d.kind === "videoinput");
+        if (videoInputs.length > 0 && isMounted) {
+          const mappedDevices = videoInputs.map((d, index) => ({
+            id: d.deviceId,
+            label: d.label || `Camera ${index + 1}`,
+          }));
+          setDevices(mappedDevices);
+          if (!activeDeviceId) {
+            const backCamera = mappedDevices.find((d) => d.label.toLowerCase().includes("back"));
+            setActiveDeviceId(backCamera ? backCamera.id : mappedDevices[0].id);
+          }
+        }
+      } catch (err) {
+        console.warn("Failed to enumerate camera devices:", err);
+      }
+
+      if (!isMounted) return;
+
+      let stream: MediaStream | null = null;
+      try {
+        const videoConstraints: MediaTrackConstraints = activeDeviceId
+          ? { deviceId: { exact: activeDeviceId } }
+          : { facingMode: { ideal: "environment" }, width: { ideal: 1280 }, height: { ideal: 720 } };
+
+        try {
+          stream = await navigator.mediaDevices.getUserMedia({ video: videoConstraints });
+        } catch (err) {
+          if (activeDeviceId) {
+            stream = await navigator.mediaDevices.getUserMedia({
+              video: { facingMode: { ideal: "environment" }, width: { ideal: 1280 }, height: { ideal: 720 } },
+            });
+          } else {
+            throw err;
+          }
+        }
+      } catch (err: any) {
+        console.error("Native camera access error:", err);
+        if (isMounted) setCameraError("Camera access denied or unavailable.");
+        return;
+      }
+
+      if (!isMounted || !stream) {
+        if (stream) stream.getTracks().forEach((t) => t.stop());
+        return;
+      }
+
+      const container = document.getElementById("reader-container");
+      if (!container) {
+        stream.getTracks().forEach((t) => t.stop());
+        return;
+      }
+
+      container.innerHTML = "";
+      const videoEl = document.createElement("video");
+      videoEl.setAttribute("playsinline", "true");
+      videoEl.setAttribute("autoplay", "true");
+      videoEl.muted = true;
+      videoEl.style.width = "100%";
+      videoEl.style.height = "100%";
+      videoEl.style.objectFit = "cover";
+      videoEl.srcObject = stream;
+      container.appendChild(videoEl);
+
+      await videoEl.play().catch((e) => console.warn("Video play error:", e));
+
+      if (!isMounted) {
+        stream.getTracks().forEach((t) => t.stop());
+        container.innerHTML = "";
+        return;
+      }
+
+      mediaStreamRef.current = stream;
+      detectorRef.current = new window.BarcodeDetector!({ formats });
+
+      if (isMounted) setScannerReady(true);
+
+      const scanLoop = async () => {
+        if (!isMounted || !mediaStreamRef.current || !detectorRef.current) return;
+
+        if (videoEl.readyState >= 2 && !processingRef.current) {
+          try {
+            const barcodes = await detectorRef.current.detect(videoEl);
+            if (barcodes && barcodes.length > 0 && !processingRef.current && isMounted) {
+              const rawValue = barcodes[0].rawValue;
+              if (rawValue) {
+                processingRef.current = true;
+                await onConfirmedScan(rawValue);
+                setTimeout(() => {
+                  processingRef.current = false;
+                }, COOLDOWN_MS);
+              }
+            }
+          } catch (err) {
+            // Ignore frame detection errors
+          }
+        }
+
+        if (isMounted) {
+          animFrameRef.current = requestAnimationFrame(scanLoop);
+        }
+      };
+
+      animFrameRef.current = requestAnimationFrame(scanLoop);
+    };
+
+    // Helper: html5-qrcode fallback scanner
+    const startHtml5QrcodeScanner = async () => {
+      let Html5Qrcode: any;
       try {
         const h5q = await import("html5-qrcode");
         Html5Qrcode = h5q.Html5Qrcode;
@@ -206,11 +347,14 @@ export default function AttendanceScanner({ sessions }: AttendanceScannerProps) 
       try {
         const allDevices = await Html5Qrcode.getCameras();
         if (allDevices && allDevices.length > 0 && isMounted) {
-          setDevices(allDevices);
+          const mappedDevices = allDevices.map((d: any) => ({
+            id: d.id,
+            label: d.label || d.id,
+          }));
+          setDevices(mappedDevices);
           if (!activeDeviceId) {
-            // Prefer a back camera if available based on label, else take the first
-            const backCamera = allDevices.find((d: any) => d.label.toLowerCase().includes("back"));
-            setActiveDeviceId(backCamera ? backCamera.id : allDevices[0].id);
+            const backCamera = mappedDevices.find((d: any) => d.label.toLowerCase().includes("back"));
+            setActiveDeviceId(backCamera ? backCamera.id : mappedDevices[0].id);
           }
         }
       } catch (err) {
@@ -218,6 +362,11 @@ export default function AttendanceScanner({ sessions }: AttendanceScannerProps) 
       }
 
       if (!isMounted) return;
+
+      const container = document.getElementById("reader-container");
+      if (container) {
+        container.innerHTML = "";
+      }
 
       if (scannerRef.current) {
         try {
@@ -227,9 +376,6 @@ export default function AttendanceScanner({ sessions }: AttendanceScannerProps) 
           scannerRef.current.clear();
         } catch (e) {}
       }
-      
-      const el = document.getElementById("reader-container");
-      if (!el) return; // if DOM element unmounted
 
       const html5QrCode = new Html5Qrcode("reader-container");
       scannerRef.current = html5QrCode;
@@ -250,7 +396,7 @@ export default function AttendanceScanner({ sessions }: AttendanceScannerProps) 
               }, COOLDOWN_MS);
             }
           },
-          (errorMessage: string) => {
+          () => {
             // Ignore parse errors
           }
         );
@@ -261,26 +407,60 @@ export default function AttendanceScanner({ sessions }: AttendanceScannerProps) 
       }
     };
 
-    startScanner();
+    // Determine engine based on window.BarcodeDetector availability
+    const hasNativeBarcodeDetector =
+      typeof window !== "undefined" &&
+      "BarcodeDetector" in window &&
+      typeof window.BarcodeDetector === "function";
+
+    if (hasNativeBarcodeDetector) {
+      startNativeScanner();
+    } else {
+      startHtml5QrcodeScanner();
+    }
 
     return () => {
       isMounted = false;
+
+      // Clean up native stream & animation frame
+      if (animFrameRef.current) {
+        cancelAnimationFrame(animFrameRef.current);
+        animFrameRef.current = null;
+      }
+      if (mediaStreamRef.current) {
+        mediaStreamRef.current.getTracks().forEach((track) => track.stop());
+        mediaStreamRef.current = null;
+      }
+      detectorRef.current = null;
+
+      // Clean up html5-qrcode fallback instance
       if (scannerRef.current) {
         const scanner = scannerRef.current;
         scannerRef.current = null;
         try {
           if (scanner.isScanning || scanner.getState() === 2) {
-            scanner.stop().then(() => {
-              try { scanner.clear(); } catch(e){}
-            }).catch((e: any) => console.log("Stop error:", e));
+            scanner
+              .stop()
+              .then(() => {
+                try {
+                  scanner.clear();
+                } catch (e) {}
+              })
+              .catch((e: any) => console.log("Stop error:", e));
           } else {
             scanner.clear();
           }
-        } catch(e) {}
+        } catch (e) {}
       }
+
+      const container = document.getElementById("reader-container");
+      if (container) {
+        container.innerHTML = "";
+      }
+
       setScannerReady(false);
     };
-  }, [selectedSessionId, activeDeviceId]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [selectedSessionId, activeDeviceId]); // eslint-disable-line react-hooks/exhaustive-deps // eslint-disable-line react-hooks/exhaustive-deps
 
   // ── Switch Camera ──────────────────────────────────────────────────────────
   const switchCamera = () => {
