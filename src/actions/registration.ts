@@ -85,7 +85,11 @@ export async function registerForEventAction(eventId: string) {
   revalidatePath(`/volunteer/events/${eventId}`);
   revalidatePath(`/admin/events/${eventId}`);
 
-  return { success: true, status: newStatus };
+  return {
+    success: true,
+    status: newStatus,
+    whatsappInviteLink: newStatus === "REGISTERED" ? (event.whatsappInviteLink || null) : null,
+  };
 }
 
 export async function cancelRegistrationAction(eventId: string) {

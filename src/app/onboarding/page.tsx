@@ -2,6 +2,8 @@ import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth-session";
 import OnboardingForm from "./onboarding-form";
 
+export const dynamic = "force-dynamic";
+
 export const metadata = {
   title: "Complete Your Profile | Matrix",
 };

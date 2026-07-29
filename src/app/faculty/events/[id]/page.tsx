@@ -154,6 +154,21 @@ export default async function FacultyEventDetailsPage({ params }: PageProps) {
               isFull={isFull}
               isRegistrationOpen={isRegistrationOpen}
             />
+
+            {registrationStatus === "REGISTERED" && event.whatsappInviteLink && (
+              <div className="pt-2 border-t border-border">
+                <a
+                  href={event.whatsappInviteLink}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="block w-full"
+                >
+                  <button className="w-full bg-[#25D366] hover:bg-[#20bd5a] text-white font-mono text-xs uppercase tracking-wider py-3 px-4 flex items-center justify-center gap-2 transition-all cursor-pointer">
+                    Join WhatsApp Group
+                  </button>
+                </a>
+              </div>
+            )}
           </div>
         </div>
       </div>

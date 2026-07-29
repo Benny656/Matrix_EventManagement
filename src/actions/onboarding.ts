@@ -4,14 +4,14 @@ import { adminDb } from "@/lib/firebase-admin";
 import { getCurrentUser } from "@/lib/auth-session";
 import { revalidatePath } from "next/cache";
 
-export async function completeOnboardingAction(data: { name: string; rollNumber: string; department: string; yearOfStudy: string }) {
+export async function completeOnboardingAction(data: { name: string; rollNumber: string; department: string; yearOfStudy: string; phoneNumber: string }) {
   try {
     const user = await getCurrentUser();
     if (!user) {
       return { status: "error", message: "Unauthorized. Please log in again." };
     }
 
-    const { name, rollNumber, department, yearOfStudy } = data;
+    const { name, rollNumber, department, yearOfStudy, phoneNumber } = data;
 
     if (!name || !name.trim()) return { status: "error", message: "Name is required." };
     
@@ -20,6 +20,12 @@ export async function completeOnboardingAction(data: { name: string; rollNumber:
 
     if (!department || !["AI", "AIML"].includes(department)) return { status: "error", message: "Invalid department." };
     if (!yearOfStudy || !["1st Year", "2nd Year", "3rd Year", "4th Year"].includes(yearOfStudy)) return { status: "error", message: "Invalid year of study." };
+
+    const cleanedPhone = (phoneNumber || "").replace(/\D/g, "");
+    if (!cleanedPhone) return { status: "error", message: "Phone Number is required." };
+    if (!/^[6-9]\d{9}$/.test(cleanedPhone)) {
+      return { status: "error", message: "Please enter a valid 10-digit Indian mobile number starting with 6, 7, 8, or 9." };
+    }
 
     // Check for duplicate roll number
     const duplicateCheck = await adminDb.collection("users")
@@ -37,6 +43,7 @@ export async function completeOnboardingAction(data: { name: string; rollNumber:
       rollNumber: trimmedRollNumber,
       department,
       yearOfStudy,
+      phoneNumber: cleanedPhone,
       onboardingCompleted: true,
       updatedAt: new Date().toISOString(),
     });

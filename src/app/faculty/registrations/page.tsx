@@ -25,6 +25,7 @@ export default async function FacultyRegistrationsPage() {
   const registrations = regsSnapshot.docs.map((doc) => {
     const data = doc.data() as any;
     const event = eventMap.get(data.eventId) || { title: "Unknown Event", venue: "", date: "" };
+    const isRegistered = data.status === "REGISTERED";
     return {
       ...data,
       id: doc.id,
@@ -33,6 +34,7 @@ export default async function FacultyRegistrationsPage() {
         ...event,
         id: data.eventId,
         date: event.date ? new Date(event.date) : new Date(),
+        whatsappInviteLink: isRegistered ? (event.whatsappInviteLink || null) : null,
       },
     };
   });

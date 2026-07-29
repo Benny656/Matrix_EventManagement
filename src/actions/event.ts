@@ -12,6 +12,25 @@ const sessionSchema = z.object({
   endTime: z.string().or(z.date()).transform((val) => new Date(val)),
 });
 
+const whatsappInviteLinkSchema = z
+  .string()
+  .nullable()
+  .optional()
+  .refine(
+    (val) => {
+      if (!val || val.trim() === "") return true;
+      const trimmed = val.trim();
+      return (
+        trimmed.startsWith("https://chat.whatsapp.com/") ||
+        trimmed.startsWith("https://www.whatsapp.com/channel/")
+      );
+    },
+    {
+      message:
+        "WhatsApp invite link must start with https://chat.whatsapp.com/ or https://www.whatsapp.com/channel/",
+    }
+  );
+
 const eventSchema = z.object({
   title: z.string().min(2, "Event title is required"),
   description: z.string().min(5, "Event description must be at least 5 characters"),
@@ -22,21 +41,22 @@ const eventSchema = z.object({
   maxParticipants: z.number().min(1, "Capacity must be at least 1"),
   category: z.string().min(2, "Category is required"),
   coordinatorName: z.string().min(2, "Coordinator name is required"),
+  whatsappInviteLink: whatsappInviteLinkSchema,
   sessions: z.array(sessionSchema).optional().default([]),
 });
 
 export type EventInput = z.infer<typeof eventSchema>;
 
-async function verifyAuth(allowedRoles: ("ADMIN" | "VOLUNTEER")[]) {
+async function verifyAuth(allowedRoles: ("ADMIN" | "FACULTY_ADMIN" | "VOLUNTEER")[]) {
   const currentUser = await getCurrentUser();
-  if (!currentUser || !allowedRoles.includes(currentUser.role as any)) {
+  if (!currentUser || (!allowedRoles.includes(currentUser.role as any) && currentUser.role !== "ADMIN" && currentUser.role !== "FACULTY_ADMIN")) {
     throw new Error("Unauthorized. Insufficient permissions.");
   }
   return currentUser;
 }
 
 export async function createEventAction(input: EventInput) {
-  const user = await verifyAuth(["ADMIN"]);
+  const user = await verifyAuth(["ADMIN", "FACULTY_ADMIN"]);
   const validated = eventSchema.parse(input);
 
   const eventRef = adminDb.collection("events").doc();
@@ -69,6 +89,7 @@ export async function createEventAction(input: EventInput) {
     maxParticipants: validated.maxParticipants,
     category: validated.category,
     coordinatorName: validated.coordinatorName,
+    whatsappInviteLink: validated.whatsappInviteLink ? validated.whatsappInviteLink.trim() : null,
     createdById: user.id,
     status: "UPCOMING",
     archivedAt: null,
@@ -114,7 +135,7 @@ export async function createEventAction(input: EventInput) {
 }
 
 export async function updateEventAction(id: string, input: Omit<EventInput, "sessions">) {
-  await verifyAuth(["ADMIN"]);
+  await verifyAuth(["ADMIN", "FACULTY_ADMIN"]);
 
   const baseSchema = eventSchema.omit({ sessions: true });
   const validated = baseSchema.parse(input);
@@ -129,13 +150,38 @@ export async function updateEventAction(id: string, input: Omit<EventInput, "ses
     maxParticipants: validated.maxParticipants,
     category: validated.category,
     coordinatorName: validated.coordinatorName,
+    whatsappInviteLink: validated.whatsappInviteLink ? validated.whatsappInviteLink.trim() : null,
     updatedAt: new Date().toISOString(),
   });
 
   revalidatePath(`/student/events/${id}`);
+  revalidatePath(`/faculty/events/${id}`);
   revalidatePath(`/volunteer/events/${id}`);
   revalidatePath("/volunteer/events");
   revalidatePath("/admin/events");
+  return { success: true };
+}
+
+export async function updateEventWhatsappLinkAction(id: string, whatsappInviteLink: string | null) {
+  const currentUser = await getCurrentUser();
+  if (!currentUser || (currentUser.role !== "ADMIN" && currentUser.role !== "FACULTY_ADMIN")) {
+    throw new Error("Unauthorized. Only Admin or Faculty Admin can edit the WhatsApp invite link.");
+  }
+
+  const validatedLink = whatsappInviteLinkSchema.parse(whatsappInviteLink);
+  const finalLink = validatedLink && validatedLink.trim() !== "" ? validatedLink.trim() : null;
+
+  await adminDb.collection("events").doc(id).update({
+    whatsappInviteLink: finalLink,
+    updatedAt: new Date().toISOString(),
+  });
+
+  revalidatePath(`/student/events/${id}`);
+  revalidatePath(`/faculty/events/${id}`);
+  revalidatePath(`/admin/events/${id}`);
+  revalidatePath("/faculty/events");
+  revalidatePath("/admin/events");
+
   return { success: true };
 }
 

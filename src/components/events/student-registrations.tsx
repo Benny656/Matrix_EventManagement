@@ -17,6 +17,7 @@ interface RegistrationWithEvent {
     venue: string;
     date: Date;
     category: string;
+    whatsappInviteLink?: string | null;
   };
 }
 
@@ -102,7 +103,20 @@ export default function StudentRegistrations({ initialRegistrations }: { initial
                       </p>
                     </div>
 
-                    <div>
+                    <div className="flex flex-wrap items-center gap-2">
+                      {reg.status === "REGISTERED" && reg.event.whatsappInviteLink && (
+                        <a
+                          href={reg.event.whatsappInviteLink}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                        >
+                          <Button
+                            className="bg-[#25D366] hover:bg-[#20bd5a] text-white font-mono text-[11px] uppercase tracking-wider py-2 px-4 transition-all h-9 rounded-none shadow-none"
+                          >
+                            Join WhatsApp Group
+                          </Button>
+                        </a>
+                      )}
                       <Button
                         variant="outline"
                         onClick={() => handleCancel(reg.event.id)}

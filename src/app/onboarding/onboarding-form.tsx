@@ -15,6 +15,7 @@ export default function OnboardingForm({ initialName, initialRollNumber }: { ini
   const [rollNumber, setRollNumber] = useState(initialRollNumber || "");
   const [department, setDepartment] = useState("");
   const [yearOfStudy, setYearOfStudy] = useState("");
+  const [phoneNumber, setPhoneNumber] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
 
@@ -41,6 +42,16 @@ export default function OnboardingForm({ initialName, initialRollNumber }: { ini
       return;
     }
 
+    const cleanedPhone = phoneNumber.replace(/\D/g, "");
+    if (!cleanedPhone) {
+      setError("Phone Number is required.");
+      return;
+    }
+    if (!/^[6-9]\d{9}$/.test(cleanedPhone)) {
+      setError("Please enter a valid 10-digit Indian mobile number starting with 6, 7, 8, or 9.");
+      return;
+    }
+
     setLoading(true);
 
     try {
@@ -49,6 +60,7 @@ export default function OnboardingForm({ initialName, initialRollNumber }: { ini
         rollNumber: trimmedRoll,
         department,
         yearOfStudy,
+        phoneNumber: cleanedPhone,
       });
 
       if (res.status === "error") {
@@ -135,6 +147,20 @@ export default function OnboardingForm({ initialName, initialRollNumber }: { ini
             <SelectItem value="4th Year">4th Year</SelectItem>
           </SelectContent>
         </Select>
+      </div>
+
+      <div className="flex flex-col gap-1.5">
+        <Label htmlFor="phoneNumber" className="text-xs">
+          Phone Number <span className="text-destructive">*</span>
+        </Label>
+        <Input
+          id="phoneNumber"
+          type="tel"
+          value={phoneNumber}
+          onChange={(e) => setPhoneNumber(e.target.value)}
+          placeholder="e.g. 9876543210"
+          required
+        />
       </div>
 
       <motion.button

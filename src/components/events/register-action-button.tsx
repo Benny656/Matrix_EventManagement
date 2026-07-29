@@ -22,6 +22,8 @@ export default function RegisterActionButton({
   const [status, setStatus] = useState(initialStatus);
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [registeredWhatsappLink, setRegisteredWhatsappLink] = useState<string | null>(null);
 
   // Optimistic status updates
   const [optimisticStatus, setOptimisticStatus] = useOptimistic(
@@ -38,6 +40,10 @@ export default function RegisterActionButton({
         const res = await registerForEventAction(eventId);
         if (res.success) {
           setStatus(res.status as any);
+          if (res.status === "REGISTERED") {
+            setRegisteredWhatsappLink(res.whatsappInviteLink || null);
+            setShowSuccessModal(true);
+          }
         }
       } catch (err: any) {
         setError(err.message || "Failed to register");
@@ -123,6 +129,43 @@ export default function RegisterActionButton({
             ? "Join waitlist"
             : "Register"}
         </Button>
+      )}
+
+      {showSuccessModal && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-card border border-border max-w-md w-full p-6 space-y-4 shadow-xl rounded-none">
+            <div className="space-y-1">
+              <h3 className="font-heading text-xl font-bold text-foreground">
+                Registration Successful!
+              </h3>
+              <p className="font-sans text-sm text-muted-foreground">
+                You have successfully registered for this event.
+              </p>
+            </div>
+
+            <div className="flex flex-col sm:flex-row gap-3 pt-4 border-t border-border">
+              {registeredWhatsappLink ? (
+                <a
+                  href={registeredWhatsappLink}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex-1"
+                >
+                  <Button className="w-full bg-[#25D366] hover:bg-[#20bd5a] text-white font-mono text-xs uppercase tracking-wider rounded-none h-10 shadow-none">
+                    Join WhatsApp Group
+                  </Button>
+                </a>
+              ) : null}
+              <Button
+                variant="outline"
+                onClick={() => setShowSuccessModal(false)}
+                className="flex-1 border-border font-mono text-xs uppercase tracking-wider rounded-none h-10 shadow-none"
+              >
+                Close
+              </Button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

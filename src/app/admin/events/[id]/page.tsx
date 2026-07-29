@@ -9,6 +9,7 @@ import AttendeeList from "@/components/events/attendee-list";
 import { Download } from "lucide-react";
 import EditRegistrationStatusForm from "@/components/events/edit-registration-status-form";
 import EditCapacityForm from "@/components/events/edit-capacity-form";
+import EditWhatsappLinkForm from "@/components/events/edit-whatsapp-link-form";
 
 export const dynamic = "force-dynamic";
 
@@ -147,6 +148,7 @@ export default async function AdminEventDetailsPage({ params }: PageProps) {
         <div className="lg:col-span-4 space-y-6">
           <EditRegistrationStatusForm eventId={event.id} initialRegistrationOpen={event.registrationOpen ?? true} />
           <EditCapacityForm eventId={event.id} initialCapacity={event.maxParticipants} />
+          <EditWhatsappLinkForm eventId={event.id} initialWhatsappInviteLink={event.whatsappInviteLink || null} />
           
           <div className="border border-border p-6 bg-card space-y-6">
             <h3 className="font-mono text-xs uppercase tracking-widest text-muted-foreground border-b border-border pb-1 font-semibold">

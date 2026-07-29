@@ -13,6 +13,25 @@ import { Card } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { AlertCircle, MapPin, Trash2 } from "lucide-react";
 
+const whatsappInviteLinkSchema = z
+  .string()
+  .nullable()
+  .optional()
+  .refine(
+    (val) => {
+      if (!val || val.trim() === "") return true;
+      const trimmed = val.trim();
+      return (
+        trimmed.startsWith("https://chat.whatsapp.com/") ||
+        trimmed.startsWith("https://www.whatsapp.com/channel/")
+      );
+    },
+    {
+      message:
+        "WhatsApp invite link must start with https://chat.whatsapp.com/ or https://www.whatsapp.com/channel/",
+    }
+  );
+
 const basicInfoSchema = z.object({
   title: z.string().min(2, "Event title is required"),
   description: z.string().min(5, "Event description must be at least 5 characters"),
@@ -21,6 +40,7 @@ const basicInfoSchema = z.object({
   venue: z.string().min(2, "Venue is required"),
   maxParticipants: z.coerce.number().min(1, "Capacity must be at least 1"),
   registrationOpen: z.boolean().default(true),
+  whatsappInviteLink: whatsappInviteLinkSchema,
 });
 
 type BasicInfoValues = z.infer<typeof basicInfoSchema>;
@@ -51,7 +71,6 @@ export default function CreateEventWizard({ role }: { role: "ADMIN" | "VOLUNTEER
   const {
     register: registerBasic,
     handleSubmit: handleBasicSubmit,
-    watch: watchBasic,
     formState: { errors: basicErrors },
   } = useForm<BasicInfoValues>({
     resolver: zodResolver(basicInfoSchema) as any,
@@ -268,20 +287,21 @@ export default function CreateEventWizard({ role }: { role: "ADMIN" | "VOLUNTEER
                 )}
               </div>
 
-              {/* Registration Toggle */}
-              <div className="flex flex-col gap-1">
-                <Label className="font-mono text-[11px] text-muted-foreground uppercase tracking-wider" htmlFor="registrationOpen">Registration Status</Label>
-                <div className="flex items-center gap-3 pt-4">
-                  <input
-                    type="checkbox"
-                    id="registrationOpen"
-                    {...registerBasic("registrationOpen")}
-                    className="h-5 w-5 border-border rounded-sm text-primary bg-background focus:ring-primary cursor-pointer"
-                  />
-                  <Label className="font-mono text-[13px] text-foreground cursor-pointer" htmlFor="registrationOpen">
-                    Open for Registration
-                  </Label>
-                </div>
+              {/* WhatsApp Group Invite Link */}
+              <div className="flex flex-col gap-1 md:col-span-2">
+                <Label className="font-mono text-[11px] text-muted-foreground uppercase tracking-wider" htmlFor="whatsappInviteLink">
+                  WhatsApp Group Invite Link (Optional)
+                </Label>
+                <Input
+                  {...registerBasic("whatsappInviteLink")}
+                  className="w-full bg-background border border-border text-foreground px-3 py-6 font-mono text-sm focus-visible:ring-1 focus-visible:ring-primary rounded-none shadow-none"
+                  id="whatsappInviteLink"
+                  type="url"
+                  placeholder="https://chat.whatsapp.com/..."
+                />
+                {basicErrors.whatsappInviteLink && (
+                  <span className="font-mono text-[10px] text-destructive uppercase mt-1">{basicErrors.whatsappInviteLink.message}</span>
+                )}
               </div>
             </div>
 
@@ -482,6 +502,12 @@ export default function CreateEventWizard({ role }: { role: "ADMIN" | "VOLUNTEER
                   <span className="text-muted-foreground block uppercase">Registration Status</span>
                   <span className="font-semibold text-foreground">
                     {basicInfo?.registrationOpen ? "Open" : "Closed"}
+                  </span>
+                </div>
+                <div className="md:col-span-2">
+                  <span className="text-muted-foreground block uppercase">WhatsApp Group Invite Link</span>
+                  <span className="font-semibold text-foreground break-all">
+                    {basicInfo?.whatsappInviteLink || "None provided"}
                   </span>
                 </div>
               </div>
