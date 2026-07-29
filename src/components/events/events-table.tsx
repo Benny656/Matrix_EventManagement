@@ -197,13 +197,13 @@ export default function EventsTable({ initialEvents, role }: EventsTableProps) {
                     <Link
                       href={role === "ADMIN" ? `/admin/events/${event.id}` : `/volunteer/events/${event.id}`}
                       className="flex-1 md:flex-none py-2.5 md:p-1 border border-border md:border-none hover:text-primary hover:bg-surface-container md:hover:bg-transparent transition-colors flex items-center justify-center gap-1.5 md:gap-0 font-mono text-[10px] md:text-xs uppercase h-10 md:h-auto min-h-[40px] md:min-h-0"
-                      title="Manage Details"
+                      title={role === "ADMIN" ? "Manage Details" : "View Details"}
                     >
                       <Pencil size={14} />
-                      <span className="inline md:hidden">Manage</span>
+                      <span className="inline md:hidden">{role === "ADMIN" ? "Manage" : "View"}</span>
                     </Link>
 
-                    {event.status !== "ARCHIVED" && (
+                    {event.status !== "ARCHIVED" && role === "ADMIN" && (
                       <button
                         onClick={() => handleArchive(event.id)}
                         disabled={isPending}

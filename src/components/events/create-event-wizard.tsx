@@ -16,6 +16,7 @@ import { AlertCircle, MapPin, Trash2 } from "lucide-react";
 const basicInfoSchema = z.object({
   title: z.string().min(2, "Event title is required"),
   description: z.string().min(5, "Event description must be at least 5 characters"),
+  eventDate: z.string().min(1, "Event date is required"),
   category: z.string().min(1, "Please select a category"),
   venue: z.string().min(2, "Venue is required"),
   maxParticipants: z.coerce.number().min(1, "Capacity must be at least 1"),
@@ -66,6 +67,7 @@ export default function CreateEventWizard({ role }: { role: "ADMIN" | "VOLUNTEER
     defaultValues: {
       noDeadline: false,
       registrationDeadline: "",
+      eventDate: "",
       ...basicInfo,
     } as any,
   });
@@ -110,13 +112,12 @@ export default function CreateEventWizard({ role }: { role: "ADMIN" | "VOLUNTEER
   };
 
   const handlePublish = async () => {
-    if (!basicInfo || sessions.length === 0) return;
+    if (!basicInfo) return;
     setPublishing(true);
     setWizardError(null);
 
-    // Calculate overall event date (use start time of the first session as event date)
-    const eventDates = sessions.map((s) => new Date(s.startTime).getTime());
-    const earliestDate = new Date(Math.min(...eventDates));
+    // Calculate overall event date from basic info
+    const earliestDate = new Date(basicInfo.eventDate);
 
     try {
       const result = await createEventAction({
@@ -246,6 +247,20 @@ export default function CreateEventWizard({ role }: { role: "ADMIN" | "VOLUNTEER
                 </div>
                 {basicErrors.venue && (
                   <span className="font-mono text-[10px] text-destructive uppercase mt-1">{basicErrors.venue.message}</span>
+                )}
+              </div>
+
+              {/* Event Date */}
+              <div className="flex flex-col gap-1">
+                <Label className="font-mono text-[11px] text-muted-foreground uppercase tracking-wider" htmlFor="eventDate">Event Date</Label>
+                <Input
+                  {...registerBasic("eventDate")}
+                  className="w-full bg-background border border-border text-foreground px-3 py-6 font-mono text-sm focus-visible:ring-1 focus-visible:ring-primary rounded-none shadow-none"
+                  id="eventDate"
+                  type="date"
+                />
+                {basicErrors.eventDate && (
+                  <span className="font-mono text-[10px] text-destructive uppercase mt-1">{basicErrors.eventDate.message}</span>
                 )}
               </div>
 
@@ -393,7 +408,7 @@ export default function CreateEventWizard({ role }: { role: "ADMIN" | "VOLUNTEER
 
             {sessions.length === 0 ? (
               <div className="border border-border p-6 text-center text-muted-foreground font-mono text-xs uppercase bg-surface-container-low">
-                No sessions defined. You must add at least one segment.
+                No sessions defined. You can add time segments later.
               </div>
             ) : (
               <div className="border border-border bg-background divide-y divide-border">
@@ -443,9 +458,8 @@ export default function CreateEventWizard({ role }: { role: "ADMIN" | "VOLUNTEER
             </button>
             <button
               type="button"
-              onClick={() => sessions.length > 0 ? setStep(3) : setSessionError("At least one session is required")}
-              className="bg-primary text-primary-foreground font-mono text-xs uppercase tracking-widest py-3 px-6 hover:bg-primary-container transition-all active:scale-95 disabled:opacity-50"
-              disabled={sessions.length === 0}
+              onClick={() => setStep(3)}
+              className="bg-primary text-primary-foreground font-mono text-xs uppercase tracking-widest py-3 px-6 hover:bg-primary-container transition-all active:scale-95"
             >
               Review Protocol
             </button>
@@ -473,6 +487,10 @@ export default function CreateEventWizard({ role }: { role: "ADMIN" | "VOLUNTEER
                 <div>
                   <span className="text-muted-foreground block uppercase">Category</span>
                   <span className="font-semibold text-foreground">{basicInfo?.category}</span>
+                </div>
+                <div>
+                  <span className="text-muted-foreground block uppercase">Date</span>
+                  <span className="font-semibold text-foreground">{new Date(basicInfo?.eventDate || "").toLocaleDateString()}</span>
                 </div>
                 <div>
                   <span className="text-muted-foreground block uppercase">Location / Venue</span>

@@ -22,13 +22,6 @@ export default async function VolunteerEventsPage() {
           </p>
         </div>
         <div>
-          <Link
-            href="/volunteer/events/new"
-            className="bg-primary text-primary-foreground font-mono text-xs uppercase tracking-widest py-3 px-6 hover:bg-primary-container transition-all active:scale-95 flex items-center justify-center gap-1"
-          >
-            <Plus size={14} />
-            Create Event
-          </Link>
         </div>
       </div>
 

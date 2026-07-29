@@ -94,7 +94,6 @@ export default function DashboardLayout({ user, children }: DashboardLayoutProps
           { label: "Overview", href: "/volunteer", icon: Home },
           { label: "Events", href: "/volunteer/events", icon: CalendarCheck },
           { label: "Attendance", href: "/volunteer/attendance", icon: ScanLine },
-          { label: "Users", href: "/volunteer/users", icon: Users },
           { label: "Updates", href: "/volunteer/updates", icon: BellRing },
         ];
       case "STUDENT":

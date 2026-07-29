@@ -25,7 +25,7 @@ const eventSchema = z.object({
   maxParticipants: z.number().min(1, "Capacity must be at least 1"),
   category: z.string().min(2, "Category is required"),
   coordinatorName: z.string().min(2, "Coordinator name is required"),
-  sessions: z.array(sessionSchema).min(1, "At least one session is required"),
+  sessions: z.array(sessionSchema).optional().default([]),
 });
 
 export type EventInput = z.infer<typeof eventSchema>;
@@ -39,7 +39,7 @@ async function verifyAuth(allowedRoles: ("ADMIN" | "VOLUNTEER")[]) {
 }
 
 export async function createEventAction(input: EventInput) {
-  const user = await verifyAuth(["ADMIN", "VOLUNTEER"]);
+  const user = await verifyAuth(["ADMIN"]);
   const validated = eventSchema.parse(input);
 
   const eventRef = adminDb.collection("events").doc();
@@ -119,7 +119,7 @@ export async function createEventAction(input: EventInput) {
 }
 
 export async function updateEventAction(id: string, input: Omit<EventInput, "sessions">) {
-  await verifyAuth(["ADMIN", "VOLUNTEER"]);
+  await verifyAuth(["ADMIN"]);
 
   const baseSchema = eventSchema.omit({ sessions: true });
   const validated = baseSchema.parse(input);
@@ -147,7 +147,7 @@ export async function updateEventAction(id: string, input: Omit<EventInput, "ses
 }
 
 export async function updateEventDeadlineAction(id: string, registrationDeadline: Date | null) {
-  await verifyAuth(["ADMIN", "VOLUNTEER"]);
+  await verifyAuth(["ADMIN"]);
 
   await adminDb.collection("events").doc(id).update({
     registrationDeadline: registrationDeadline ? registrationDeadline.toISOString() : null,
@@ -163,7 +163,7 @@ export async function updateEventDeadlineAction(id: string, registrationDeadline
 }
 
 export async function updateEventCapacityAction(id: string, maxParticipants: number) {
-  await verifyAuth(["ADMIN", "VOLUNTEER"]);
+  await verifyAuth(["ADMIN"]);
 
   if (!maxParticipants || maxParticipants < 1) {
     throw new Error("Capacity must be at least 1.");
@@ -236,7 +236,7 @@ export async function updateEventCapacityAction(id: string, maxParticipants: num
 }
 
 export async function archiveEventAction(id: string) {
-  await verifyAuth(["ADMIN", "VOLUNTEER"]);
+  await verifyAuth(["ADMIN"]);
 
   await adminDb.collection("events").doc(id).update({
     status: "ARCHIVED",
