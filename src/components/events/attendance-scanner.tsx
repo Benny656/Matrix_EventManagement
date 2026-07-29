@@ -133,6 +133,8 @@ export default function AttendanceScanner({ sessions }: AttendanceScannerProps) 
   useEffect(() => {
     if (!selectedSessionId) return;
 
+    let isMounted = true;
+
     // Reset per-session state
     setScannerReady(false);
     setCameraError(null);
@@ -153,6 +155,7 @@ export default function AttendanceScanner({ sessions }: AttendanceScannerProps) 
       }
       try {
         const result = await markAttendanceByScan(selectedSessionId, rollNumber);
+        if (!isMounted) return;
         if (result.status === "success") {
           setScanResult({
             type: "SUCCESS",
@@ -181,6 +184,7 @@ export default function AttendanceScanner({ sessions }: AttendanceScannerProps) 
           });
         }
       } catch (err: any) {
+        if (!isMounted) return;
         setScanResult({
           type: "ERROR",
           message: err.message || "Attendance system request failed.",
@@ -193,13 +197,15 @@ export default function AttendanceScanner({ sessions }: AttendanceScannerProps) 
         const h5q = await import("html5-qrcode");
         Html5Qrcode = h5q.Html5Qrcode;
       } catch (e) {
-        setCameraError("Failed to load barcode decoder.");
+        if (isMounted) setCameraError("Failed to load barcode decoder.");
         return;
       }
 
+      if (!isMounted) return;
+
       try {
         const allDevices = await Html5Qrcode.getCameras();
-        if (allDevices && allDevices.length > 0) {
+        if (allDevices && allDevices.length > 0 && isMounted) {
           setDevices(allDevices);
           if (!activeDeviceId) {
             // Prefer a back camera if available based on label, else take the first
@@ -211,12 +217,19 @@ export default function AttendanceScanner({ sessions }: AttendanceScannerProps) 
         console.warn("Failed to enumerate camera devices:", err);
       }
 
+      if (!isMounted) return;
+
       if (scannerRef.current) {
         try {
-          await scannerRef.current.stop();
+          if (scannerRef.current.isScanning || scannerRef.current.getState() === 2) {
+            await scannerRef.current.stop();
+          }
           scannerRef.current.clear();
         } catch (e) {}
       }
+      
+      const el = document.getElementById("reader-container");
+      if (!el) return; // if DOM element unmounted
 
       const html5QrCode = new Html5Qrcode("reader-container");
       scannerRef.current = html5QrCode;
@@ -229,7 +242,7 @@ export default function AttendanceScanner({ sessions }: AttendanceScannerProps) 
           cameraIdOrConfig,
           config,
           async (decodedText: string) => {
-            if (!processingRef.current) {
+            if (!processingRef.current && isMounted) {
               processingRef.current = true;
               await onConfirmedScan(decodedText);
               setTimeout(() => {
@@ -238,24 +251,32 @@ export default function AttendanceScanner({ sessions }: AttendanceScannerProps) 
             }
           },
           (errorMessage: string) => {
-            // Ignore parse errors (fired repeatedly when no barcode is present)
+            // Ignore parse errors
           }
         );
-        setScannerReady(true);
+        if (isMounted) setScannerReady(true);
       } catch (err: any) {
         console.error("Scanner start error:", err);
-        setCameraError("Camera access denied or unavailable.");
+        if (isMounted) setCameraError("Camera access denied or unavailable.");
       }
     };
 
     startScanner();
 
     return () => {
+      isMounted = false;
       if (scannerRef.current) {
-        scannerRef.current.stop().then(() => {
-          scannerRef.current.clear();
-        }).catch((e: any) => console.log("Stop error:", e));
+        const scanner = scannerRef.current;
         scannerRef.current = null;
+        try {
+          if (scanner.isScanning || scanner.getState() === 2) {
+            scanner.stop().then(() => {
+              try { scanner.clear(); } catch(e){}
+            }).catch((e: any) => console.log("Stop error:", e));
+          } else {
+            scanner.clear();
+          }
+        } catch(e) {}
       }
       setScannerReady(false);
     };
