@@ -17,7 +17,8 @@ export default async function OnboardingPage() {
 
   if (user.onboardingCompleted) {
     // If they already have a complete profile, redirect them back to their dashboard.
-    if (user.role === "ADMIN") redirect("/admin");
+    if (user.role === "ADMIN" || user.role === "FACULTY_ADMIN") redirect("/admin");
+    if (user.role === "FACULTY") redirect("/faculty");
     if (user.role === "VOLUNTEER") redirect("/volunteer");
     redirect("/student");
   }
@@ -52,7 +53,7 @@ export default async function OnboardingPage() {
               </p>
             </div>
             
-            <OnboardingForm initialName={user.name} initialRollNumber={user.rollNumber || ""} />
+            <OnboardingForm initialName={user.name} initialRollNumber={user.rollNumber || ""} userRole={user.role} />
           </div>
         </div>
       </div>

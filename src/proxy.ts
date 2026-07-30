@@ -8,6 +8,7 @@ export default async function proxy(request: NextRequest) {
     pathname.startsWith("/admin") ||
     pathname.startsWith("/volunteer") ||
     pathname.startsWith("/student") ||
+    pathname.startsWith("/faculty") ||
     pathname.startsWith("/profile");
 
   const isChangePassword = pathname === "/change-password";
@@ -45,7 +46,8 @@ export default async function proxy(request: NextRequest) {
     // If they don't actually need to change their password, send them home.
     if (!user?.mustChangePassword) {
       const role = user?.role;
-      if (role === "ADMIN") return NextResponse.redirect(new URL("/admin", request.url));
+      if (role === "ADMIN" || role === "FACULTY_ADMIN") return NextResponse.redirect(new URL("/admin", request.url));
+      if (role === "FACULTY") return NextResponse.redirect(new URL("/faculty", request.url));
       if (role === "VOLUNTEER") return NextResponse.redirect(new URL("/volunteer", request.url));
       return NextResponse.redirect(new URL("/student", request.url));
     }
@@ -60,7 +62,8 @@ export default async function proxy(request: NextRequest) {
     // If they have completed onboarding, send them home.
     if (user?.onboardingCompleted) {
       const role = user?.role;
-      if (role === "ADMIN") return NextResponse.redirect(new URL("/admin", request.url));
+      if (role === "ADMIN" || role === "FACULTY_ADMIN") return NextResponse.redirect(new URL("/admin", request.url));
+      if (role === "FACULTY") return NextResponse.redirect(new URL("/faculty", request.url));
       if (role === "VOLUNTEER") return NextResponse.redirect(new URL("/volunteer", request.url));
       return NextResponse.redirect(new URL("/student", request.url));
     }
@@ -83,7 +86,11 @@ export default async function proxy(request: NextRequest) {
   }
 
   // ── 4. Role-based checks ──────────────────────────────────────────────────
-  if (pathname.startsWith("/admin") && user?.role !== "ADMIN") {
+  if (pathname.startsWith("/admin") && user?.role !== "ADMIN" && user?.role !== "FACULTY_ADMIN") {
+    return NextResponse.redirect(new URL("/unauthorized", request.url));
+  }
+
+  if (pathname.startsWith("/faculty") && user?.role !== "FACULTY" && user?.role !== "FACULTY_ADMIN" && user?.role !== "ADMIN") {
     return NextResponse.redirect(new URL("/unauthorized", request.url));
   }
 
@@ -101,6 +108,7 @@ export default async function proxy(request: NextRequest) {
 export const config = {
   matcher: [
     "/admin/:path*",
+    "/faculty/:path*",
     "/volunteer/:path*",
     "/student/:path*",
     "/profile",

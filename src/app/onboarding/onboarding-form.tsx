@@ -12,8 +12,18 @@ import { completeOnboardingAction } from "@/actions/onboarding";
 const UG_DEGREES = ["B.Tech", "B.Sc", "BCA", "B.Com", "BBA", "B.A"];
 const PG_DEGREES = ["M.Tech", "M.Sc", "MCA", "MBA", "M.A", "Ph.D"];
 
-export default function OnboardingForm({ initialName, initialRollNumber }: { initialName: string, initialRollNumber: string }) {
+export default function OnboardingForm({
+  initialName,
+  initialRollNumber,
+  userRole,
+}: {
+  initialName: string;
+  initialRollNumber: string;
+  userRole?: string;
+}) {
   const router = useRouter();
+  const isFaculty = userRole === "FACULTY" || userRole === "FACULTY_ADMIN";
+
   const [name, setName] = useState(initialName || "");
   const [rollNumber, setRollNumber] = useState(initialRollNumber || "");
   const [programType, setProgramType] = useState<"UG" | "PG">("UG");
@@ -30,7 +40,6 @@ export default function OnboardingForm({ initialName, initialRollNumber }: { ini
     if (!val) return;
     const newType = val as "UG" | "PG";
     setProgramType(newType);
-    // Reset degree if current degree is not valid for new program type
     const newAvailable = newType === "UG" ? UG_DEGREES : PG_DEGREES;
     if (!newAvailable.includes(degree)) {
       setDegree("");
@@ -46,25 +55,9 @@ export default function OnboardingForm({ initialName, initialRollNumber }: { ini
       setError("Name is required.");
       return;
     }
-    const trimmedRoll = rollNumber.trim().toUpperCase();
-    if (!trimmedRoll) {
-      setError("Roll Number is required.");
-      return;
-    }
-    if (!programType) {
-      setError("Please select Program Level (UG or PG).");
-      return;
-    }
-    if (!degree) {
-      setError("Please select your degree.");
-      return;
-    }
+
     if (!department) {
       setError("Please select a department.");
-      return;
-    }
-    if (!yearOfStudy) {
-      setError("Please select your year of study.");
       return;
     }
 
@@ -78,16 +71,37 @@ export default function OnboardingForm({ initialName, initialRollNumber }: { ini
       return;
     }
 
+    let trimmedRoll = "";
+    if (!isFaculty) {
+      trimmedRoll = rollNumber.trim().toUpperCase();
+      if (!trimmedRoll) {
+        setError("Roll Number is required.");
+        return;
+      }
+      if (!programType) {
+        setError("Please select Program Level (UG or PG).");
+        return;
+      }
+      if (!degree) {
+        setError("Please select your degree.");
+        return;
+      }
+      if (!yearOfStudy) {
+        setError("Please select your year of study.");
+        return;
+      }
+    }
+
     setLoading(true);
 
     try {
       const res = await completeOnboardingAction({
         name: trimmedName,
-        rollNumber: trimmedRoll,
-        programType,
-        degree,
+        rollNumber: isFaculty ? undefined : trimmedRoll,
+        programType: isFaculty ? undefined : programType,
+        degree: isFaculty ? undefined : degree,
         department,
-        yearOfStudy,
+        yearOfStudy: isFaculty ? undefined : yearOfStudy,
         phoneNumber: cleanedPhone,
       });
 
@@ -132,53 +146,57 @@ export default function OnboardingForm({ initialName, initialRollNumber }: { ini
         />
       </div>
 
-      <div className="flex flex-col gap-1.5">
-        <Label htmlFor="rollNumber" className="text-xs">
-          Roll Number <span className="text-destructive">*</span>
-        </Label>
-        <Input
-          id="rollNumber"
-          value={rollNumber}
-          onChange={(e) => setRollNumber(e.target.value)}
-          placeholder="e.g. URK25CS7102"
-          required
-        />
-      </div>
+      {!isFaculty && (
+        <>
+          <div className="flex flex-col gap-1.5">
+            <Label htmlFor="rollNumber" className="text-xs">
+              Roll Number <span className="text-destructive">*</span>
+            </Label>
+            <Input
+              id="rollNumber"
+              value={rollNumber}
+              onChange={(e) => setRollNumber(e.target.value)}
+              placeholder="e.g. URK25CS7102"
+              required
+            />
+          </div>
 
-      <div className="grid grid-cols-2 gap-3">
-        <div className="flex flex-col gap-1.5">
-          <Label htmlFor="programType" className="text-xs">
-            Program Level <span className="text-destructive">*</span>
-          </Label>
-          <Select value={programType} onValueChange={handleProgramTypeChange} required>
-            <SelectTrigger id="programType">
-              <SelectValue placeholder="Select level" />
-            </SelectTrigger>
-            <SelectContent>
-              <SelectItem value="UG">UG (Undergraduate)</SelectItem>
-              <SelectItem value="PG">PG (Postgraduate)</SelectItem>
-            </SelectContent>
-          </Select>
-        </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="programType" className="text-xs">
+                Program Level <span className="text-destructive">*</span>
+              </Label>
+              <Select value={programType} onValueChange={handleProgramTypeChange} required>
+                <SelectTrigger id="programType">
+                  <SelectValue placeholder="Select level" />
+                </SelectTrigger>
+                <SelectContent>
+                  <SelectItem value="UG">UG (Undergraduate)</SelectItem>
+                  <SelectItem value="PG">PG (Postgraduate)</SelectItem>
+                </SelectContent>
+              </Select>
+            </div>
 
-        <div className="flex flex-col gap-1.5">
-          <Label htmlFor="degree" className="text-xs">
-            Degree <span className="text-destructive">*</span>
-          </Label>
-          <Select value={degree} onValueChange={(val) => setDegree(val || "")} required>
-            <SelectTrigger id="degree">
-              <SelectValue placeholder="Select degree" />
-            </SelectTrigger>
-            <SelectContent>
-              {availableDegrees.map((deg) => (
-                <SelectItem key={deg} value={deg}>
-                  {deg}
-                </SelectItem>
-              ))}
-            </SelectContent>
-          </Select>
-        </div>
-      </div>
+            <div className="flex flex-col gap-1.5">
+              <Label htmlFor="degree" className="text-xs">
+                Degree <span className="text-destructive">*</span>
+              </Label>
+              <Select value={degree} onValueChange={(val) => setDegree(val || "")} required>
+                <SelectTrigger id="degree">
+                  <SelectValue placeholder="Select degree" />
+                </SelectTrigger>
+                <SelectContent>
+                  {availableDegrees.map((deg) => (
+                    <SelectItem key={deg} value={deg}>
+                      {deg}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          </div>
+        </>
+      )}
 
       <div className="flex flex-col gap-1.5">
         <Label htmlFor="department" className="text-xs">
@@ -195,22 +213,24 @@ export default function OnboardingForm({ initialName, initialRollNumber }: { ini
         </Select>
       </div>
 
-      <div className="flex flex-col gap-1.5">
-        <Label htmlFor="yearOfStudy" className="text-xs">
-          Year of Study <span className="text-destructive">*</span>
-        </Label>
-        <Select value={yearOfStudy} onValueChange={(val) => setYearOfStudy(val || "")} required>
-          <SelectTrigger id="yearOfStudy">
-            <SelectValue placeholder="Select year" />
-          </SelectTrigger>
-          <SelectContent>
-            <SelectItem value="1st Year">1st Year</SelectItem>
-            <SelectItem value="2nd Year">2nd Year</SelectItem>
-            <SelectItem value="3rd Year">3rd Year</SelectItem>
-            <SelectItem value="4th Year">4th Year</SelectItem>
-          </SelectContent>
-        </Select>
-      </div>
+      {!isFaculty && (
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="yearOfStudy" className="text-xs">
+            Year of Study <span className="text-destructive">*</span>
+          </Label>
+          <Select value={yearOfStudy} onValueChange={(val) => setYearOfStudy(val || "")} required>
+            <SelectTrigger id="yearOfStudy">
+              <SelectValue placeholder="Select year" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="1st Year">1st Year</SelectItem>
+              <SelectItem value="2nd Year">2nd Year</SelectItem>
+              <SelectItem value="3rd Year">3rd Year</SelectItem>
+              <SelectItem value="4th Year">4th Year</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      )}
 
       <div className="flex flex-col gap-1.5">
         <Label htmlFor="phoneNumber" className="text-xs">
