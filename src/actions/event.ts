@@ -313,7 +313,12 @@ export async function getEventsAction(
   let events = snapshot.docs.map((doc: any) => {
     const data = doc.data() as any;
     const eventSessions = allSessions.filter((s: any) => s.eventId === doc.id);
-    const regCount = allRegistrations.filter((r: any) => r.eventId === doc.id && r.status === "REGISTERED").length;
+    const regCount = allRegistrations.filter(
+      (r: any) => r.eventId === doc.id && r.status === "REGISTERED" && r.eventRole !== "volunteer"
+    ).length;
+    const volCount = allRegistrations.filter(
+      (r: any) => r.eventId === doc.id && r.status === "REGISTERED" && r.eventRole === "volunteer"
+    ).length;
 
     return {
       ...data,
@@ -327,6 +332,7 @@ export async function getEventsAction(
       })),
       _count: {
         registrations: regCount,
+        volunteers: volCount,
       },
     };
   });

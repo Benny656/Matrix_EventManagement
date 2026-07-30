@@ -10,6 +10,8 @@ import { Download } from "lucide-react";
 import EditRegistrationStatusForm from "@/components/events/edit-registration-status-form";
 import EditCapacityForm from "@/components/events/edit-capacity-form";
 import EditWhatsappLinkForm from "@/components/events/edit-whatsapp-link-form";
+import AdminEventTabs from "@/components/events/admin-event-tabs";
+import { getEventVolunteersAction, getEventRegistrationsForVolunteerAssignmentAction } from "@/actions/volunteer-management";
 
 export const dynamic = "force-dynamic";
 
@@ -56,6 +58,7 @@ export default async function AdminEventDetailsPage({ params }: PageProps) {
       const student = userMap.get(r.studentId) || { name: "Unknown", email: "" };
       return {
         ...r,
+        eventRole: r.eventRole || "participant",
         student: {
           id: r.studentId,
           name: student.name,
@@ -78,9 +81,15 @@ export default async function AdminEventDetailsPage({ params }: PageProps) {
 
   const checkedInStudentIds = new Set(attendances.map((a: any) => a.studentId));
 
-  const confirmedCount = registrations.filter((r: any) => r.status === "REGISTERED").length;
-  const waitlistedCount = registrations.filter((r: any) => r.status === "WAITLISTED").length;
+  const participantRegs = registrations.filter((r: any) => r.eventRole !== "volunteer");
+  const confirmedCount = participantRegs.filter((r: any) => r.status === "REGISTERED").length;
+  const waitlistedCount = participantRegs.filter((r: any) => r.status === "WAITLISTED").length;
   const checkedInCount = checkedInStudentIds.size;
+
+  // Fetch Volunteers and all registrations for volunteer assignment
+  const volunteers = await getEventVolunteersAction(id);
+  const allRegsForVolunteer = await getEventRegistrationsForVolunteerAssignmentAction(id);
+  const volunteerPresentCount = volunteers.filter((v) => v.attendanceStatus === "PRESENT").length;
 
   const sessionsWithCount = sessions.map((s: any) => ({
     ...s,
@@ -124,25 +133,35 @@ export default async function AdminEventDetailsPage({ params }: PageProps) {
       </div>
 
       {/* Metrics Row */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+      <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-4 gap-4">
         <div className="border border-border bg-card p-4">
-          <div className="font-mono text-[10px] text-muted-foreground mb-1 uppercase">Total RSVP</div>
+          <div className="font-mono text-[10px] text-muted-foreground mb-1 uppercase">Participants RSVP</div>
           <div className="font-heading text-2xl font-bold text-foreground">{confirmedCount}</div>
         </div>
         <div className="border border-border bg-card p-4">
-          <div className="font-mono text-[10px] text-muted-foreground mb-1 uppercase">Checked-In</div>
+          <div className="font-mono text-[10px] text-muted-foreground mb-1 uppercase">Assigned Volunteers</div>
+          <div className="font-heading text-2xl font-bold text-primary">{volunteers.length}</div>
+        </div>
+        <div className="border border-border bg-card p-4">
+          <div className="font-mono text-[10px] text-muted-foreground mb-1 uppercase">Participant Check-Ins</div>
           <div className="font-heading text-2xl font-bold text-foreground">{checkedInCount}</div>
         </div>
         <div className="border border-border bg-card p-4">
-          <div className="font-mono text-[10px] text-muted-foreground mb-1 uppercase">Waitlisted</div>
-          <div className="font-heading text-2xl font-bold text-primary">{waitlistedCount}</div>
+          <div className="font-mono text-[10px] text-muted-foreground mb-1 uppercase">Volunteer Attendance</div>
+          <div className="font-heading text-2xl font-bold text-primary">{volunteerPresentCount} / {volunteers.length}</div>
         </div>
       </div>
 
       {/* Main Grid */}
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
         <div className="lg:col-span-8 space-y-6">
-          <AttendeeList registrations={registrations as any} />
+          <AdminEventTabs
+            eventId={event.id}
+            registrations={registrations}
+            volunteers={volunteers}
+            allRegistrationsForVolunteerAssignment={allRegsForVolunteer}
+            isAdmin={true}
+          />
         </div>
 
         <div className="lg:col-span-4 space-y-6">

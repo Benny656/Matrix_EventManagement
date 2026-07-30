@@ -28,11 +28,17 @@ export async function StatsGrid() {
   const attsSnapshot = await adminDb.collection("attendances").get();
   const allAtts = attsSnapshot.docs.map((d: any) => d.data()) as any[];
 
+  const volAttsSnapshot = await adminDb.collection("volunteer_attendances").get();
+  const allVolAtts = volAttsSnapshot.docs.map((d: any) => d.data()) as any[];
+
+  const assignedVolunteersCount = allRegs.filter((r: any) => r.eventRole === "volunteer" && r.status === "REGISTERED").length;
+  const volunteerPresentCount = allVolAtts.filter((va: any) => va.attendanceStatus === "PRESENT").length;
+
   let totalRsvps = 0;
   let totalUniqueCheckedIn = 0;
 
   completedEvents.forEach((evt: any) => {
-    const rsvps = allRegs.filter((r: any) => r.eventId === evt.id && r.status === "REGISTERED").length;
+    const rsvps = allRegs.filter((r: any) => r.eventId === evt.id && r.status === "REGISTERED" && r.eventRole !== "volunteer").length;
     totalRsvps += rsvps;
 
     const eventSessionIds = allSessions.filter((s: any) => s.eventId === evt.id).map((s: any) => s.id);
@@ -78,24 +84,24 @@ export async function StatsGrid() {
       {/* Card 3 */}
       <div className="border border-border bg-card flex flex-col">
         <div className="bg-surface-container px-4 py-2 flex justify-between items-center border-b border-border">
-          <span className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">Attendance Rate</span>
+          <span className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">Participant Attendance</span>
           <ClipboardCheck size={16} className="text-primary" />
         </div>
         <div className="p-4">
           <h2 className="font-mono text-2xl font-bold text-foreground">{attendanceRate}%</h2>
-          <p className="font-mono text-[10px] text-muted-foreground mt-1">For all completed events</p>
+          <p className="font-mono text-[10px] text-muted-foreground mt-1">Completed events rate</p>
         </div>
       </div>
 
       {/* Card 4 */}
       <div className="border border-border bg-card flex flex-col">
         <div className="bg-surface-container px-4 py-2 flex justify-between items-center border-b border-border">
-          <span className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">Total Volunteers</span>
+          <span className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground">Volunteer Attendance</span>
           <Heart size={16} className="text-primary" />
         </div>
         <div className="p-4">
-          <h2 className="font-mono text-2xl font-bold text-foreground">{totalVolunteers}</h2>
-          <p className="font-mono text-[10px] text-muted-foreground mt-1">Authorized staff profiles</p>
+          <h2 className="font-mono text-2xl font-bold text-foreground">{volunteerPresentCount} Present</h2>
+          <p className="font-mono text-[10px] text-muted-foreground mt-1">{assignedVolunteersCount} total event assignments</p>
         </div>
       </div>
     </div>

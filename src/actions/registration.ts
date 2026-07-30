@@ -51,9 +51,11 @@ export async function registerForEventAction(eventId: string) {
   const newStatus = isWaitlist ? "WAITLISTED" : "REGISTERED";
 
   if (existingRegDoc) {
+    const existingData = existingRegDoc.data();
     await existingRegDoc.ref.update({
       status: newStatus,
       participantRole: user.role,
+      eventRole: existingData.eventRole || "participant",
       createdAt: new Date().toISOString(),
     });
   } else {
@@ -62,6 +64,7 @@ export async function registerForEventAction(eventId: string) {
       id: newRef.id,
       studentId: user.id, // Keeping studentId for backward compatibility
       participantRole: user.role,
+      eventRole: "participant",
       eventId: eventId,
       status: newStatus,
       createdAt: new Date().toISOString(),

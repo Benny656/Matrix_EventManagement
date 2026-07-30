@@ -31,6 +31,7 @@ interface EventWithSessions {
   sessions: Session[];
   _count: {
     registrations: number;
+    volunteers?: number;
   };
 }
 
@@ -202,10 +203,15 @@ export default function EventsTable({ initialEvents, role }: EventsTableProps) {
                       </span>
                     </div>
 
-                    {/* Registrations */}
-                    <div className="text-left md:text-right text-foreground font-semibold md:col-span-2 md:pr-2">
-                      <span className="inline md:hidden text-muted-foreground text-[10px] uppercase font-normal mr-1">RSVPs:</span>
-                      {event._count.registrations} / {event.maxParticipants}
+                    {/* Registrations & Volunteers */}
+                    <div className="text-left md:text-right text-foreground font-semibold md:col-span-2 md:pr-2 flex flex-col md:items-end">
+                      <div>
+                        <span className="inline md:hidden text-muted-foreground text-[10px] uppercase font-normal mr-1">RSVPs:</span>
+                        {event._count.registrations} / {event.maxParticipants}
+                      </div>
+                      <span className="text-[10px] text-muted-foreground font-normal block mt-0.5">
+                        Volunteers: {event._count.volunteers ?? 0}
+                      </span>
                     </div>
                   </div>
 
