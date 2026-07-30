@@ -6,7 +6,6 @@ import { usePathname, useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { signOut as firebaseSignOut } from "firebase/auth";
 import { auth } from "@/lib/firebase";
-import { getUnreadNotificationCountAction } from "@/actions/notification";
 
 import ThemeToggle from "@/components/theme-toggle";
 
@@ -14,7 +13,6 @@ import {
   BarChart2,
   CalendarDays,
   Users,
-  BellRing,
   FileText,
   Home,
   CalendarCheck,
@@ -22,7 +20,6 @@ import {
   LogOut,
   Menu,
   X,
-  Bell,
 } from "lucide-react";
 
 interface NavItem {
@@ -44,21 +41,6 @@ export default function DashboardLayout({ user, children }: DashboardLayoutProps
   const pathname = usePathname();
   const router = useRouter();
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
-  const [unreadCount, setUnreadCount] = useState(0);
-
-  React.useEffect(() => {
-    const fetchUnread = async () => {
-      try {
-        const count = await getUnreadNotificationCountAction();
-        setUnreadCount(count);
-      } catch (e) {
-        console.error("Failed to fetch unread count", e);
-      }
-    };
-    fetchUnread();
-    const interval = setInterval(fetchUnread, 30000);
-    return () => clearInterval(interval);
-  }, [pathname]);
 
   const isAuthorized = React.useMemo(() => {
     if (pathname.startsWith("/admin") && user.role !== "ADMIN" && user.role !== "FACULTY_ADMIN") return false;
@@ -108,15 +90,6 @@ export default function DashboardLayout({ user, children }: DashboardLayoutProps
   const navItems = getNavItems();
 
   const roleLabel = ["ADMIN", "FACULTY_ADMIN"].includes(user.role) ? "Admin" : user.role === "VOLUNTEER" ? "Volunteer" : user.role === "FACULTY" ? "Faculty" : "Student";
-
-  const notificationsHref =
-    ["ADMIN", "FACULTY_ADMIN"].includes(user.role)
-      ? "/admin/notifications"
-      : user.role === "VOLUNTEER"
-      ? "/volunteer/notifications"
-      : user.role === "FACULTY"
-      ? "/faculty/notifications"
-      : "/student/notifications";
 
   const handleSignOut = async () => {
     try {
@@ -168,16 +141,6 @@ export default function DashboardLayout({ user, children }: DashboardLayoutProps
                     <Icon size={14} />
                     {item.label}
                   </div>
-                  {isUpdatesTab && unreadCount > 0 && (
-                    <motion.span
-                      initial={{ scale: 0 }}
-                      animate={{ scale: 1 }}
-                      className="bg-primary text-primary-foreground text-[9px] px-1.5 py-0.5 rounded-sm min-w-[18px] text-center"
-                      style={active ? { backgroundColor: "rgba(255,255,255,0.25)" } : {}}
-                    >
-                      {unreadCount > 99 ? "99+" : unreadCount}
-                    </motion.span>
-                  )}
                 </Link>
               </motion.div>
             );
@@ -215,21 +178,6 @@ export default function DashboardLayout({ user, children }: DashboardLayoutProps
 
           <div className="flex items-center gap-1.5">
             <ThemeToggle />
-            
-            <Link
-              href={notificationsHref}
-              className="p-2 text-muted-foreground hover:text-foreground hover:bg-surface-container transition-colors flex items-center relative rounded-sm"
-              aria-label="Notifications"
-            >
-              <Bell size={17} />
-              {unreadCount > 0 && (
-                <motion.span
-                  initial={{ scale: 0 }}
-                  animate={{ scale: 1 }}
-                  className="absolute top-1.5 right-1.5 w-1.5 h-1.5 bg-primary rounded-full"
-                />
-              )}
-            </Link>
 
             <div
               className="w-7 h-7 ml-1 border border-border bg-surface-container-high overflow-hidden rounded-sm flex items-center justify-center select-none"
@@ -304,11 +252,6 @@ export default function DashboardLayout({ user, children }: DashboardLayoutProps
                           <Icon size={14} />
                           {item.label}
                         </div>
-                        {isUpdatesTab && unreadCount > 0 && (
-                          <span className="bg-primary text-primary-foreground text-[9px] px-1.5 py-0.5 rounded-sm">
-                            {unreadCount > 99 ? "99+" : unreadCount}
-                          </span>
-                        )}
                       </Link>
                     );
                   })}

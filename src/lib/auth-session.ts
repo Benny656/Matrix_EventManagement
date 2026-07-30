@@ -10,6 +10,8 @@ export interface UserProfile {
   emailVerified?: boolean;
   image?: string | null;
   rollNumber?: string | null;
+  programType?: "UG" | "PG" | string | null;
+  degree?: string | null;
   department?: string | null;
   yearOfStudy?: string | null;
   onboardingCompleted?: boolean;
@@ -67,6 +69,8 @@ export async function getCurrentUser(): Promise<UserProfile | null> {
       emailVerified: data.emailVerified || false,
       image: data.image || null,
       rollNumber: data.rollNumber || null,
+      programType: data.programType || null,
+      degree: data.degree || null,
       department: data.department || null,
       yearOfStudy: data.yearOfStudy || null,
       onboardingCompleted: data.onboardingCompleted ?? undefined,

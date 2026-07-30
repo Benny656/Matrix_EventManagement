@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import { useRouter } from "next/navigation";
-import { useForm } from "react-hook-form";
+import { useForm, Controller } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import * as z from "zod";
 import { createEventAction } from "@/actions/event";
@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { AlertCircle, MapPin, Trash2 } from "lucide-react";
+import { AlertCircle, MapPin, Trash2, Users } from "lucide-react";
 
 const whatsappInviteLinkSchema = z
   .string()
@@ -32,6 +32,9 @@ const whatsappInviteLinkSchema = z
     }
   );
 
+const YEAR_OPTIONS = ["1st Year", "2nd Year", "3rd Year", "4th Year"] as const;
+type YearOption = (typeof YEAR_OPTIONS)[number];
+
 const basicInfoSchema = z.object({
   title: z.string().min(2, "Event title is required"),
   description: z.string().min(5, "Event description must be at least 5 characters"),
@@ -41,6 +44,9 @@ const basicInfoSchema = z.object({
   maxParticipants: z.coerce.number().min(1, "Capacity must be at least 1"),
   registrationOpen: z.boolean().default(true),
   whatsappInviteLink: whatsappInviteLinkSchema,
+  eligibilityAudience: z.enum(["ALL", "STUDENTS", "FACULTY"]).default("ALL"),
+  eligibilityDegree: z.enum(["UG", "PG", "ALL"]).optional(),
+  eligibilityYears: z.array(z.string()).optional(),
 });
 
 type BasicInfoValues = z.infer<typeof basicInfoSchema>;
@@ -57,6 +63,11 @@ export default function CreateEventWizard({ role }: { role: "ADMIN" | "VOLUNTEER
   const [step, setStep] = useState<1 | 2 | 3>(1);
   const [basicInfo, setBasicInfo] = useState<BasicInfoValues | null>(null);
   const [sessions, setSessions] = useState<SessionItem[]>([]);
+
+  // Eligibility state (controlled separately for multi-checkbox)
+  const [audience, setAudience] = useState<"ALL" | "STUDENTS" | "FACULTY">("ALL");
+  const [degree, setDegree] = useState<"UG" | "PG" | "ALL">("ALL");
+  const [selectedYears, setSelectedYears] = useState<YearOption[]>([]);
   
   // Single Session Form States
   const [sessionTitle, setSessionTitle] = useState("");
@@ -72,17 +83,20 @@ export default function CreateEventWizard({ role }: { role: "ADMIN" | "VOLUNTEER
     register: registerBasic,
     handleSubmit: handleBasicSubmit,
     formState: { errors: basicErrors },
+    watch: watchBasic,
   } = useForm<BasicInfoValues>({
     resolver: zodResolver(basicInfoSchema) as any,
     defaultValues: {
       registrationOpen: true,
       eventDate: "",
+      eligibilityAudience: "ALL",
       ...basicInfo,
     } as any,
   });
 
   const nextStepBasic = (data: BasicInfoValues) => {
     setBasicInfo(data);
+    setAudience(data.eligibilityAudience ?? "ALL");
     setStep(2);
   };
 
@@ -131,8 +145,18 @@ export default function CreateEventWizard({ role }: { role: "ADMIN" | "VOLUNTEER
         ...basicInfo,
         date: earliestDate,
         registrationOpen: basicInfo.registrationOpen,
-        posterUrl: null, // Scoped out for now
+        posterUrl: null,
         coordinatorName: role === "ADMIN" ? "Admin Team" : "Volunteer Coordinator",
+        eligibility: {
+          targetAudience: audience,
+          degree: audience === "STUDENTS" ? degree : undefined,
+          years:
+            audience === "STUDENTS"
+              ? selectedYears.length > 0
+                ? (selectedYears as any)
+                : ["ALL"]
+              : undefined,
+        },
         sessions: sessions.map((s) => ({
           title: s.title,
           venue: s.venue,
@@ -303,6 +327,137 @@ export default function CreateEventWizard({ role }: { role: "ADMIN" | "VOLUNTEER
                   <span className="font-mono text-[10px] text-destructive uppercase mt-1">{basicErrors.whatsappInviteLink.message}</span>
                 )}
               </div>
+            </div>
+
+            {/* ─── Eligibility Section ──────────────────────────────────── */}
+            <div className="border border-border bg-surface-container-low p-4 space-y-4">
+              <div className="flex items-center gap-2 border-b border-border pb-2">
+                <Users size={14} className="text-primary shrink-0" />
+                <h3 className="font-mono text-[11px] font-semibold text-foreground uppercase tracking-widest">
+                  Eligibility
+                </h3>
+              </div>
+
+              {/* Target Audience */}
+              <div className="flex flex-col gap-2">
+                <span className="font-mono text-[10px] text-muted-foreground uppercase tracking-wider">
+                  Target Audience
+                </span>
+                <div className="flex flex-wrap gap-3">
+                  {(["ALL", "STUDENTS", "FACULTY"] as const).map((opt) => (
+                    <label
+                      key={opt}
+                      className={`flex items-center gap-2 px-3 py-2 border cursor-pointer transition-colors font-mono text-xs uppercase tracking-wide ${
+                        audience === opt
+                          ? "bg-primary text-primary-foreground border-primary"
+                          : "bg-background border-border text-muted-foreground hover:border-primary/50"
+                      }`}
+                    >
+                      <input
+                        type="radio"
+                        name="eligibilityAudience"
+                        value={opt}
+                        className="sr-only"
+                        checked={audience === opt}
+                        onChange={() => {
+                          setAudience(opt);
+                          if (opt !== "STUDENTS") {
+                            setDegree("ALL");
+                            setSelectedYears([]);
+                          }
+                        }}
+                      />
+                      {opt === "ALL" ? "All" : opt === "STUDENTS" ? "Students" : "Faculty"}
+                    </label>
+                  ))}
+                </div>
+              </div>
+
+              {/* Student sub-fields */}
+              {audience === "STUDENTS" && (
+                <div className="space-y-4 pl-2 border-l-2 border-primary/30">
+                  {/* Degree */}
+                  <div className="flex flex-col gap-2">
+                    <span className="font-mono text-[10px] text-muted-foreground uppercase tracking-wider">
+                      Degree
+                    </span>
+                    <div className="flex flex-wrap gap-3">
+                      {(["UG", "PG", "ALL"] as const).map((d) => (
+                        <label
+                          key={d}
+                          className={`flex items-center gap-2 px-3 py-2 border cursor-pointer transition-colors font-mono text-xs uppercase tracking-wide ${
+                            degree === d
+                              ? "bg-primary text-primary-foreground border-primary"
+                              : "bg-background border-border text-muted-foreground hover:border-primary/50"
+                          }`}
+                        >
+                          <input
+                            type="radio"
+                            name="eligibilityDegree"
+                            value={d}
+                            className="sr-only"
+                            checked={degree === d}
+                            onChange={() => setDegree(d)}
+                          />
+                          {d === "ALL" ? "All" : d}
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Year(s) */}
+                  <div className="flex flex-col gap-2">
+                    <span className="font-mono text-[10px] text-muted-foreground uppercase tracking-wider">
+                      Year(s)
+                    </span>
+                    <div className="flex flex-wrap gap-3">
+                      {/* All option */}
+                      <label
+                        className={`flex items-center gap-2 px-3 py-2 border cursor-pointer transition-colors font-mono text-xs uppercase tracking-wide ${
+                          selectedYears.length === 0
+                            ? "bg-primary text-primary-foreground border-primary"
+                            : "bg-background border-border text-muted-foreground hover:border-primary/50"
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          className="sr-only"
+                          checked={selectedYears.length === 0}
+                          onChange={() => setSelectedYears([])}
+                        />
+                        All
+                      </label>
+                      {YEAR_OPTIONS.map((yr) => (
+                        <label
+                          key={yr}
+                          className={`flex items-center gap-2 px-3 py-2 border cursor-pointer transition-colors font-mono text-xs uppercase tracking-wide ${
+                            selectedYears.includes(yr)
+                              ? "bg-primary text-primary-foreground border-primary"
+                              : "bg-background border-border text-muted-foreground hover:border-primary/50"
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            className="sr-only"
+                            checked={selectedYears.includes(yr)}
+                            onChange={() =>
+                              setSelectedYears((prev) =>
+                                prev.includes(yr)
+                                  ? prev.filter((y) => y !== yr)
+                                  : [...prev, yr]
+                              )
+                            }
+                          />
+                          {yr}
+                        </label>
+                      ))}
+                    </div>
+                    <p className="font-mono text-[10px] text-muted-foreground">
+                      Select specific years or leave "All" for all years.
+                    </p>
+                  </div>
+                </div>
+              )}
             </div>
 
             {/* Actions */}
@@ -508,6 +663,20 @@ export default function CreateEventWizard({ role }: { role: "ADMIN" | "VOLUNTEER
                   <span className="text-muted-foreground block uppercase">WhatsApp Group Invite Link</span>
                   <span className="font-semibold text-foreground break-all">
                     {basicInfo?.whatsappInviteLink || "None provided"}
+                  </span>
+                </div>
+                <div className="md:col-span-2">
+                  <span className="text-muted-foreground block uppercase">Eligibility</span>
+                  <span className="font-semibold text-foreground">
+                    {audience === "ALL" && "All Users"}
+                    {audience === "FACULTY" && "Faculty Only"}
+                    {audience === "STUDENTS" && (
+                      <>Students — {degree}{" "}
+                        {selectedYears.length === 0
+                          ? "(All Years)"
+                          : `(${selectedYears.join(", ")})`}
+                      </>
+                    )}
                   </span>
                 </div>
               </div>

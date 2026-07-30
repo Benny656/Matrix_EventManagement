@@ -3,6 +3,7 @@
 import { revalidatePath } from "next/cache";
 import { adminDb } from "@/lib/firebase-admin";
 import { getCurrentUser } from "@/lib/auth-session";
+import { isEligible } from "@/lib/eligibility";
 
 async function verifyParticipant() {
   const currentUser = await getCurrentUser();
@@ -21,6 +22,11 @@ export async function registerForEventAction(eventId: string) {
   const event = eventDoc.data() as any;
   if (event.status === "ARCHIVED") {
     throw new Error("Cannot register for an archived event.");
+  }
+
+  // ── Eligibility gate ──────────────────────────────────────────────────────
+  if (!isEligible(event, user)) {
+    throw new Error("You are not eligible to register for this event.");
   }
 
   if (event.registrationOpen === false) {
@@ -61,20 +67,6 @@ export async function registerForEventAction(eventId: string) {
       createdAt: new Date().toISOString(),
     });
   }
-
-  // Create notification
-  const notifRef = adminDb.collection("notifications").doc();
-  await notifRef.set({
-    id: notifRef.id,
-    userId: user.id,
-    type: isWaitlist ? "UPDATE_POSTED" : "REGISTRATION_CONFIRMED",
-    message: isWaitlist
-      ? `You have been added to the waitlist for ${event.title}.`
-      : `Registration confirmed for ${event.title}!`,
-    read: false,
-    linkUrl: `/${user.role.startsWith("FACULTY") ? "faculty" : "student"}/events/${eventId}`,
-    createdAt: new Date().toISOString(),
-  });
 
   revalidatePath("/student");
   revalidatePath(`/student/events/${eventId}`);
@@ -130,17 +122,6 @@ export async function cancelRegistrationAction(eventId: string) {
     if (waitlistedDocs.length > 0) {
       const promotedDoc = waitlistedDocs[0];
       await promotedDoc.ref.update({ status: "REGISTERED" });
-
-      const notifRef = adminDb.collection("notifications").doc();
-      await notifRef.set({
-        id: notifRef.id,
-        userId: promotedDoc.data().studentId,
-        type: "REGISTRATION_CONFIRMED",
-        message: `Good news! You have been promoted from the waitlist and registered for ${eventTitle}.`,
-        read: false,
-        linkUrl: `/${user.role.startsWith("FACULTY") ? "faculty" : "student"}/events/${eventId}`,
-        createdAt: new Date().toISOString(),
-      });
     }
   }
 

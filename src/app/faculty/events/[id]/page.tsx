@@ -2,6 +2,7 @@ import React from "react";
 import { notFound, redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth-session";
 import { adminDb } from "@/lib/firebase-admin";
+import { isEligible } from "@/lib/eligibility";
 import RegisterActionButton from "@/components/events/register-action-button";
 
 export const dynamic = "force-dynamic";
@@ -25,6 +26,11 @@ export default async function FacultyEventDetailsPage({ params }: PageProps) {
   }
 
   const event = { id: eventDoc.id, ...eventDoc.data() } as any;
+
+  // Enforce eligibility — ineligible users see a 404
+  if (!isEligible(event, currentUser)) {
+    notFound();
+  }
 
   const sessionsSnapshot = await adminDb
     .collection("sessions")

@@ -1,11 +1,18 @@
 import React from "react";
+import { redirect } from "next/navigation";
+import { getCurrentUser } from "@/lib/auth-session";
 import { getEventsAction } from "@/actions/event";
 import FacultyEventList from "@/components/events/faculty-event-list";
 
 export const dynamic = "force-dynamic";
 
 export default async function FacultyEventsPage() {
-  const events = await getEventsAction(false);
+  const currentUser = await getCurrentUser();
+  if (!currentUser || (currentUser.role !== "FACULTY" && currentUser.role !== "FACULTY_ADMIN")) {
+    redirect("/login");
+  }
+
+  const events = await getEventsAction(false, currentUser);
 
   return (
     <div className="space-y-6">

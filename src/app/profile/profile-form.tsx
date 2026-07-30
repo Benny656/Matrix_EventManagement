@@ -25,6 +25,7 @@ import {
   CalendarCheck,
   UserCheck,
   Loader2,
+  GraduationCap,
 } from "lucide-react";
 
 const profileSchema = z.object({
@@ -56,6 +57,8 @@ interface ProfileFormProps {
     email: string;
     role: "ADMIN" | "VOLUNTEER" | "STUDENT" | "FACULTY" | "FACULTY_ADMIN";
     rollNumber: string | null;
+    programType?: string | null;
+    degree?: string | null;
     phoneNumber: string;
   };
   stats: { label: string; value: number }[];
@@ -193,6 +196,20 @@ export default function ProfileForm({ user, stats }: ProfileFormProps) {
                 <span className="truncate">{user.email}</span>
               </div>
             </div>
+
+            {user.degree && (
+              <div className="flex flex-col gap-1">
+                <span className="font-mono text-[9px] text-[#747686] uppercase tracking-widest">
+                  Degree & Program
+                </span>
+                <div className="flex items-center gap-2 text-foreground font-mono bg-background/30 px-2.5 py-1.5 rounded-md border border-border/30 select-all">
+                  <GraduationCap size={13} className="text-muted-foreground shrink-0" />
+                  <span>
+                    {user.degree} {user.programType ? `(${user.programType})` : ""}
+                  </span>
+                </div>
+              </div>
+            )}
 
             {user.rollNumber && (
               <div className="flex flex-col gap-1">

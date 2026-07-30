@@ -149,6 +149,43 @@ export default async function AdminEventDetailsPage({ params }: PageProps) {
           <EditRegistrationStatusForm eventId={event.id} initialRegistrationOpen={event.registrationOpen ?? true} />
           <EditCapacityForm eventId={event.id} initialCapacity={event.maxParticipants} />
           <EditWhatsappLinkForm eventId={event.id} initialWhatsappInviteLink={event.whatsappInviteLink || null} />
+
+          {/* Eligibility Panel */}
+          <div className="border border-border p-6 bg-card space-y-4">
+            <h3 className="font-mono text-xs uppercase tracking-widest text-muted-foreground border-b border-border pb-1 font-semibold">
+              Audience Eligibility
+            </h3>
+            <div className="space-y-3 font-mono text-xs">
+              {(() => {
+                const elig = event.eligibility;
+                const audience: string = elig?.targetAudience ?? "ALL";
+                return (
+                  <>
+                    <div className="flex justify-between border-b border-dashed border-border pb-2">
+                      <span className="text-muted-foreground">Target Audience:</span>
+                      <span className="font-semibold text-foreground uppercase">{audience}</span>
+                    </div>
+                    {audience === "STUDENTS" && (
+                      <>
+                        <div className="flex justify-between border-b border-dashed border-border pb-2">
+                          <span className="text-muted-foreground">Degree:</span>
+                          <span className="font-semibold text-foreground">{elig?.degree ?? "ALL"}</span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Year(s):</span>
+                          <span className="font-semibold text-foreground text-right">
+                            {elig?.years && elig.years.length > 0
+                              ? elig.years.join(", ")
+                              : "All"}
+                          </span>
+                        </div>
+                      </>
+                    )}
+                  </>
+                );
+              })()}
+            </div>
+          </div>
           
           <div className="border border-border p-6 bg-card space-y-6">
             <h3 className="font-mono text-xs uppercase tracking-widest text-muted-foreground border-b border-border pb-1 font-semibold">

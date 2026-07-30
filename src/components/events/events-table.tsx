@@ -2,11 +2,11 @@
 
 import React, { useState, useTransition } from "react";
 import Link from "next/link";
-import { archiveEventAction } from "@/actions/event";
+import { archiveEventAction, updateEventRegistrationStatusAction } from "@/actions/event";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Search, AlertCircle, Pencil, Archive } from "lucide-react";
+import { Search, AlertCircle, Pencil, Archive, Lock, Unlock } from "lucide-react";
 
 interface Session {
   id: string;
@@ -63,6 +63,23 @@ export default function EventsTable({ initialEvents, role }: EventsTableProps) {
         }
       } catch (err: any) {
         setError(err.message || "Failed to archive event");
+      }
+    });
+  };
+
+  const handleToggleRegistration = async (id: string, currentOpen: boolean) => {
+    setError(null);
+    startTransition(async () => {
+      try {
+        const nextState = !currentOpen;
+        const res = await updateEventRegistrationStatusAction(id, nextState);
+        if (res.success) {
+          setEvents((prev) =>
+            prev.map((e) => (e.id === id ? { ...e, registrationOpen: nextState } : e))
+          );
+        }
+      } catch (err: any) {
+        setError(err.message || "Failed to toggle registration status");
       }
     });
   };
@@ -135,11 +152,11 @@ export default function EventsTable({ initialEvents, role }: EventsTableProps) {
       <div className="border border-border bg-card">
         {/* Table Header */}
         <div className="hidden md:grid grid-cols-12 border-b border-border bg-surface-container px-4 py-3 font-mono text-[10px] uppercase tracking-wider text-muted-foreground font-bold">
-          <div className="col-span-5">Event Title</div>
+          <div className="col-span-4">Event Title</div>
           <div className="col-span-2">Date</div>
           <div className="col-span-2">Status</div>
           <div className="col-span-2 text-right">Registrations</div>
-          <div className="col-span-1 text-right">Actions</div>
+          <div className="col-span-2 text-right">Actions</div>
         </div>
 
         {/* Table Rows */}
@@ -159,7 +176,7 @@ export default function EventsTable({ initialEvents, role }: EventsTableProps) {
               return (
                 <div key={event.id} className="flex flex-col md:grid md:grid-cols-12 gap-3 md:gap-2 px-4 py-4 font-mono text-xs items-stretch md:items-center hover:bg-surface-container-low/50 border-b border-border last:border-b-0 md:border-b-0">
                   {/* Title & Category */}
-                  <div className="md:col-span-5 pr-4 flex flex-col">
+                  <div className="md:col-span-4 pr-4 flex flex-col">
                     <span className="text-[10px] text-primary uppercase font-bold tracking-widest">{event.category}</span>
                     <h4 className="font-sans text-sm font-bold text-foreground mt-0.5 line-clamp-2">{event.title}</h4>
                     <span className="text-muted-foreground text-[10px] block mt-0.5">Location: {event.venue}</span>
@@ -193,7 +210,32 @@ export default function EventsTable({ initialEvents, role }: EventsTableProps) {
                   </div>
 
                   {/* Actions */}
-                  <div className="md:col-span-1 text-right flex items-center justify-end gap-3 pt-2 border-t border-border/45 md:border-t-0 md:pt-0">
+                  <div className="md:col-span-2 text-right flex items-center justify-end gap-2.5 pt-2 border-t border-border/45 md:border-t-0 md:pt-0">
+                    {role === "ADMIN" && event.status !== "ARCHIVED" && (
+                      <button
+                        onClick={() => handleToggleRegistration(event.id, event.registrationOpen)}
+                        disabled={isPending}
+                        className={`px-2 py-1 font-mono text-[9px] uppercase font-bold border transition-all cursor-pointer active:scale-95 disabled:opacity-50 flex items-center gap-1 ${
+                          event.registrationOpen
+                            ? "bg-primary/10 text-primary border-primary/30 hover:bg-destructive/10 hover:text-destructive hover:border-destructive/30"
+                            : "bg-destructive/10 text-destructive border-destructive/30 hover:bg-primary/10 hover:text-primary hover:border-primary/30"
+                        }`}
+                        title={event.registrationOpen ? "Click to Close Registration" : "Click to Open Registration"}
+                      >
+                        {event.registrationOpen ? (
+                          <>
+                            <Unlock size={10} />
+                            <span>REG: OPEN</span>
+                          </>
+                        ) : (
+                          <>
+                            <Lock size={10} />
+                            <span>REG: CLOSED</span>
+                          </>
+                        )}
+                      </button>
+                    )}
+
                     <Link
                       href={role === "ADMIN" ? `/admin/events/${event.id}` : `/volunteer/events/${event.id}`}
                       className="flex-1 md:flex-none py-2.5 md:p-1 border border-border md:border-none hover:text-primary hover:bg-surface-container md:hover:bg-transparent transition-colors flex items-center justify-center gap-1.5 md:gap-0 font-mono text-[10px] md:text-xs uppercase h-10 md:h-auto min-h-[40px] md:min-h-0"

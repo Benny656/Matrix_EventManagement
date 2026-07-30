@@ -9,15 +9,33 @@ import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { completeOnboardingAction } from "@/actions/onboarding";
 
+const UG_DEGREES = ["B.Tech", "B.Sc", "BCA", "B.Com", "BBA", "B.A"];
+const PG_DEGREES = ["M.Tech", "M.Sc", "MCA", "MBA", "M.A", "Ph.D"];
+
 export default function OnboardingForm({ initialName, initialRollNumber }: { initialName: string, initialRollNumber: string }) {
   const router = useRouter();
   const [name, setName] = useState(initialName || "");
   const [rollNumber, setRollNumber] = useState(initialRollNumber || "");
+  const [programType, setProgramType] = useState<"UG" | "PG">("UG");
+  const [degree, setDegree] = useState("");
   const [department, setDepartment] = useState("");
   const [yearOfStudy, setYearOfStudy] = useState("");
   const [phoneNumber, setPhoneNumber] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [loading, setLoading] = useState(false);
+
+  const availableDegrees = programType === "UG" ? UG_DEGREES : PG_DEGREES;
+
+  const handleProgramTypeChange = (val: string | null) => {
+    if (!val) return;
+    const newType = val as "UG" | "PG";
+    setProgramType(newType);
+    // Reset degree if current degree is not valid for new program type
+    const newAvailable = newType === "UG" ? UG_DEGREES : PG_DEGREES;
+    if (!newAvailable.includes(degree)) {
+      setDegree("");
+    }
+  };
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -31,6 +49,14 @@ export default function OnboardingForm({ initialName, initialRollNumber }: { ini
     const trimmedRoll = rollNumber.trim().toUpperCase();
     if (!trimmedRoll) {
       setError("Roll Number is required.");
+      return;
+    }
+    if (!programType) {
+      setError("Please select Program Level (UG or PG).");
+      return;
+    }
+    if (!degree) {
+      setError("Please select your degree.");
       return;
     }
     if (!department) {
@@ -58,6 +84,8 @@ export default function OnboardingForm({ initialName, initialRollNumber }: { ini
       const res = await completeOnboardingAction({
         name: trimmedName,
         rollNumber: trimmedRoll,
+        programType,
+        degree,
         department,
         yearOfStudy,
         phoneNumber: cleanedPhone,
@@ -115,6 +143,41 @@ export default function OnboardingForm({ initialName, initialRollNumber }: { ini
           placeholder="e.g. URK25CS7102"
           required
         />
+      </div>
+
+      <div className="grid grid-cols-2 gap-3">
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="programType" className="text-xs">
+            Program Level <span className="text-destructive">*</span>
+          </Label>
+          <Select value={programType} onValueChange={handleProgramTypeChange} required>
+            <SelectTrigger id="programType">
+              <SelectValue placeholder="Select level" />
+            </SelectTrigger>
+            <SelectContent>
+              <SelectItem value="UG">UG (Undergraduate)</SelectItem>
+              <SelectItem value="PG">PG (Postgraduate)</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+
+        <div className="flex flex-col gap-1.5">
+          <Label htmlFor="degree" className="text-xs">
+            Degree <span className="text-destructive">*</span>
+          </Label>
+          <Select value={degree} onValueChange={(val) => setDegree(val || "")} required>
+            <SelectTrigger id="degree">
+              <SelectValue placeholder="Select degree" />
+            </SelectTrigger>
+            <SelectContent>
+              {availableDegrees.map((deg) => (
+                <SelectItem key={deg} value={deg}>
+                  {deg}
+                </SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
       </div>
 
       <div className="flex flex-col gap-1.5">

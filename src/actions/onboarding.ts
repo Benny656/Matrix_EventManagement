@@ -4,19 +4,35 @@ import { adminDb } from "@/lib/firebase-admin";
 import { getCurrentUser } from "@/lib/auth-session";
 import { revalidatePath } from "next/cache";
 
-export async function completeOnboardingAction(data: { name: string; rollNumber: string; department: string; yearOfStudy: string; phoneNumber: string }) {
+export async function completeOnboardingAction(data: {
+  name: string;
+  rollNumber: string;
+  programType: string;
+  degree: string;
+  department: string;
+  yearOfStudy: string;
+  phoneNumber: string;
+}) {
   try {
     const user = await getCurrentUser();
     if (!user) {
       return { status: "error", message: "Unauthorized. Please log in again." };
     }
 
-    const { name, rollNumber, department, yearOfStudy, phoneNumber } = data;
+    const { name, rollNumber, programType, degree, department, yearOfStudy, phoneNumber } = data;
 
     if (!name || !name.trim()) return { status: "error", message: "Name is required." };
     
     const trimmedRollNumber = rollNumber?.trim().toUpperCase();
     if (!trimmedRollNumber) return { status: "error", message: "Roll Number is required." };
+
+    if (!programType || !["UG", "PG"].includes(programType)) {
+      return { status: "error", message: "Please select your Program Level (UG or PG)." };
+    }
+
+    if (!degree || !degree.trim()) {
+      return { status: "error", message: "Please select your degree." };
+    }
 
     if (!department || !["AI", "AIML"].includes(department)) return { status: "error", message: "Invalid department." };
     if (!yearOfStudy || !["1st Year", "2nd Year", "3rd Year", "4th Year"].includes(yearOfStudy)) return { status: "error", message: "Invalid year of study." };
@@ -41,6 +57,8 @@ export async function completeOnboardingAction(data: { name: string; rollNumber:
     await adminDb.collection("users").doc(user.id).update({
       name: name.trim(),
       rollNumber: trimmedRollNumber,
+      programType,
+      degree: degree.trim(),
       department,
       yearOfStudy,
       phoneNumber: cleanedPhone,

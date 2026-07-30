@@ -75,6 +75,8 @@ export default async function ProfilePage() {
             email: currentUser.email,
             role: currentUser.role,
             rollNumber: currentUser.rollNumber || null,
+            programType: currentUser.programType || null,
+            degree: currentUser.degree || null,
             phoneNumber: currentUser.phoneNumber || "",
           }}
           stats={stats}

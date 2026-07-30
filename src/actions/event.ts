@@ -3,6 +3,8 @@
 import { revalidatePath } from "next/cache";
 import { adminDb } from "@/lib/firebase-admin";
 import { getCurrentUser } from "@/lib/auth-session";
+import { isEligible } from "@/lib/eligibility";
+import type { UserProfile } from "@/lib/auth-session";
 import * as z from "zod";
 
 const sessionSchema = z.object({
@@ -31,6 +33,15 @@ const whatsappInviteLinkSchema = z
     }
   );
 
+const eligibilitySchema = z.object({
+  targetAudience: z.enum(["ALL", "STUDENTS", "FACULTY"]).default("ALL"),
+  degree: z.enum(["UG", "PG", "ALL"]).optional().nullable(),
+  years: z
+    .array(z.enum(["1st Year", "2nd Year", "3rd Year", "4th Year", "ALL"]))
+    .optional()
+    .nullable(),
+});
+
 const eventSchema = z.object({
   title: z.string().min(2, "Event title is required"),
   description: z.string().min(5, "Event description must be at least 5 characters"),
@@ -42,6 +53,7 @@ const eventSchema = z.object({
   category: z.string().min(2, "Category is required"),
   coordinatorName: z.string().min(2, "Coordinator name is required"),
   whatsappInviteLink: whatsappInviteLinkSchema,
+  eligibility: eligibilitySchema.optional().default({ targetAudience: "ALL" }),
   sessions: z.array(sessionSchema).optional().default([]),
 });
 
@@ -78,6 +90,19 @@ export async function createEventAction(input: EventInput) {
 
   const batch = adminDb.batch();
 
+  const eligibility = validated.eligibility ?? { targetAudience: "ALL" as const };
+  // Normalise: clear degree/years when not targeting students
+  const eligibilityToStore = {
+    targetAudience: eligibility.targetAudience,
+    degree: eligibility.targetAudience === "STUDENTS" ? (eligibility.degree ?? "ALL") : null,
+    years:
+      eligibility.targetAudience === "STUDENTS"
+        ? eligibility.years && eligibility.years.length > 0
+          ? eligibility.years
+          : ["ALL"]
+        : null,
+  };
+
   batch.set(eventRef, {
     id: eventId,
     title: validated.title,
@@ -90,6 +115,7 @@ export async function createEventAction(input: EventInput) {
     category: validated.category,
     coordinatorName: validated.coordinatorName,
     whatsappInviteLink: validated.whatsappInviteLink ? validated.whatsappInviteLink.trim() : null,
+    eligibility: eligibilityToStore,
     createdById: user.id,
     status: "UPCOMING",
     archivedAt: null,
@@ -103,31 +129,6 @@ export async function createEventAction(input: EventInput) {
 
   await batch.commit();
 
-  // Create notifications for users
-  try {
-    const usersSnapshot = await adminDb.collection("users").get();
-    const registrationStr = validated.registrationOpen
-      ? " Registration is open."
-      : " Registration is currently closed.";
-
-    const notifBatch = adminDb.batch();
-    usersSnapshot.docs.forEach((uDoc) => {
-      const nRef = adminDb.collection("notifications").doc();
-      notifBatch.set(nRef, {
-        id: nRef.id,
-        userId: uDoc.id,
-        type: "NEW_EVENT",
-        message: `New event published: ${validated.title}.${registrationStr}`,
-        read: false,
-        linkUrl: `/student/events/${eventId}`,
-        createdAt: new Date().toISOString(),
-      });
-    });
-    await notifBatch.commit();
-  } catch (err) {
-    console.error("Failed to create new event notifications:", err);
-  }
-
   revalidatePath("/student");
   revalidatePath("/volunteer");
   revalidatePath("/admin");
@@ -140,6 +141,18 @@ export async function updateEventAction(id: string, input: Omit<EventInput, "ses
   const baseSchema = eventSchema.omit({ sessions: true });
   const validated = baseSchema.parse(input);
 
+  const eligibility = validated.eligibility ?? { targetAudience: "ALL" as const };
+  const eligibilityToStore = {
+    targetAudience: eligibility.targetAudience,
+    degree: eligibility.targetAudience === "STUDENTS" ? (eligibility.degree ?? "ALL") : null,
+    years:
+      eligibility.targetAudience === "STUDENTS"
+        ? eligibility.years && eligibility.years.length > 0
+          ? eligibility.years
+          : ["ALL"]
+        : null,
+  };
+
   await adminDb.collection("events").doc(id).update({
     title: validated.title,
     description: validated.description,
@@ -151,6 +164,7 @@ export async function updateEventAction(id: string, input: Omit<EventInput, "ses
     category: validated.category,
     coordinatorName: validated.coordinatorName,
     whatsappInviteLink: validated.whatsappInviteLink ? validated.whatsappInviteLink.trim() : null,
+    eligibility: eligibilityToStore,
     updatedAt: new Date().toISOString(),
   });
 
@@ -250,16 +264,6 @@ export async function updateEventCapacityAction(id: string, maxParticipants: num
       const batch = adminDb.batch();
       promoted.forEach((rDoc) => {
         batch.update(rDoc.ref, { status: "REGISTERED" });
-        const nRef = adminDb.collection("notifications").doc();
-        batch.set(nRef, {
-          id: nRef.id,
-          userId: rDoc.data().studentId,
-          type: "REGISTRATION_CONFIRMED",
-          message: `Good news! You have been promoted from the waitlist and registered for ${eventData.title}.`,
-          read: false,
-          linkUrl: `/student/events/${id}`,
-          createdAt: new Date().toISOString(),
-        });
       });
       await batch.commit();
     }
@@ -291,7 +295,10 @@ export async function archiveEventAction(id: string) {
   return { success: true };
 }
 
-export async function getEventsAction(includeArchived = false) {
+export async function getEventsAction(
+  includeArchived = false,
+  requestingUser?: UserProfile | null
+) {
   let query = adminDb.collection("events");
 
   const snapshot = await query.get();
@@ -326,6 +333,11 @@ export async function getEventsAction(includeArchived = false) {
 
   if (!includeArchived) {
     events = events.filter((e: any) => e.status !== "ARCHIVED");
+  }
+
+  // Apply eligibility filter when a requesting user is provided
+  if (requestingUser) {
+    events = events.filter((e: any) => isEligible(e, requestingUser));
   }
 
   // Dynamically update status based on current time
