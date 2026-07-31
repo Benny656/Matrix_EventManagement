@@ -271,9 +271,18 @@ export default async function Home() {
             <span className="font-mono text-[9px] uppercase tracking-widest text-muted-foreground">Matrix · AIML</span>
             <span className="font-mono text-[9px] text-muted-foreground">© {new Date().getFullYear()} Karunya Institute of Technology and Sciences</span>
           </div>
-          <div className="flex gap-5">
-            <a className="font-mono text-[9px] text-muted-foreground hover:text-primary transition-colors" href="#">Privacy</a>
-            <a className="font-mono text-[9px] text-muted-foreground hover:text-primary transition-colors" href="#">Terms</a>
+          <div className="flex items-center gap-1.5 font-mono text-[9px] text-muted-foreground">
+            <span>Developed by</span>
+            <span className="font-semibold text-foreground">Benny Manuel</span>
+            <a
+              href="https://www.linkedin.com/in/benman656"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-primary hover:text-primary/80 transition-colors inline-flex items-center ml-0.5"
+              aria-label="Benny Manuel LinkedIn Profile"
+            >
+              <LinkedInIcon size={13} className="shrink-0" />
+            </a>
           </div>
         </div>
       </footer>

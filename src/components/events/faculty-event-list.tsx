@@ -8,7 +8,7 @@ import { Search, CalendarDays, MapPin } from "lucide-react";
 interface Session {
   id: string;
   startTime: Date;
-  endTime: Date;
+  endTime?: Date | null;
 }
 
 interface EventWithCount {
@@ -18,7 +18,7 @@ interface EventWithCount {
   venue: string;
   date: Date;
   registrationOpen: boolean;
-  maxParticipants: number;
+  maxParticipants?: number | null;
   category: string;
   status: "UPCOMING" | "ONGOING" | "COMPLETED" | "ARCHIVED";
   sessions: Session[];
@@ -81,7 +81,7 @@ export default function FacultyEventList({ events }: { events: EventWithCount[] 
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filtered.map((event) => {
-            const isFull = event._count.registrations >= event.maxParticipants;
+            const isFull = event.maxParticipants ? event._count.registrations >= event.maxParticipants : false;
             const isOpen = event.registrationOpen;
             const dateStr = new Date(event.date).toLocaleDateString("en-US", {
               month: "short",
@@ -122,7 +122,7 @@ export default function FacultyEventList({ events }: { events: EventWithCount[] 
                     <div className="flex items-center justify-between mt-2 pt-2 border-t border-dashed border-border">
                       <span>CAPACITY:</span>
                       <span className={isFull ? "text-primary font-bold" : "text-foreground font-semibold"}>
-                        {event._count.registrations} / {event.maxParticipants} {isFull && "(WAITLIST)"}
+                        {event.maxParticipants ? `${event._count.registrations} / ${event.maxParticipants} ${isFull ? "(WAITLIST)" : ""}` : `${event._count.registrations} (UNLIMITED)`}
                       </span>
                     </div>
                   </div>

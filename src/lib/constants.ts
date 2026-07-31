@@ -4,3 +4,8 @@ export const MATRIX_SOCIALS = {
   github: "https://github.com/matrix-aiml-karunya",
   email: "mailto:matrix@karunya.edu.in",
 };
+
+export const HARDCODED_ADMIN_EMAILS = [
+  "matrixkarunya@gmail.com",
+  "bennymanuel2020@gmail.com",
+];

@@ -20,6 +20,10 @@ import {
   ScanLine,
   ChevronDown,
   RefreshCw,
+  Camera,
+  Keyboard,
+  Search,
+  Loader2,
 } from "lucide-react";
 
 // ──────────────────────────────────────────────────────────────────────────────
@@ -98,7 +102,7 @@ export default function AttendanceScanner({ sessions }: AttendanceScannerProps) 
   const [selectedSessionId, setSelectedSessionId] = useState(sessions[0]?.id || "");
   const [manualRollNumber, setManualRollNumber] = useState("");
   const [isPending, startTransition] = useTransition();
-  const [showManual, setShowManual] = useState(false);
+  const [activeTab, setActiveTab] = useState<"SCANNER" | "MANUAL">("SCANNER");
   const [checkedInCount, setCheckedInCount] = useState(0);
   const [registeredStudents, setRegisteredStudents] = useState<
     { id: string; name: string; rollNumber: string | null }[]
@@ -152,7 +156,7 @@ export default function AttendanceScanner({ sessions }: AttendanceScannerProps) 
 
   // ── Camera + Barcode Scanning loop ─────────────────────────────────────────
   useEffect(() => {
-    if (!selectedSessionId) return;
+    if (!selectedSessionId || activeTab !== "SCANNER") return;
 
     let isMounted = true;
 
@@ -460,7 +464,7 @@ export default function AttendanceScanner({ sessions }: AttendanceScannerProps) 
 
       setScannerReady(false);
     };
-  }, [selectedSessionId, activeDeviceId]); // eslint-disable-line react-hooks/exhaustive-deps // eslint-disable-line react-hooks/exhaustive-deps
+  }, [selectedSessionId, activeDeviceId, activeTab]);
 
   // ── Switch Camera ──────────────────────────────────────────────────────────
   const switchCamera = () => {
@@ -610,150 +614,94 @@ export default function AttendanceScanner({ sessions }: AttendanceScannerProps) 
 
   // ── Render ────────────────────────────────────────────────────────────────
   return (
-    <div className="flex flex-col gap-4 max-w-2xl mx-auto w-full pb-12">
-
-
-
-      {/* ── Top status bar ────────────────────────────────────────────────── */}
-      <div className="flex items-center justify-between border border-border bg-card px-4 py-3">
-        <div className="min-w-0">
-          <p className="font-mono text-[10px] text-muted-foreground uppercase tracking-widest">Active Session</p>
-          <p className="font-sans text-sm font-bold text-foreground truncate mt-0.5">
-            {selectedSession
-              ? `${selectedSession.event.title} — ${selectedSession.title}`
-              : "No session selected"}
-          </p>
-        </div>
-        <div className="text-right ml-4 shrink-0">
-          <p className="font-mono text-[10px] text-muted-foreground uppercase tracking-widest">Checked In</p>
-          <p className="font-heading text-2xl font-bold text-primary leading-none mt-0.5">
-            {checkedInCount}
-          </p>
-        </div>
-      </div>
-
-      {/* ── Camera viewfinder ──────────────────────────────────────────────── */}
-      <div className="relative w-full bg-black overflow-hidden" style={{ aspectRatio: "1 / 1" }}>
-
-        {/* Live video — html5-qrcode will mount inside here */}
-        <div id="reader-container" className="absolute inset-0 w-full h-full object-cover [&>video]:object-cover [&>video]:w-full [&>video]:h-full border-none outline-none" />
-
-
-
-        {/* Camera switch toggle — only rendered when multiple cameras are found */}
-        {devices.length > 1 && scannerReady && (
-          <button
-            onClick={switchCamera}
-            aria-label="Switch camera"
-            className="absolute top-3 left-3 z-20 p-2 rounded-full bg-black/50 text-white hover:bg-black/70 transition-colors active:scale-95"
-          >
-            <RefreshCw size={20} />
-          </button>
-        )}
-
-        {/* Scan-frame overlay — purely visual guidance over the live feed */}
-        {scannerReady && (
-          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-            {/* Dimmed surround */}
-            <div className="absolute inset-0 bg-black/35" />
-
-            {/* Transparent cutout with corner brackets */}
-            <div
-              className="relative z-10"
-              style={{ width: "min(62vw, 240px)", height: "min(62vw, 240px)" }}
+    <div className="flex flex-col gap-4 max-w-lg mx-auto w-full pb-10 px-1 sm:px-0">
+      {/* ── 1. Compact Session & Checked-in Count Header ───────────────────── */}
+      <div className="border border-border bg-card p-3 shadow-sm">
+        <div className="flex items-center justify-between gap-2">
+          <div className="flex-1 min-w-0 flex items-center gap-2">
+            <select
+              id="session-select"
+              value={selectedSessionId}
+              onChange={(e) => setSelectedSessionId(e.target.value)}
+              className="w-full bg-transparent border-none text-foreground font-sans text-sm font-bold focus:outline-none uppercase tracking-tight truncate cursor-pointer py-1"
             >
-              {/* Corner ticks */}
-              <span className="absolute -top-[2px] -left-[2px] w-6 h-6 border-t-[3px] border-l-[3px] border-primary" />
-              <span className="absolute -top-[2px] -right-[2px] w-6 h-6 border-t-[3px] border-r-[3px] border-primary" />
-              <span className="absolute -bottom-[2px] -left-[2px] w-6 h-6 border-b-[3px] border-l-[3px] border-primary" />
-              <span className="absolute -bottom-[2px] -right-[2px] w-6 h-6 border-b-[3px] border-r-[3px] border-primary" />
-
-              {/* Animated scan line — CSS keyframe defined in globals.css */}
-              <span
-                className="absolute left-0 right-0 h-[2px] bg-primary/80"
-                style={{ animation: "scanline 1.8s ease-in-out infinite" }}
-              />
-            </div>
-
-            <p className="absolute bottom-5 left-0 right-0 text-center font-mono text-[11px] text-white/65 uppercase tracking-widest">
-              Point camera at student ID barcode or QR
-            </p>
+              {sessions.length === 0 ? (
+                <option value="">No Active Sessions Available</option>
+              ) : (
+                sessions.map((s) => (
+                  <option key={s.id} value={s.id}>
+                    {s.event.title} — {s.title}
+                  </option>
+                ))
+              )}
+            </select>
           </div>
-        )}
-
-        {/* Loading state */}
-        {!scannerReady && !cameraError && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/80">
-            <ScanLine size={32} className="text-primary animate-pulse" />
-            <p className="font-mono text-xs text-white/60 uppercase tracking-widest">
-              Starting camera…
-            </p>
+          <div className="shrink-0 bg-primary/10 border border-primary/20 px-2.5 py-1 flex items-center gap-1.5">
+            <span className="font-mono text-[10px] text-primary uppercase font-bold tracking-wider">Checked In:</span>
+            <span className="font-heading text-sm font-bold text-primary">{checkedInCount}</span>
           </div>
-        )}
-
-        {/* Error state */}
-        {cameraError && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/90 px-8 text-center">
-            <AlertCircle size={28} className="text-destructive" />
-            <p className="font-mono text-xs text-white/80 uppercase tracking-widest">
-              {cameraError}
-            </p>
-          </div>
-        )}
+        </div>
       </div>
 
-      {/* ── Session selector ──────────────────────────────────────────────── */}
-      <div className="border border-border bg-card px-4 py-3 flex items-center gap-3">
-        <ChevronDown size={14} className="text-muted-foreground shrink-0" />
-        <select
-          id="session-select"
-          value={selectedSessionId}
-          onChange={(e) => setSelectedSessionId(e.target.value)}
-          className="flex-1 bg-transparent border-none text-foreground font-mono text-xs focus:outline-none uppercase tracking-wider"
+      {/* ── 2. Top Segmented Mode Tabs ───────────────────────────────────────── */}
+      <div className="grid grid-cols-2 gap-1.5 border border-border bg-card p-1.5 shadow-sm">
+        <button
+          type="button"
+          onClick={() => setActiveTab("SCANNER")}
+          className={`flex items-center justify-center gap-2 font-mono text-xs uppercase tracking-wider transition-all h-12 rounded-none cursor-pointer ${
+            activeTab === "SCANNER"
+              ? "bg-primary text-primary-foreground font-bold shadow-none"
+              : "text-muted-foreground hover:text-foreground hover:bg-surface-container"
+          }`}
         >
-          {sessions.length === 0 ? (
-            <option value="">No Active Sessions Available</option>
-          ) : (
-            sessions.map((s) => (
-              <option key={s.id} value={s.id}>
-                {s.event.title} — {s.title}
-              </option>
-            ))
-          )}
-        </select>
+          <Camera size={18} />
+          <span>Camera Scanner</span>
+        </button>
+        <button
+          type="button"
+          onClick={() => setActiveTab("MANUAL")}
+          className={`flex items-center justify-center gap-2 font-mono text-xs uppercase tracking-wider transition-all h-12 rounded-none cursor-pointer ${
+            activeTab === "MANUAL"
+              ? "bg-primary text-primary-foreground font-bold shadow-none"
+              : "text-muted-foreground hover:text-foreground hover:bg-surface-container"
+          }`}
+        >
+          <Keyboard size={18} />
+          <span>Manual Entry</span>
+        </button>
       </div>
 
-      {/* ── Scan result alert ─────────────────────────────────────────────── */}
+      {/* ── 3. Scan Result Alert Notification ──────────────────────────────── */}
       {optimisticScanResult && (
-        <div>
+        <div className="animate-in fade-in slide-in-from-top-2 duration-200">
           {optimisticScanResult.type === "SUCCESS" && (
-            <Alert className="rounded-none border-tertiary bg-tertiary/5 text-tertiary font-mono text-xs uppercase">
-              <CheckCircle2 size={14} className="mr-2 shrink-0" />
+            <Alert className="rounded-none border-tertiary bg-tertiary/10 text-tertiary font-mono text-xs uppercase p-4 shadow-sm">
+              <CheckCircle2 size={18} className="mr-2 shrink-0 text-tertiary" />
               <div>
                 <AlertTitle className="font-bold tracking-wide">CHECK-IN CONFIRMED</AlertTitle>
-                <AlertDescription className="mt-1">{optimisticScanResult.message}</AlertDescription>
+                <AlertDescription className="mt-1 text-xs">{optimisticScanResult.message}</AlertDescription>
               </div>
             </Alert>
           )}
           {optimisticScanResult.type === "ERROR" && (
-            <Alert variant="destructive" className="rounded-none border-destructive bg-destructive/5 text-destructive font-mono text-xs uppercase">
-              <AlertCircle size={14} className="mr-2 shrink-0" />
+            <Alert variant="destructive" className="rounded-none border-destructive bg-destructive/10 text-destructive font-mono text-xs uppercase p-4 shadow-sm">
+              <AlertCircle size={18} className="mr-2 shrink-0 text-destructive" />
               <div>
                 <AlertTitle className="font-bold tracking-wide">ACCESS DENIED</AlertTitle>
-                <AlertDescription className="mt-1">{optimisticScanResult.message}</AlertDescription>
+                <AlertDescription className="mt-1 text-xs">{optimisticScanResult.message}</AlertDescription>
               </div>
             </Alert>
           )}
           {optimisticScanResult.type === "WARNING" && (
-            <Alert className="rounded-none border-primary bg-primary/5 text-primary font-mono text-xs uppercase">
-              <TriangleAlert size={14} className="mr-2 shrink-0" />
+            <Alert className="rounded-none border-primary bg-primary/10 text-primary font-mono text-xs uppercase p-4 shadow-sm">
+              <TriangleAlert size={18} className="mr-2 shrink-0 text-primary" />
               <div>
                 <AlertTitle className="font-bold tracking-wide">WAITLISTED WARNING</AlertTitle>
-                <AlertDescription className="mt-1">{optimisticScanResult.message}</AlertDescription>
+                <AlertDescription className="mt-1 text-xs">{optimisticScanResult.message}</AlertDescription>
                 <Button
                   onClick={handleOverride}
                   disabled={isPending}
-                  className="mt-3 bg-primary text-primary-foreground font-mono text-[10px] py-1.5 px-3 h-8 hover:bg-primary-container active:scale-95 transition-all shadow-none rounded-none w-full"
+                  className="mt-3 bg-primary text-primary-foreground font-mono text-xs py-2 px-4 h-11 hover:bg-primary-container active:scale-95 transition-all shadow-none rounded-none w-full cursor-pointer"
                 >
                   Confirm Override &amp; Check-in
                 </Button>
@@ -763,98 +711,158 @@ export default function AttendanceScanner({ sessions }: AttendanceScannerProps) 
         </div>
       )}
 
-      {/* ── Manual entry panel (collapsible) ─────────────────────────────── */}
-      <div className="border border-border bg-card">
-        <button
-          type="button"
-          onClick={() => setShowManual((v) => !v)}
-          className="w-full flex items-center justify-between px-4 py-3 font-mono text-[11px] uppercase tracking-widest text-muted-foreground hover:bg-surface-container transition-colors"
-        >
-          <span>Enter Manually</span>
-          <ChevronDown
-            size={14}
-            className={`transition-transform ${showManual ? "rotate-180" : ""}`}
-          />
-        </button>
+      {/* ── 4. Main Content: Camera Scanner View ────────────────────────────── */}
+      {activeTab === "SCANNER" && (
+        <div className="space-y-4">
+          <div className="relative w-full bg-black overflow-hidden aspect-[3/4] sm:aspect-square max-h-[58vh] border border-border shadow-md">
+            <div id="reader-container" className="absolute inset-0 w-full h-full object-cover [&>video]:object-cover [&>video]:w-full [&>video]:h-full border-none outline-none" />
 
-        {showManual && (
-          <div className="border-t border-border px-4 pb-5 pt-4 space-y-5">
+            {devices.length > 1 && scannerReady && (
+              <button
+                onClick={switchCamera}
+                aria-label="Switch camera"
+                className="absolute top-4 left-4 z-20 p-3 rounded-full bg-black/65 text-white hover:bg-black/85 transition-colors active:scale-95 cursor-pointer shadow-lg"
+              >
+                <RefreshCw size={20} />
+              </button>
+            )}
 
-            {/* Search registered students */}
-            <div className="flex flex-col gap-1.5">
-              <Label className="font-mono text-[10px] text-muted-foreground uppercase" htmlFor="search-input">
-                Search Registered Student
-              </Label>
+            {scannerReady && (
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                <div className="absolute inset-0 bg-black/35" />
+                <div
+                  className="relative z-10"
+                  style={{ width: "min(68vw, 240px)", height: "min(68vw, 240px)" }}
+                >
+                  <span className="absolute -top-[2px] -left-[2px] w-7 h-7 border-t-[3px] border-l-[3px] border-primary" />
+                  <span className="absolute -top-[2px] -right-[2px] w-7 h-7 border-t-[3px] border-r-[3px] border-primary" />
+                  <span className="absolute -bottom-[2px] -left-[2px] w-7 h-7 border-b-[3px] border-l-[3px] border-primary" />
+                  <span className="absolute -bottom-[2px] -right-[2px] w-7 h-7 border-b-[3px] border-r-[3px] border-primary" />
+                  <span
+                    className="absolute left-0 right-0 h-[2px] bg-primary/90"
+                    style={{ animation: "scanline 1.8s ease-in-out infinite" }}
+                  />
+                </div>
+                <div className="absolute bottom-4 left-4 right-4 text-center">
+                  <span className="inline-block font-mono text-[11px] text-white/90 uppercase tracking-wider bg-black/60 backdrop-blur-sm px-3 py-1.5 border border-white/10">
+                    Align Barcode or QR Code in Frame
+                  </span>
+                </div>
+              </div>
+            )}
+
+            {!scannerReady && !cameraError && (
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/85">
+                <ScanLine size={36} className="text-primary animate-pulse" />
+                <p className="font-mono text-xs text-white/70 uppercase tracking-widest">
+                  Initializing camera feed…
+                </p>
+              </div>
+            )}
+
+            {cameraError && (
+              <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/90 px-8 text-center">
+                <AlertCircle size={32} className="text-destructive" />
+                <p className="font-mono text-xs text-white/80 uppercase tracking-widest">
+                  {cameraError}
+                </p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+
+      {/* ── 5. Main Content: Manual Entry & Directory Search View ─────────────── */}
+      {activeTab === "MANUAL" && (
+        <div className="space-y-4 animate-in fade-in duration-200">
+          {/* Quick Roll Number Entry Card */}
+          <div className="border border-border bg-card p-4 space-y-3 shadow-sm">
+            <h3 className="font-mono text-xs uppercase tracking-widest text-muted-foreground font-bold border-b border-border pb-2">
+              Quick Check-in by Roll Number
+            </h3>
+            <form onSubmit={handleManualSubmit} className="flex flex-col sm:flex-row gap-3 items-stretch sm:items-end">
+              <div className="flex-1 flex flex-col gap-1.5">
+                <Label className="font-mono text-[10px] text-muted-foreground uppercase" htmlFor="manual-roll-input">
+                  Roll Number
+                </Label>
+                <Input
+                  id="manual-roll-input"
+                  className="w-full bg-background border border-border text-foreground px-3.5 font-mono text-sm focus-visible:ring-1 focus-visible:ring-primary rounded-none shadow-none h-12 uppercase"
+                  placeholder="e.g. URK25CS7035"
+                  value={manualRollNumber}
+                  onChange={(e) => setManualRollNumber(e.target.value)}
+                  disabled={isPending}
+                />
+              </div>
+              <Button
+                type="submit"
+                disabled={isPending || !manualRollNumber.trim()}
+                className="bg-primary text-primary-foreground font-mono text-xs uppercase tracking-wider px-6 h-12 hover:bg-primary-container active:scale-95 transition-all rounded-none shadow-none cursor-pointer shrink-0"
+              >
+                {isPending ? (
+                  <span className="flex items-center gap-2">
+                    <Loader2 size={16} className="animate-spin" />
+                    Checking...
+                  </span>
+                ) : (
+                  "Check In"
+                )}
+              </Button>
+            </form>
+          </div>
+
+          {/* Student Search & Direct Check-in */}
+          <div className="border border-border bg-card p-4 space-y-3 shadow-sm">
+            <h3 className="font-mono text-xs uppercase tracking-widest text-muted-foreground font-bold border-b border-border pb-2">
+              Search Registered Students
+            </h3>
+            <div className="relative">
+              <Search size={18} className="absolute left-3.5 top-3.5 text-muted-foreground" />
               <Input
                 id="search-input"
-                className="w-full bg-background border border-border text-foreground px-3 font-sans text-sm focus-visible:ring-1 focus-visible:ring-primary rounded-none shadow-none h-10"
-                placeholder="Name or roll number…"
+                className="w-full bg-background border border-border text-foreground pl-10 pr-3.5 font-sans text-sm focus-visible:ring-1 focus-visible:ring-primary rounded-none shadow-none h-12"
+                placeholder="Search name or roll number…"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
                 disabled={isPending}
               />
-              {searchQuery && (
-                <div className="mt-1 border border-border divide-y divide-border max-h-48 overflow-y-auto bg-background">
-                  {filteredStudents.length === 0 ? (
-                    <div className="p-3 text-xs text-muted-foreground font-mono uppercase">
-                      No Matching Registrations Found
-                    </div>
-                  ) : (
-                    filteredStudents.map((student) => (
-                      <div
-                        key={student.id}
-                        className="p-3 flex justify-between items-center bg-surface-container-low hover:bg-surface-container/45 transition-all"
-                      >
-                        <div className="min-w-0">
-                          <span className="font-sans text-xs font-bold text-foreground block truncate">
-                            {student.name}
-                          </span>
-                          <span className="font-mono text-[10px] text-muted-foreground block">
-                            {student.rollNumber || "NO ROLL NUMBER"}
-                          </span>
-                        </div>
-                        <Button
-                          onClick={() => triggerManualCheckIn(student.id)}
-                          disabled={isPending}
-                          className="bg-primary text-primary-foreground font-mono text-[10px] uppercase py-1 px-3.5 h-8 rounded-none shadow-none"
-                        >
-                          Check In
-                        </Button>
-                      </div>
-                    ))
-                  )}
-                </div>
-              )}
             </div>
 
-            {/* Quick roll number entry */}
-            <div className="border-t border-dashed border-border pt-4">
-              <form onSubmit={handleManualSubmit} className="flex gap-4 items-end">
-                <div className="flex-1 flex flex-col gap-1">
-                  <Label className="font-mono text-[10px] text-muted-foreground uppercase" htmlFor="roll-input">
-                    Quick Check-in by Roll Number
-                  </Label>
-                  <Input
-                    id="roll-input"
-                    className="w-full bg-background border border-border text-foreground px-3 font-mono text-sm focus-visible:ring-1 focus-visible:ring-primary rounded-none shadow-none h-10"
-                    placeholder="e.g. Kits1248"
-                    value={manualRollNumber}
-                    onChange={(e) => setManualRollNumber(e.target.value)}
-                    disabled={isPending}
-                  />
-                </div>
-                <Button
-                  type="submit"
-                  disabled={isPending}
-                  className="bg-secondary text-secondary-foreground font-mono text-xs uppercase tracking-widest px-6 h-10 hover:opacity-90 active:scale-95 transition-all rounded-none shadow-none"
-                >
-                  Verify
-                </Button>
-              </form>
-            </div>
+            {searchQuery && (
+              <div className="border border-border divide-y divide-border max-h-64 overflow-y-auto bg-background">
+                {filteredStudents.length === 0 ? (
+                  <div className="p-4 text-xs text-muted-foreground font-mono uppercase text-center">
+                    No Matching Registrations Found
+                  </div>
+                ) : (
+                  filteredStudents.map((student) => (
+                    <div
+                      key={student.id}
+                      className="p-3.5 flex justify-between items-center bg-surface-container-low hover:bg-surface-container/45 transition-all gap-3"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <span className="font-sans text-sm font-bold text-foreground block truncate">
+                          {student.name}
+                        </span>
+                        <span className="font-mono text-[11px] text-muted-foreground block mt-0.5">
+                          {student.rollNumber || "NO ROLL NUMBER"}
+                        </span>
+                      </div>
+                      <Button
+                        onClick={() => triggerManualCheckIn(student.id)}
+                        disabled={isPending}
+                        className="bg-primary text-primary-foreground font-mono text-xs uppercase py-2 px-4 h-10 rounded-none shadow-none shrink-0 cursor-pointer"
+                      >
+                        Check In
+                      </Button>
+                    </div>
+                  ))
+                )}
+              </div>
+            )}
           </div>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }

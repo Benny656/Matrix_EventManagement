@@ -92,6 +92,7 @@ export default function AdminEventTabs({
         <VolunteerAttendancePanel
           eventId={eventId}
           initialVolunteers={volunteers}
+          readOnly={isAdmin}
         />
       )}
     </div>

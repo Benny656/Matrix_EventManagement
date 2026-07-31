@@ -48,10 +48,50 @@ export default async function StudentEventDetailsPage({ params }: PageProps) {
   const userRegistration = registrations.find((r) => r.studentId === currentUser.id);
 
   const activeRegistrationsCount = registrations.filter((r) => r.status === "REGISTERED").length;
-  const isFull = activeRegistrationsCount >= event.maxParticipants;
+  const isFull = event.maxParticipants ? activeRegistrationsCount >= event.maxParticipants : false;
   const isRegistrationOpen = event.registrationOpen ?? true;
 
   const registrationStatus = userRegistration ? userRegistration.status : null;
+
+  // Fetch student's attendance records for this event if registered
+  let userAttendedSessionIds = new Set<string>();
+  if (registrationStatus === "REGISTERED") {
+    const userAttsSnapshot = await adminDb
+      .collection("attendances")
+      .where("studentId", "==", currentUser.id)
+      .get();
+    userAttsSnapshot.docs.forEach((d) => {
+      userAttendedSessionIds.add(d.data().sessionId);
+    });
+  }
+
+  const sessionAttendanceList = sessions.map((sess) => {
+    const startStr = new Date(sess.startTime).toLocaleTimeString("en-US", {
+      hour: "2-digit",
+      minute: "2-digit",
+      hour12: true,
+    });
+    const endStr = sess.endTime
+      ? new Date(sess.endTime).toLocaleTimeString("en-US", {
+          hour: "2-digit",
+          minute: "2-digit",
+          hour12: true,
+        })
+      : null;
+    const dateStr = new Date(sess.startTime).toLocaleDateString("en-US", {
+      month: "short",
+      day: "numeric",
+    });
+
+    const isPresent = userAttendedSessionIds.has(sess.id);
+
+    return {
+      id: sess.id,
+      title: sess.title,
+      timeStr: `${dateStr}, ${startStr}${endStr ? ` - ${endStr}` : ""}`,
+      status: isPresent ? ("P" as const) : ("A" as const),
+    };
+  });
 
   return (
     <div className="space-y-6">
@@ -93,37 +133,60 @@ export default async function StudentEventDetailsPage({ params }: PageProps) {
             </p>
           </div>
 
-          {/* Session Timeline */}
-          <div className="border border-border bg-card p-6 space-y-4">
-            <h3 className="font-mono text-xs uppercase tracking-widest text-muted-foreground font-semibold border-b border-border pb-1">
-              Scheduled Blocks / Sessions
-            </h3>
-
-            {sessions.length === 0 ? (
-              <p className="font-mono text-xs text-muted-foreground uppercase py-2">
-                No session blocks scheduled for this event.
-              </p>
-            ) : (
-              <div className="relative border-l border-border pl-6 ml-2 space-y-6">
-                {sessions.map((sess) => {
-                  const startStr = new Date(sess.startTime).toLocaleTimeString("en-US", { hour12: false, hour: "2-digit", minute: "2-digit" });
-                  const endStr = new Date(sess.endTime).toLocaleTimeString("en-US", { hour12: false, hour: "2-digit", minute: "2-digit" });
-                  const dateStr = new Date(sess.startTime).toLocaleDateString("en-US", { month: "short", day: "numeric" });
-
-                  return (
-                    <div key={sess.id} className="relative">
-                      <span className="absolute -left-[31px] top-1.5 w-2 h-2 bg-primary rounded-full ring-4 ring-background"></span>
-                      <div>
-                        <span className="font-mono text-[10px] text-primary uppercase font-bold tracking-wider">{dateStr} / {startStr} - {endStr}</span>
-                        <h4 className="font-sans text-sm font-bold text-foreground mt-0.5">{sess.title}</h4>
-                        <span className="font-mono text-[10px] text-muted-foreground block mt-0.5">Location: {sess.venue}</span>
-                      </div>
-                    </div>
-                  );
-                })}
+          {/* Attendance Marked Table (only if registered) */}
+          {registrationStatus === "REGISTERED" && (
+            <div className="border border-border bg-card p-6 space-y-4">
+              <div className="flex justify-between items-center border-b border-border pb-2">
+                <h3 className="font-mono text-xs uppercase tracking-widest text-foreground font-semibold">
+                  Attendance Marked
+                </h3>
+                <span className="font-mono text-[10px] text-muted-foreground uppercase font-semibold">
+                  {sessionAttendanceList.filter((s) => s.status === "P").length} Present
+                </span>
               </div>
-            )}
-          </div>
+
+              {sessionAttendanceList.length === 0 ? (
+                <p className="font-mono text-xs text-muted-foreground uppercase py-2">
+                  No sessions scheduled for attendance tracking.
+                </p>
+              ) : (
+                <div className="overflow-x-auto border border-border">
+                  <table className="w-full text-left border-collapse font-mono text-xs">
+                    <thead>
+                      <tr className="border-b border-border text-[10px] uppercase tracking-wider text-muted-foreground bg-surface-container/50">
+                        <th className="py-2.5 px-4 font-bold">Session Heading</th>
+                        <th className="py-2.5 px-4 font-bold">Session Time</th>
+                        <th className="py-2.5 px-4 font-bold text-right">Status (P/A)</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border">
+                      {sessionAttendanceList.map((item) => (
+                        <tr key={item.id} className="hover:bg-surface-container-low/50 transition-colors">
+                          <td className="py-3 px-4 font-sans font-bold text-foreground">
+                            {item.title}
+                          </td>
+                          <td className="py-3 px-4 text-muted-foreground whitespace-nowrap">
+                            {item.timeStr}
+                          </td>
+                          <td className="py-3 px-4 text-right">
+                            <span
+                              className={`inline-block px-3 py-0.5 font-mono text-xs font-bold border ${
+                                item.status === "P"
+                                  ? "bg-primary/10 text-primary border-primary/30"
+                                  : "bg-destructive/10 text-destructive border-destructive/30"
+                              }`}
+                            >
+                              {item.status}
+                            </span>
+                          </td>
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
+              )}
+            </div>
+          )}
         </div>
 
         {/* Right Side bar */}
@@ -136,17 +199,11 @@ export default async function StudentEventDetailsPage({ params }: PageProps) {
             <div className="space-y-4 font-mono text-xs">
               <div className="flex justify-between border-b border-border pb-2 border-dashed">
                 <span className="text-muted-foreground">Capacity Limit:</span>
-                <span className="text-foreground font-semibold">{event.maxParticipants} Attendees</span>
+                <span className="text-foreground font-semibold">{event.maxParticipants ? `${event.maxParticipants} Attendees` : "Unlimited"}</span>
               </div>
               <div className="flex justify-between border-b border-border pb-2 border-dashed">
                 <span className="text-muted-foreground">Registered:</span>
                 <span className="text-foreground font-semibold">{activeRegistrationsCount} Students</span>
-              </div>
-              <div className="flex justify-between border-b border-border pb-2 border-dashed">
-                <span className="text-muted-foreground">Waitlisted:</span>
-                <span className="text-foreground font-semibold">
-                  {registrations.filter((r) => r.status === "WAITLISTED").length} Students
-                </span>
               </div>
               <div className="flex justify-between border-b border-border pb-2 border-dashed">
                 <span className="text-muted-foreground">Status:</span>

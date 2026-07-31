@@ -45,7 +45,7 @@ export default function DashboardLayout({ user, children }: DashboardLayoutProps
   const isAuthorized = React.useMemo(() => {
     if (pathname.startsWith("/admin") && user.role !== "ADMIN" && user.role !== "FACULTY_ADMIN") return false;
     if (pathname.startsWith("/volunteer") && user.role !== "VOLUNTEER" && user.role !== "ADMIN" && user.role !== "FACULTY_ADMIN") return false;
-    if (pathname.startsWith("/student") && user.role !== "STUDENT" && user.role !== "ADMIN" && user.role !== "FACULTY_ADMIN") return false;
+    if (pathname.startsWith("/student") && user.role !== "STUDENT" && user.role !== "ADMIN" && user.role !== "FACULTY_ADMIN" && user.role !== "VOLUNTEER") return false;
     if (pathname.startsWith("/faculty") && !["FACULTY", "FACULTY_ADMIN", "ADMIN"].includes(user.role)) return false;
     return true;
   }, [pathname, user.role]);
@@ -61,9 +61,8 @@ export default function DashboardLayout({ user, children }: DashboardLayoutProps
         return [
           { label: "Overview", href: "/admin", icon: BarChart2 },
           { label: "All Events", href: "/admin/events", icon: CalendarDays },
-          { label: "Attendance", href: "/volunteer/attendance", icon: ScanLine },
-          { label: "Users", href: "/admin/users", icon: Users },
           { label: "Reports", href: "/admin/reports", icon: FileText },
+          { label: "Users", href: "/admin/users", icon: Users },
         ];
       case "VOLUNTEER":
         return [
@@ -273,7 +272,7 @@ export default function DashboardLayout({ user, children }: DashboardLayoutProps
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-4 md:p-6 pb-[calc(5.5rem+env(safe-area-inset-bottom))] md:pb-6 bg-background">
-          <div className="h-full">
+          <div className="w-full">
             {children}
           </div>
         </div>

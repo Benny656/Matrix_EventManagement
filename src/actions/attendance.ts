@@ -18,6 +18,13 @@ export async function markAttendanceAction(params: {
   method: "SCANNED" | "MANUAL";
 }) {
   const staff = await verifyStaff();
+  if (staff.role === "ADMIN" || staff.role === "FACULTY_ADMIN") {
+    return {
+      success: false,
+      error: "UNAUTHORIZED" as const,
+      message: "Attendance marking is restricted to Volunteers only.",
+    };
+  }
   const { sessionId, rollNumber, method } = params;
 
   // 1. Fetch student by roll number
@@ -184,7 +191,7 @@ export async function getActiveSessionsAction() {
         id: doc.id,
         ...data,
         startTime: new Date(data.startTime),
-        endTime: new Date(data.endTime),
+        endTime: data.endTime ? new Date(data.endTime) : null,
         event: {
           title: event.title,
         },
@@ -212,6 +219,9 @@ export async function markAttendanceByScan(sessionId: string, rollNumber: string
 
 export async function markAttendanceManual(sessionId: string, studentId: string) {
   const staff = await verifyStaff();
+  if (staff.role === "ADMIN" || staff.role === "FACULTY_ADMIN") {
+    return { status: "error" as const, message: "Attendance marking is restricted to Volunteers only." };
+  }
 
   const studentDoc = await adminDb.collection("users").doc(studentId).get();
   if (!studentDoc.exists) {

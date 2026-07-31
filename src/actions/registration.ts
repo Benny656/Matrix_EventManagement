@@ -43,12 +43,14 @@ export async function registerForEventAction(eventId: string) {
   const existingRegDoc = regSnapshot.docs.find((d) => d.data().studentId === user.id);
 
   if (existingRegDoc && existingRegDoc.data().status !== "CANCELLED") {
-    throw new Error("You are already registered or waitlisted for this event.");
+    throw new Error("You are already registered for this event.");
   }
 
   const activeCount = eventRegs.filter((r) => r.status === "REGISTERED").length;
-  const isWaitlist = activeCount >= event.maxParticipants;
-  const newStatus = isWaitlist ? "WAITLISTED" : "REGISTERED";
+  if (event.maxParticipants && activeCount >= event.maxParticipants) {
+    throw new Error("Event capacity has been reached. Registration is closed.");
+  }
+  const newStatus = "REGISTERED";
 
   if (existingRegDoc) {
     const existingData = existingRegDoc.data();
@@ -89,6 +91,7 @@ export async function registerForEventAction(eventId: string) {
 
 export async function cancelRegistrationAction(eventId: string) {
   const user = await verifyParticipant();
+  throw new Error("Registrations cannot be cancelled once submitted.");
 
   const regSnapshot = await adminDb
     .collection("registrations")

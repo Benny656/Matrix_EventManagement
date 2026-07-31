@@ -48,7 +48,7 @@ export default async function FacultyEventDetailsPage({ params }: PageProps) {
   const userRegistration = registrations.find((r) => r.FacultyId === currentUser.id);
 
   const activeRegistrationsCount = registrations.filter((r) => r.status === "REGISTERED").length;
-  const isFull = activeRegistrationsCount >= event.maxParticipants;
+  const isFull = event.maxParticipants ? activeRegistrationsCount >= event.maxParticipants : false;
   const isRegistrationOpen = event.registrationOpen ?? true;
 
   const registrationStatus = userRegistration ? userRegistration.status : null;
@@ -107,16 +107,17 @@ export default async function FacultyEventDetailsPage({ params }: PageProps) {
               <div className="relative border-l border-border pl-6 ml-2 space-y-6">
                 {sessions.map((sess) => {
                   const startStr = new Date(sess.startTime).toLocaleTimeString("en-US", { hour12: false, hour: "2-digit", minute: "2-digit" });
-                  const endStr = new Date(sess.endTime).toLocaleTimeString("en-US", { hour12: false, hour: "2-digit", minute: "2-digit" });
+                  const endStr = sess.endTime ? new Date(sess.endTime).toLocaleTimeString("en-US", { hour12: false, hour: "2-digit", minute: "2-digit" }) : null;
                   const dateStr = new Date(sess.startTime).toLocaleDateString("en-US", { month: "short", day: "numeric" });
 
                   return (
                     <div key={sess.id} className="relative">
                       <span className="absolute -left-[31px] top-1.5 w-2 h-2 bg-primary rounded-full ring-4 ring-background"></span>
                       <div>
-                        <span className="font-mono text-[10px] text-primary uppercase font-bold tracking-wider">{dateStr} / {startStr} - {endStr}</span>
+                        <span className="font-mono text-[10px] text-primary uppercase font-bold tracking-wider">
+                          {dateStr} / {startStr}{endStr ? ` - ${endStr}` : ""}
+                        </span>
                         <h4 className="font-sans text-sm font-bold text-foreground mt-0.5">{sess.title}</h4>
-                        <span className="font-mono text-[10px] text-muted-foreground block mt-0.5">Location: {sess.venue}</span>
                       </div>
                     </div>
                   );
@@ -136,7 +137,7 @@ export default async function FacultyEventDetailsPage({ params }: PageProps) {
             <div className="space-y-4 font-mono text-xs">
               <div className="flex justify-between border-b border-border pb-2 border-dashed">
                 <span className="text-muted-foreground">Capacity Limit:</span>
-                <span className="text-foreground font-semibold">{event.maxParticipants} Attendees</span>
+                <span className="text-foreground font-semibold">{event.maxParticipants ? `${event.maxParticipants} Attendees` : "Unlimited"}</span>
               </div>
               <div className="flex justify-between border-b border-border pb-2 border-dashed">
                 <span className="text-muted-foreground">Registered:</span>

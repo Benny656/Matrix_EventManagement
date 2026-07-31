@@ -9,9 +9,9 @@ import * as z from "zod";
 
 const sessionSchema = z.object({
   title: z.string().min(2, "Session title is required"),
-  venue: z.string().min(2, "Session venue is required"),
+  venue: z.string().optional().nullable(),
   startTime: z.string().or(z.date()).transform((val) => new Date(val)),
-  endTime: z.string().or(z.date()).transform((val) => new Date(val)),
+  endTime: z.string().or(z.date()).transform((val) => new Date(val)).optional().nullable(),
 });
 
 const whatsappInviteLinkSchema = z
@@ -49,7 +49,7 @@ const eventSchema = z.object({
   venue: z.string().min(2, "Event venue is required"),
   date: z.string().or(z.date()).transform((val) => new Date(val)),
   registrationOpen: z.boolean().default(true),
-  maxParticipants: z.number().min(1, "Capacity must be at least 1"),
+  maxParticipants: z.number().min(1).optional().nullable(),
   category: z.string().min(2, "Category is required"),
   coordinatorName: z.string().min(2, "Coordinator name is required"),
   whatsappInviteLink: whatsappInviteLinkSchema,
@@ -82,7 +82,7 @@ export async function createEventAction(input: EventInput) {
       title: s.title,
       venue: s.venue,
       startTime: s.startTime.toISOString(),
-      endTime: s.endTime.toISOString(),
+      endTime: s.endTime ? s.endTime.toISOString() : null,
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     };
@@ -328,7 +328,7 @@ export async function getEventsAction(
       sessions: eventSessions.map((s: any) => ({
         ...s,
         startTime: new Date(s.startTime),
-        endTime: new Date(s.endTime),
+        endTime: s.endTime ? new Date(s.endTime) : null,
       })),
       _count: {
         registrations: regCount,
@@ -354,9 +354,11 @@ export async function getEventsAction(
       let newStatus: "UPCOMING" | "ONGOING" | "COMPLETED" = "UPCOMING";
 
       const hasOngoingSession = event.sessions.some(
-        (s: any) => now >= s.startTime && now <= s.endTime
+        (s: any) => s.startTime && now >= s.startTime && (!s.endTime || now <= s.endTime)
       );
-      const allSessionsFinished = event.sessions.every((s: any) => now > s.endTime);
+      const allSessionsFinished =
+        event.sessions.length > 0 &&
+        event.sessions.every((s: any) => (s.endTime ? now > s.endTime : false));
 
       if (hasOngoingSession) {
         newStatus = "ONGOING";

@@ -117,14 +117,9 @@ export default function StudentRegistrations({ initialRegistrations }: { initial
                           </Button>
                         </a>
                       )}
-                      <Button
-                        variant="outline"
-                        onClick={() => handleCancel(reg.event.id)}
-                        disabled={isPending}
-                        className="border-destructive text-destructive font-mono text-[11px] uppercase tracking-wider py-2 px-4 hover:bg-destructive/5 active:scale-95 transition-all h-9 rounded-none shadow-none"
-                      >
-                        Cancel registration
-                      </Button>
+                      <span className="font-mono text-[10px] text-muted-foreground uppercase border border-border px-2 py-1 bg-surface-container">
+                        Final Record
+                      </span>
                     </div>
                   </div>
                 </div>

@@ -4,7 +4,7 @@ import React, { useState, useTransition, useOptimistic } from "react";
 import { registerForEventAction, cancelRegistrationAction } from "@/actions/registration";
 import { Button } from "@/components/ui/button";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { AlertCircle } from "lucide-react";
+import { AlertCircle, Loader2 } from "lucide-react";
 
 interface RegisterActionButtonProps {
   eventId: string;
@@ -31,11 +31,13 @@ export default function RegisterActionButton({
     (state, nextStatus: "REGISTERED" | "CANCELLED" | "WAITLISTED" | null) => nextStatus
   );
 
-  const handleRegister = async () => {
+  const [showConfirmModal, setShowConfirmModal] = useState(false);
+
+  const confirmAndRegister = async () => {
+    setShowConfirmModal(false);
     setError(null);
     startTransition(async () => {
-      const nextStatus = isFull ? "WAITLISTED" : "REGISTERED";
-      setOptimisticStatus(nextStatus);
+      setOptimisticStatus("REGISTERED");
       try {
         const res = await registerForEventAction(eventId);
         if (res.success) {
@@ -51,24 +53,7 @@ export default function RegisterActionButton({
     });
   };
 
-  const handleCancel = async () => {
-    setError(null);
-    if (!confirm("Are you sure you want to cancel your registration?")) return;
-
-    startTransition(async () => {
-      setOptimisticStatus("CANCELLED");
-      try {
-        const res = await cancelRegistrationAction(eventId);
-        if (res.success) {
-          setStatus("CANCELLED");
-        }
-      } catch (err: any) {
-        setError(err.message || "Failed to cancel");
-      }
-    });
-  };
-
-  if (!isRegistrationOpen && optimisticStatus !== "REGISTERED" && optimisticStatus !== "WAITLISTED") {
+  if (!isRegistrationOpen && optimisticStatus !== "REGISTERED") {
     return (
       <div className="border border-border p-4 bg-surface-container text-center font-mono text-xs uppercase text-muted-foreground">
         Registration is closed.
@@ -86,49 +71,77 @@ export default function RegisterActionButton({
       )}
 
       {optimisticStatus === "REGISTERED" && (
-        <div className="space-y-3">
-          <div className="border border-tertiary bg-tertiary/5 text-tertiary p-4 font-mono text-xs uppercase text-center">
+        <div className="space-y-2">
+          <div className="border border-tertiary bg-tertiary/5 text-tertiary p-4 font-mono text-xs uppercase text-center font-bold">
             Registration Status: Confirmed / Registered
           </div>
-          <Button
-            variant="outline"
-            onClick={handleCancel}
-            disabled={isPending}
-            className="w-full border-destructive text-destructive font-mono text-xs uppercase tracking-wider py-6 hover:bg-destructive/5 active:scale-98 transition-all rounded-none h-11 shadow-none"
-          >
-            Cancel Registration Record
-          </Button>
-        </div>
-      )}
-
-      {optimisticStatus === "WAITLISTED" && (
-        <div className="space-y-3">
-          <div className="border border-primary bg-primary/5 text-primary p-4 font-mono text-xs uppercase text-center font-bold">
-            Registration Status: Waitlisted
-          </div>
-          <Button
-            variant="outline"
-            onClick={handleCancel}
-            disabled={isPending}
-            className="w-full border-destructive text-destructive font-mono text-xs uppercase tracking-wider py-6 hover:bg-destructive/5 active:scale-98 transition-all rounded-none h-11 shadow-none"
-          >
-            Cancel Waitlist Record
-          </Button>
+          <p className="font-mono text-[10px] text-muted-foreground text-center uppercase">
+            Registrations are final and cannot be cancelled.
+          </p>
         </div>
       )}
 
       {(optimisticStatus === null || optimisticStatus === "CANCELLED") && (
-        <Button
-          onClick={handleRegister}
-          disabled={isPending}
-          className="w-full bg-primary text-primary-foreground font-mono text-xs uppercase tracking-widest py-6 hover:bg-primary-container active:scale-98 transition-all rounded-none h-11 shadow-none"
-        >
-          {isPending
-            ? "Submitting…"
-            : isFull
-            ? "Join waitlist"
-            : "Register"}
-        </Button>
+        isFull ? null : (
+          <Button
+            onClick={() => setShowConfirmModal(true)}
+            disabled={isPending}
+            className="w-full bg-primary text-primary-foreground font-mono text-xs uppercase tracking-widest py-6 hover:bg-primary-container active:scale-98 transition-all rounded-none h-11 shadow-none cursor-pointer"
+          >
+            {isPending ? (
+              <span className="flex items-center justify-center gap-2">
+                <Loader2 size={16} className="animate-spin shrink-0 text-primary-foreground" />
+                <span>Submitting...</span>
+              </span>
+            ) : (
+              "Register"
+            )}
+          </Button>
+        )
+      )}
+
+      {showConfirmModal && (
+        <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
+          <div className="bg-card border border-border max-w-md w-full p-6 space-y-4 shadow-xl rounded-none">
+            <div className="space-y-2">
+              <h3 className="font-heading text-xl font-bold text-foreground">
+                Confirm Registration
+              </h3>
+              <div className="border border-destructive/30 bg-destructive/5 text-destructive p-3 font-mono text-xs uppercase">
+                <span className="font-bold block mb-1">Important Notice:</span>
+                Once registered, you cannot cancel your registration.
+              </div>
+              <p className="font-sans text-xs text-muted-foreground leading-relaxed">
+                Are you sure you want to proceed with registering for this event?
+              </p>
+            </div>
+
+            <div className="flex flex-col sm:flex-row gap-3 pt-4 border-t border-border">
+              <Button
+                variant="outline"
+                onClick={() => setShowConfirmModal(false)}
+                disabled={isPending}
+                className="flex-1 border-border font-mono text-xs uppercase tracking-wider rounded-none h-10 shadow-none"
+              >
+                Go Back
+              </Button>
+              <Button
+                onClick={confirmAndRegister}
+                disabled={isPending}
+                className="flex-1 bg-primary text-primary-foreground font-mono text-xs uppercase tracking-wider rounded-none h-10 shadow-none"
+              >
+                {isPending ? (
+                  <span className="flex items-center justify-center gap-2">
+                    <Loader2 size={14} className="animate-spin shrink-0" />
+                    <span>Submitting...</span>
+                  </span>
+                ) : (
+                  "Confirm & Register"
+                )}
+              </Button>
+            </div>
+          </div>
+        </div>
       )}
 
       {showSuccessModal && (

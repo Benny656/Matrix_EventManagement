@@ -8,32 +8,36 @@ import { Search, CalendarDays, MapPin } from "lucide-react";
 interface Session {
   id: string;
   startTime: Date;
-  endTime: Date;
+  endTime?: Date | null;
 }
 
-interface EventWithCount {
+interface EventItem {
   id: string;
   title: string;
   description: string;
   venue: string;
   date: Date;
   registrationOpen: boolean;
-  maxParticipants: number;
+  maxParticipants?: number | null;
   category: string;
+  coordinatorName: string;
   status: "UPCOMING" | "ONGOING" | "COMPLETED" | "ARCHIVED";
   sessions: Session[];
   _count: {
     registrations: number;
+    volunteers: number;
   };
 }
 
-export default function StudentEventList({ events }: { events: EventWithCount[] }) {
+export default function StudentEventList({ events }: { events: EventItem[] }) {
   const [search, setSearch] = useState("");
   const [category, setCategory] = useState("ALL");
 
   const filtered = events.filter((e) => {
-    const matchesSearch = e.title.toLowerCase().includes(search.toLowerCase()) || 
-                          e.description.toLowerCase().includes(search.toLowerCase());
+    const matchesSearch =
+      e.title.toLowerCase().includes(search.toLowerCase()) ||
+      e.description.toLowerCase().includes(search.toLowerCase()) ||
+      e.category.toLowerCase().includes(search.toLowerCase());
     const matchesCategory = category === "ALL" || e.category === category;
     return matchesSearch && matchesCategory;
   });
@@ -42,29 +46,29 @@ export default function StudentEventList({ events }: { events: EventWithCount[] 
 
   return (
     <div className="space-y-6">
-      {/* Search and Filters */}
-      <div className="flex flex-col md:flex-row gap-4 border-b border-border pb-4 bg-background">
-        <div className="relative flex-grow max-w-md">
-          <span className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground">
-            <Search size={14} />
-          </span>
+      {/* Controls Header */}
+      <div className="flex flex-col md:flex-row gap-4 items-stretch md:items-center justify-between bg-card p-4 border border-border">
+        {/* Search */}
+        <div className="relative flex-1">
+          <Search size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
           <Input
-            className="w-full bg-surface-container-low border border-border pl-10 pr-4 py-2 font-mono text-xs rounded-none shadow-none h-9"
-            placeholder="Search events by title or type…"
+            placeholder="Search events..."
             value={search}
             onChange={(e) => setSearch(e.target.value)}
+            className="pl-9 bg-background font-mono text-xs border-border"
           />
         </div>
 
-        <div className="flex items-center gap-2 overflow-x-auto pb-1 select-none">
+        {/* Category Pills */}
+        <div className="flex flex-wrap items-center gap-1.5">
           {categories.map((cat) => (
             <button
               key={cat}
               onClick={() => setCategory(cat)}
-              className={`px-3 py-1.5 font-mono text-[10px] uppercase tracking-wider border transition-colors shrink-0 ${
+              className={`px-3 py-1.5 font-mono text-[10px] uppercase tracking-wider transition-all border ${
                 category === cat
-                  ? "bg-primary text-primary-foreground border-primary"
-                  : "bg-surface-container text-muted-foreground border-border hover:bg-surface-container-high"
+                  ? "bg-primary text-primary-foreground border-primary font-bold"
+                  : "bg-surface-container text-muted-foreground border-border hover:bg-surface-container-high hover:text-foreground"
               }`}
             >
               {cat}
@@ -73,15 +77,15 @@ export default function StudentEventList({ events }: { events: EventWithCount[] 
         </div>
       </div>
 
-      {/* Grid of Cards */}
+      {/* Events List */}
       {filtered.length === 0 ? (
-        <div className="border border-border p-12 text-center text-muted-foreground font-mono text-xs uppercase bg-card">
-          No events matching filter specifications.
+        <div className="border border-border bg-card p-12 text-center text-muted-foreground font-mono text-xs uppercase">
+          No events found matching your criteria.
         </div>
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {filtered.map((event) => {
-            const isFull = event._count.registrations >= event.maxParticipants;
+            const isFull = event.maxParticipants ? event._count.registrations >= event.maxParticipants : false;
             const isOpen = event.registrationOpen;
             const dateStr = new Date(event.date).toLocaleDateString("en-US", {
               month: "short",
@@ -122,7 +126,7 @@ export default function StudentEventList({ events }: { events: EventWithCount[] 
                     <div className="flex items-center justify-between mt-2 pt-2 border-t border-dashed border-border">
                       <span>CAPACITY:</span>
                       <span className={isFull ? "text-primary font-bold" : "text-foreground font-semibold"}>
-                        {event._count.registrations} / {event.maxParticipants} {isFull && "(WAITLIST)"}
+                        {event.maxParticipants ? `${event._count.registrations} / ${event.maxParticipants} ${isFull ? "(FULL)" : ""}` : `${event._count.registrations} (UNLIMITED)`}
                       </span>
                     </div>
                   </div>

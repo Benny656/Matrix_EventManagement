@@ -1,6 +1,8 @@
 import { cookies, headers } from "next/headers";
 import { adminAuth, adminDb } from "./firebase-admin";
 
+import { HARDCODED_ADMIN_EMAILS } from "./constants";
+
 export type Role = "ADMIN" | "FACULTY_ADMIN" | "FACULTY" | "STUDENT" | "VOLUNTEER";
 
 export interface UserProfile {
@@ -60,7 +62,7 @@ export async function getCurrentUser(): Promise<UserProfile | null> {
     }
 
     const data = userDoc.data() as any;
-    const isHardcodedAdmin = ["matrixkarunya@gmail.com", "bennymanuel2020@gmail.com"].includes(data.email?.toLowerCase());
+    const isHardcodedAdmin = HARDCODED_ADMIN_EMAILS.includes(data.email?.toLowerCase());
 
     return {
       id: userDoc.id,
@@ -73,7 +75,7 @@ export async function getCurrentUser(): Promise<UserProfile | null> {
       degree: data.degree || null,
       department: data.department || null,
       yearOfStudy: data.yearOfStudy || null,
-      onboardingCompleted: data.onboardingCompleted ?? undefined,
+      onboardingCompleted: isHardcodedAdmin ? true : (data.onboardingCompleted ?? undefined),
       role: isHardcodedAdmin ? "ADMIN" : ((data.role as Role) || "STUDENT"),
       phoneNumber: data.phoneNumber || null,
       mustChangePassword: data.mustChangePassword || false,

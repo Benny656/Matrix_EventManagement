@@ -13,7 +13,7 @@ interface Session {
   title: string;
   venue: string;
   startTime: Date;
-  endTime: Date;
+  endTime?: Date | null;
 }
 
 interface EventWithSessions {
@@ -23,7 +23,7 @@ interface EventWithSessions {
   venue: string;
   date: Date;
   registrationOpen: boolean;
-  maxParticipants: number;
+  maxParticipants?: number | null;
   category: string;
   coordinatorName: string;
   status: "UPCOMING" | "ONGOING" | "COMPLETED" | "ARCHIVED";
@@ -207,7 +207,7 @@ export default function EventsTable({ initialEvents, role }: EventsTableProps) {
                     <div className="text-left md:text-right text-foreground font-semibold md:col-span-2 md:pr-2 flex flex-col md:items-end">
                       <div>
                         <span className="inline md:hidden text-muted-foreground text-[10px] uppercase font-normal mr-1">RSVPs:</span>
-                        {event._count.registrations} / {event.maxParticipants}
+                        {event.maxParticipants ? `${event._count.registrations} / ${event.maxParticipants}` : `${event._count.registrations} (∞)`}
                       </div>
                       <span className="text-[10px] text-muted-foreground font-normal block mt-0.5">
                         Volunteers: {event._count.volunteers ?? 0}

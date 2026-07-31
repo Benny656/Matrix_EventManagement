@@ -3,7 +3,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { verifyStaff } from "@/lib/auth-session";
 import { adminDb } from "@/lib/firebase-admin";
-import { Plus, Megaphone } from "lucide-react";
+import { Megaphone } from "lucide-react";
 import VolunteerClock from "@/components/volunteer-clock";
 
 export const dynamic = "force-dynamic";
@@ -151,11 +151,7 @@ export default async function VolunteerDashboardPage() {
               Quick Actions
             </h2>
             <div className="grid grid-cols-1 gap-2">
-              <Link href="/volunteer/events/new" className="w-full bg-primary text-primary-foreground font-mono text-xs uppercase tracking-wider py-3 flex items-center justify-center gap-1 hover:bg-primary-container transition-all active:scale-98">
-                <Plus size={14} />
-                Create Event
-              </Link>
-              <Link href="/volunteer/updates/new" className="w-full border border-border bg-background text-foreground font-mono text-xs uppercase tracking-wider py-3 flex items-center justify-center gap-1 hover:bg-surface-container transition-all active:scale-98">
+              <Link href="/volunteer/updates/new" className="w-full bg-primary text-primary-foreground font-mono text-xs uppercase tracking-wider py-3 flex items-center justify-center gap-1 hover:bg-primary-container transition-all active:scale-98">
                 <Megaphone size={14} />
                 Post Update
               </Link>

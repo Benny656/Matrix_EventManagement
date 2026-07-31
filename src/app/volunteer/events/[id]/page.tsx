@@ -108,16 +108,6 @@ export default async function VolunteerEventDetailsPage({ params }: PageProps) {
             Venue: {event.venue} • Coordinator: {event.coordinatorName}
           </p>
         </div>
-        <Link
-          href={`/api/reports/export?type=event&eventId=${event.id}`}
-          className={cn(
-            buttonVariants({ variant: "outline" }),
-            "font-mono text-xs uppercase tracking-wider rounded-none h-9 px-4 shadow-none hover:bg-surface-container border-border inline-flex items-center"
-          )}
-        >
-          <Download size={14} className="mr-2" />
-          Export CSV
-        </Link>
       </div>
 
       {/* Metrics Row */}
@@ -156,16 +146,17 @@ export default async function VolunteerEventDetailsPage({ params }: PageProps) {
               <div className="relative border-l border-border pl-6 ml-2 space-y-6">
                 {sessionsWithCount.map((sess) => {
                   const startStr = new Date(sess.startTime).toLocaleTimeString("en-US", { hour12: false, hour: "2-digit", minute: "2-digit" });
-                  const endStr = new Date(sess.endTime).toLocaleTimeString("en-US", { hour12: false, hour: "2-digit", minute: "2-digit" });
+                  const endStr = sess.endTime ? new Date(sess.endTime).toLocaleTimeString("en-US", { hour12: false, hour: "2-digit", minute: "2-digit" }) : null;
                   const dateStr = new Date(sess.startTime).toLocaleDateString("en-US", { month: "short", day: "numeric" });
 
                   return (
                     <div key={sess.id} className="relative">
                       <span className="absolute -left-[31px] top-1.5 w-2 h-2 bg-primary rounded-full ring-4 ring-background"></span>
                       <div>
-                        <span className="font-mono text-[10px] text-primary uppercase font-bold tracking-wider">{dateStr} / {startStr} - {endStr}</span>
+                        <span className="font-mono text-[10px] text-primary uppercase font-bold tracking-wider">
+                          {dateStr} / {startStr}{endStr ? ` - ${endStr}` : ""}
+                        </span>
                         <h4 className="font-sans text-sm font-bold text-foreground mt-0.5">{sess.title}</h4>
-                        <span className="font-mono text-[10px] text-muted-foreground block mt-0.5">Location: {sess.venue}</span>
                         <span className="font-mono text-[10px] text-muted-foreground block mt-1">
                           Arrivals: {sess.attendances.length} Scanned
                         </span>

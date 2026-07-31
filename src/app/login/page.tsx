@@ -9,6 +9,7 @@ import { doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
 import { AlertCircle, Loader2, ShieldCheck, ArrowLeft } from "lucide-react";
 import ThemeToggle from "@/components/theme-toggle";
+import { HARDCODED_ADMIN_EMAILS } from "@/lib/constants";
 
 function extractKarunyaDetails(displayName: string, email: string): { name: string; rollNumber: string | null } {
   if (!email.toLowerCase().endsWith("@karunya.edu.in")) {
@@ -54,7 +55,7 @@ function LoginContent() {
       const firebaseUser = result.user;
       const email = (firebaseUser.email || "").toLowerCase();
 
-      const allowedAdmins = ["matrixkarunya@gmail.com", "bennymanuel2020@gmail.com"];
+      const allowedAdmins = HARDCODED_ADMIN_EMAILS;
       const isStudentEmail = email.endsWith("@karunya.edu.in");
       const isFacultyEmail = email.endsWith("@karunya.edu");
       const isAdminEmail = allowedAdmins.includes(email);
@@ -83,15 +84,15 @@ function LoginContent() {
           email: firebaseUser.email,
           rollNumber,
           role,
-          onboardingCompleted: false,
+          onboardingCompleted: isAdminEmail ? true : false,
           mustChangePassword: false,
           createdAt: new Date().toISOString(),
           updatedAt: new Date().toISOString(),
         });
       } else {
         const existingData = userSnap.data();
-        if (isAdminEmail && existingData.role !== "ADMIN") {
-          await updateDoc(userRef, { role: "ADMIN" });
+        if (isAdminEmail) {
+          await updateDoc(userRef, { role: "ADMIN", onboardingCompleted: true });
           role = "ADMIN";
         } else {
           role = existingData.role || (isFacultyEmail ? "FACULTY" : "STUDENT");

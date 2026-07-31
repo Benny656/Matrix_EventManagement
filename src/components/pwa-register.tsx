@@ -4,7 +4,7 @@ import { useEffect } from "react";
 
 export default function PWARegister() {
   useEffect(() => {
-    if ("serviceWorker" in navigator) {
+    if (process.env.NODE_ENV === "production" && "serviceWorker" in navigator) {
       window.addEventListener("load", () => {
         navigator.serviceWorker
           .register("/sw.js")
@@ -14,6 +14,12 @@ export default function PWARegister() {
           .catch((err) => {
             console.error("Service Worker registration failed:", err);
           });
+      });
+    } else if (process.env.NODE_ENV !== "production" && "serviceWorker" in navigator) {
+      navigator.serviceWorker.getRegistrations().then((registrations) => {
+        for (let registration of registrations) {
+          registration.unregister();
+        }
       });
     }
   }, []);

@@ -10,11 +10,13 @@ import { Alert, AlertDescription } from "@/components/ui/alert";
 interface VolunteerAttendancePanelProps {
   eventId: string;
   initialVolunteers: VolunteerMember[];
+  readOnly?: boolean;
 }
 
 export default function VolunteerAttendancePanel({
   eventId,
   initialVolunteers,
+  readOnly = false,
 }: VolunteerAttendancePanelProps) {
   const [volunteers, setVolunteers] = useState<VolunteerMember[]>(initialVolunteers);
   const [search, setSearch] = useState("");
@@ -133,12 +135,12 @@ export default function VolunteerAttendancePanel({
 
       {/* Volunteer Attendance Table */}
       <div className="border border-border bg-card">
-        <div className="hidden md:grid grid-cols-12 border-b border-border bg-surface-container px-4 py-3 font-mono text-[10px] uppercase tracking-wider text-muted-foreground font-bold">
+        <div className={`hidden md:grid ${readOnly ? "grid-cols-10" : "grid-cols-12"} border-b border-border bg-surface-container px-4 py-3 font-mono text-[10px] uppercase tracking-wider text-muted-foreground font-bold`}>
           <div className="col-span-3">Volunteer Name</div>
           <div className="col-span-2">Register No.</div>
           <div className="col-span-2">Department</div>
           <div className="col-span-3">Attendance Audit</div>
-          <div className="col-span-2 text-right">Mark Attendance</div>
+          {!readOnly && <div className="col-span-2 text-right">Mark Attendance</div>}
         </div>
 
         {filteredVolunteers.length === 0 ? (
@@ -159,7 +161,7 @@ export default function VolunteerAttendancePanel({
               return (
                 <div
                   key={v.studentId}
-                  className="flex flex-col md:grid md:grid-cols-12 gap-3 md:gap-2 px-4 py-3 font-mono text-xs items-start md:items-center hover:bg-surface-container-low/50"
+                  className={`flex flex-col md:grid ${readOnly ? "grid-cols-10" : "grid-cols-12"} gap-3 md:gap-2 px-4 py-3 font-mono text-xs items-start md:items-center hover:bg-surface-container-low/50`}
                 >
                   <div className="md:col-span-3">
                     <span className="font-sans font-bold text-foreground block">{v.name}</span>
@@ -189,33 +191,35 @@ export default function VolunteerAttendancePanel({
                     )}
                   </div>
 
-                  <div className="md:col-span-2 text-right flex items-center justify-end gap-2 w-full md:w-auto">
-                    <button
-                      onClick={() => handleMarkAttendance(v.studentId, "PRESENT")}
-                      disabled={isPending}
-                      className={`px-3 py-1 font-mono text-[10px] uppercase font-bold border transition-all cursor-pointer disabled:opacity-50 flex items-center gap-1 ${
-                        v.attendanceStatus === "PRESENT"
-                          ? "bg-primary text-primary-foreground border-primary"
-                          : "bg-background text-foreground border-border hover:border-primary/50"
-                      }`}
-                    >
-                      <CheckCircle2 size={12} />
-                      <span>Present</span>
-                    </button>
+                  {!readOnly && (
+                    <div className="md:col-span-2 text-right flex items-center justify-end gap-2 w-full md:w-auto">
+                      <button
+                        onClick={() => handleMarkAttendance(v.studentId, "PRESENT")}
+                        disabled={isPending}
+                        className={`px-3 py-1 font-mono text-[10px] uppercase font-bold border transition-all cursor-pointer disabled:opacity-50 flex items-center gap-1 ${
+                          v.attendanceStatus === "PRESENT"
+                            ? "bg-primary text-primary-foreground border-primary"
+                            : "bg-background text-foreground border-border hover:border-primary/50"
+                        }`}
+                      >
+                        <CheckCircle2 size={12} />
+                        <span>Present</span>
+                      </button>
 
-                    <button
-                      onClick={() => handleMarkAttendance(v.studentId, "ABSENT")}
-                      disabled={isPending}
-                      className={`px-3 py-1 font-mono text-[10px] uppercase font-bold border transition-all cursor-pointer disabled:opacity-50 flex items-center gap-1 ${
-                        v.attendanceStatus === "ABSENT"
-                          ? "bg-destructive text-destructive-foreground border-destructive"
-                          : "bg-background text-foreground border-border hover:border-destructive/50"
-                      }`}
-                    >
-                      <XCircle size={12} />
-                      <span>Absent</span>
-                    </button>
-                  </div>
+                      <button
+                        onClick={() => handleMarkAttendance(v.studentId, "ABSENT")}
+                        disabled={isPending}
+                        className={`px-3 py-1 font-mono text-[10px] uppercase font-bold border transition-all cursor-pointer disabled:opacity-50 flex items-center gap-1 ${
+                          v.attendanceStatus === "ABSENT"
+                            ? "bg-destructive text-destructive-foreground border-destructive"
+                            : "bg-background text-foreground border-border hover:border-destructive/50"
+                        }`}
+                      >
+                        <XCircle size={12} />
+                        <span>Absent</span>
+                      </button>
+                    </div>
+                  )}
                 </div>
               );
             })}

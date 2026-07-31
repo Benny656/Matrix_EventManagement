@@ -49,9 +49,35 @@ export async function toggleVolunteerStatusAction(params: {
     updatedAt: new Date().toISOString(),
   });
 
+  // Sync user's global system role in 'users' collection
+  const userRef = adminDb.collection("users").doc(studentId);
+  const userSnap = await userRef.get();
+  if (userSnap.exists) {
+    const userData = userSnap.data();
+    if (isVolunteer && userData?.role === "STUDENT") {
+      await userRef.update({ role: "VOLUNTEER", updatedAt: new Date().toISOString() });
+    } else if (!isVolunteer && userData?.role === "VOLUNTEER") {
+      // Check if user is a volunteer in any other active event
+      const otherVolRegs = await adminDb
+        .collection("registrations")
+        .where("studentId", "==", studentId)
+        .where("eventRole", "==", "volunteer")
+        .get();
+      const activeVolRegs = otherVolRegs.docs.filter(
+        (d) => d.id !== regDoc.id && d.data().status !== "CANCELLED"
+      );
+      if (activeVolRegs.length === 0) {
+        await userRef.update({ role: "STUDENT", updatedAt: new Date().toISOString() });
+      }
+    }
+  }
+
   revalidatePath(`/admin/events/${eventId}`);
   revalidatePath(`/volunteer/events/${eventId}`);
   revalidatePath("/admin/events");
+  revalidatePath("/admin/users");
+  revalidatePath("/student");
+  revalidatePath("/volunteer");
 
   return { success: true, eventRole: newRole };
 }

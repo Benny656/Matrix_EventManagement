@@ -81,11 +81,11 @@ export default async function proxy(request: NextRequest) {
   }
 
   // ── 3.5 Onboarding — intercept before any dashboard access ───────────────
-  if (user?.onboardingCompleted === false) {
+  if (user?.onboardingCompleted === false && user?.role !== "ADMIN" && user?.role !== "FACULTY_ADMIN") {
     return NextResponse.redirect(new URL("/onboarding", request.url));
   }
 
-  // ── 4. Role-based checks ──────────────────────────────────────────────────
+  // ── 4. Role-based checks & auto-redirections ──────────────────────────────
   if (pathname.startsWith("/admin") && user?.role !== "ADMIN" && user?.role !== "FACULTY_ADMIN") {
     return NextResponse.redirect(new URL("/unauthorized", request.url));
   }
@@ -95,10 +95,14 @@ export default async function proxy(request: NextRequest) {
   }
 
   if (pathname.startsWith("/volunteer") && user?.role !== "VOLUNTEER" && user?.role !== "ADMIN") {
+    if (user?.role === "STUDENT") return NextResponse.redirect(new URL("/student", request.url));
+    if (user?.role === "FACULTY") return NextResponse.redirect(new URL("/faculty", request.url));
     return NextResponse.redirect(new URL("/unauthorized", request.url));
   }
 
   if (pathname.startsWith("/student") && user?.role !== "STUDENT" && user?.role !== "ADMIN") {
+    if (user?.role === "VOLUNTEER") return NextResponse.redirect(new URL("/volunteer", request.url));
+    if (user?.role === "FACULTY") return NextResponse.redirect(new URL("/faculty", request.url));
     return NextResponse.redirect(new URL("/unauthorized", request.url));
   }
 
