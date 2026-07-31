@@ -271,39 +271,11 @@ export default function DashboardLayout({ user, children }: DashboardLayoutProps
         </AnimatePresence>
 
         {/* Content */}
-        <div className="flex-1 overflow-y-auto p-4 md:p-6 pb-[calc(5.5rem+env(safe-area-inset-bottom))] md:pb-6 bg-background">
+        <div className="flex-1 overflow-y-auto p-4 md:p-6 pb-[calc(1rem+env(safe-area-inset-bottom))] md:pb-6 bg-background">
           <div className="w-full">
             {children}
           </div>
         </div>
-
-        {/* Bottom Nav (Mobile) */}
-        <nav className="fixed bottom-0 left-0 right-0 z-30 md:hidden flex justify-around items-center h-[calc(4rem+env(safe-area-inset-bottom))] pb-[env(safe-area-inset-bottom)] border-t border-border/80 bg-background/80 backdrop-blur-md px-2">
-          {navItems.slice(0, 3).map((item) => {
-            const Icon = item.icon;
-            const isRoot = ["/admin", "/volunteer", "/student", "/faculty"].includes(item.href);
-            const active = isRoot ? pathname === item.href : pathname === item.href || pathname.startsWith(item.href + "/");
-            return (
-              <Link
-                key={item.href}
-                href={item.href}
-                className={`flex-1 flex flex-col items-center justify-center h-full py-1.5 transition-all gap-1 rounded-md active:scale-95 ${
-                  active ? "text-primary font-semibold" : "text-muted-foreground hover:text-foreground"
-                }`}
-              >
-                <Icon size={18} />
-                <span className="font-mono text-[8px] uppercase tracking-widest">{item.label}</span>
-              </Link>
-            );
-          })}
-          <button
-            onClick={() => setMobileMenuOpen(true)}
-            className="flex-1 flex flex-col items-center justify-center h-full py-1.5 text-muted-foreground hover:text-foreground transition-all gap-1 rounded-md active:scale-95 cursor-pointer"
-          >
-            <Menu size={18} />
-            <span className="font-mono text-[8px] uppercase tracking-widest">More</span>
-          </button>
-        </nav>
       </div>
     </div>
   );

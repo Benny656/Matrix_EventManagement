@@ -46,7 +46,7 @@ const eventSchema = z.object({
   title: z.string().min(2, "Event title is required"),
   description: z.string().min(5, "Event description must be at least 5 characters"),
   posterUrl: z.string().optional().nullable(),
-  venue: z.string().min(2, "Event venue is required"),
+  venue: z.string().optional().nullable(),
   date: z.string().or(z.date()).transform((val) => new Date(val)),
   registrationOpen: z.boolean().default(true),
   maxParticipants: z.number().min(1).optional().nullable(),

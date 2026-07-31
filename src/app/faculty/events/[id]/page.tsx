@@ -131,7 +131,7 @@ export default async function FacultyEventDetailsPage({ params }: PageProps) {
         <div className="lg:col-span-4 space-y-6">
           <div className="border border-border p-6 bg-card space-y-6">
             <h3 className="font-mono text-xs uppercase tracking-widest text-muted-foreground border-b border-border pb-1 font-semibold">
-              Deployment Info
+              Event Details
             </h3>
 
             <div className="space-y-4 font-mono text-xs">

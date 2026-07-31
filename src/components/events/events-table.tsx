@@ -180,7 +180,7 @@ export default function EventsTable({ initialEvents, role }: EventsTableProps) {
                   <div className="md:col-span-4 pr-4 flex flex-col">
                     <span className="text-[10px] text-primary uppercase font-bold tracking-widest">{event.category}</span>
                     <h4 className="font-sans text-sm font-bold text-foreground mt-0.5 line-clamp-2">{event.title}</h4>
-                    <span className="text-muted-foreground text-[10px] block mt-0.5">Location: {event.venue}</span>
+                    {event.venue ? <span className="text-muted-foreground text-[10px] block mt-0.5">Location: {event.venue}</span> : null}
                   </div>
 
                   {/* Mobile Meta Grid */}

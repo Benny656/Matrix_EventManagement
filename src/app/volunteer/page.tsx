@@ -76,7 +76,7 @@ export default async function VolunteerDashboardPage() {
         {/* Active deployments */}
         <div className="lg:col-span-8 space-y-4">
           <div className="flex items-center justify-between border-b border-border pb-1">
-            <h2 className="font-mono text-xs uppercase tracking-widest text-muted-foreground">Active Deployments</h2>
+            <h2 className="font-mono text-xs uppercase tracking-widest text-muted-foreground">Active Events</h2>
             <Link href="/volunteer/events" className="font-mono text-[11px] text-primary hover:underline uppercase font-semibold">
               View All
             </Link>
@@ -85,7 +85,7 @@ export default async function VolunteerDashboardPage() {
           <div className="space-y-3">
             {activeEvents.length === 0 ? (
               <div className="border border-border p-12 text-center text-muted-foreground font-mono text-xs uppercase bg-card">
-                No active deployments at this time.
+                No active events at this time.
               </div>
             ) : (
               activeEvents.map((event) => {

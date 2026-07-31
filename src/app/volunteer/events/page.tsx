@@ -18,7 +18,7 @@ export default async function VolunteerEventsPage() {
             Events Management
           </h1>
           <p className="font-sans text-sm text-muted-foreground">
-            Monitor and coordinate active deployments, or review historically archived events.
+            Monitor and coordinate events, or review past events.
           </p>
         </div>
         <div>

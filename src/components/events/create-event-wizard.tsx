@@ -40,7 +40,7 @@ const basicInfoSchema = z.object({
   description: z.string().min(5, "Event description must be at least 5 characters"),
   eventDate: z.string().min(1, "Event date is required"),
   category: z.string().min(1, "Please select a category"),
-  venue: z.string().min(2, "Venue is required"),
+  venue: z.string().optional().nullable(),
   maxParticipants: z.preprocess(
     (val) => (val === "" || val === undefined || val === null || (typeof val === "number" && isNaN(val)) ? null : Number(val)),
     z.number().min(1, "Capacity must be at least 1").optional().nullable()
@@ -204,7 +204,7 @@ export default function CreateEventWizard({ role }: { role: "ADMIN" | "VOLUNTEER
       {step === 1 && (
         <div className="border border-border bg-card p-4 md:p-6 space-y-6">
           <div className="border-b border-border pb-3 -mx-4 md:-mx-6 px-4 md:px-6 bg-surface-container -mt-4 md:-mt-6 mb-6">
-            <span className="font-mono text-[11px] font-semibold text-muted-foreground uppercase tracking-widest">Step 1: Foundational Parameters</span>
+            <span className="font-mono text-[11px] font-semibold text-muted-foreground uppercase tracking-widest">Step 1: Basic Info</span>
           </div>
 
           <form onSubmit={handleBasicSubmit(nextStepBasic)} className="space-y-6">
@@ -258,22 +258,6 @@ export default function CreateEventWizard({ role }: { role: "ADMIN" | "VOLUNTEER
                 )}
               </div>
 
-              {/* Venue */}
-              <div className="flex flex-col gap-1">
-                <Label className="font-mono text-[11px] text-muted-foreground uppercase tracking-wider" htmlFor="venue">Location / Facility</Label>
-                <div className="relative">
-                  <MapPin size={14} className="absolute left-3 top-1/2 -translate-y-1/2 text-muted-foreground" />
-                  <Input
-                    {...registerBasic("venue")}
-                    className="w-full bg-background border border-border text-foreground pl-10 pr-3 py-6 font-mono text-sm focus-visible:ring-1 focus-visible:ring-primary rounded-none shadow-none"
-                    id="venue"
-                    placeholder="e.g. Sector 4, Hub B"
-                  />
-                </div>
-                {basicErrors.venue && (
-                  <span className="font-mono text-[10px] text-destructive uppercase mt-1">{basicErrors.venue.message}</span>
-                )}
-              </div>
 
               {/* Event Date */}
               <div className="flex flex-col gap-1">
@@ -460,13 +444,13 @@ export default function CreateEventWizard({ role }: { role: "ADMIN" | "VOLUNTEER
                 onClick={() => router.back()}
                 className="font-mono text-xs uppercase text-primary hover:text-primary-container px-2 py-1"
               >
-                Cancel Protocol
+                Cancel
               </button>
               <button
                 type="submit"
                 className="bg-primary text-primary-foreground font-mono text-xs uppercase tracking-widest py-3 px-6 hover:bg-primary-container transition-all active:scale-95"
               >
-                Configure Sessions
+                Next: Sessions
               </button>
             </div>
           </form>
@@ -477,7 +461,7 @@ export default function CreateEventWizard({ role }: { role: "ADMIN" | "VOLUNTEER
       {step === 2 && (
         <div className="border border-border bg-card p-4 md:p-6 space-y-6">
           <div className="border-b border-border pb-3 -mx-4 md:-mx-6 px-4 md:px-6 bg-surface-container -mt-4 md:-mt-6 mb-6">
-            <span className="font-mono text-[11px] font-semibold text-muted-foreground uppercase tracking-widest">Step 2: Configure Sessions</span>
+            <span className="font-mono text-[11px] font-semibold text-muted-foreground uppercase tracking-widest">Step 2: Add Sessions</span>
           </div>
 
           {/* Session Creation Sub-form */}
@@ -519,15 +503,15 @@ export default function CreateEventWizard({ role }: { role: "ADMIN" | "VOLUNTEER
               onClick={addSession}
               className="bg-secondary text-secondary-foreground font-mono text-[11px] uppercase tracking-wider py-2 px-4 hover:opacity-90 active:scale-95 transition-all"
             >
-              Add Segment Record
+              Add Session
             </button>
           </div>
 
           {/* Current Sessions List */}
           <div className="space-y-3">
             <div className="flex justify-between items-end">
-              <h3 className="font-mono text-xs uppercase tracking-widest text-muted-foreground font-semibold">Scheduled Segments</h3>
-              <span className="font-mono text-[10px] bg-surface-container px-2 py-1 border border-border">{sessions.length} RECORDS</span>
+              <h3 className="font-mono text-xs uppercase tracking-widest text-muted-foreground font-semibold">Scheduled Sessions</h3>
+              <span className="font-mono text-[10px] bg-surface-container px-2 py-1 border border-border">{sessions.length} SESSIONS</span>
             </div>
 
             {sessions.length === 0 ? (
@@ -578,7 +562,7 @@ export default function CreateEventWizard({ role }: { role: "ADMIN" | "VOLUNTEER
               onClick={() => setStep(3)}
               className="bg-primary text-primary-foreground font-mono text-xs uppercase tracking-widest py-3 px-6 hover:bg-primary-container transition-all active:scale-95"
             >
-              Review Protocol
+              Next: Review Event
             </button>
           </div>
         </div>
@@ -588,13 +572,13 @@ export default function CreateEventWizard({ role }: { role: "ADMIN" | "VOLUNTEER
       {step === 3 && (
         <div className="border border-border bg-card p-4 md:p-6 space-y-6">
           <div className="border-b border-border pb-3 -mx-4 md:-mx-6 px-4 md:px-6 bg-surface-container -mt-4 md:-mt-6 mb-6">
-            <span className="font-mono text-[11px] font-semibold text-muted-foreground uppercase tracking-widest">Step 3: Review Specifications</span>
+            <span className="font-mono text-[11px] font-semibold text-muted-foreground uppercase tracking-widest">Step 3: Review Details</span>
           </div>
 
           <div className="space-y-6">
             <div className="border border-border p-4 space-y-4">
               <h3 className="font-mono text-xs uppercase tracking-widest text-muted-foreground font-semibold border-b border-border pb-1">
-                Event Core Parameters
+                Event Details
               </h3>
               <div className="grid grid-cols-1 md:grid-cols-2 gap-4 font-mono text-xs">
                 <div>
@@ -609,10 +593,7 @@ export default function CreateEventWizard({ role }: { role: "ADMIN" | "VOLUNTEER
                   <span className="text-muted-foreground block uppercase">Date</span>
                   <span className="font-semibold text-foreground">{new Date(basicInfo?.eventDate || "").toLocaleDateString()}</span>
                 </div>
-                <div>
-                  <span className="text-muted-foreground block uppercase">Location / Venue</span>
-                  <span className="font-semibold text-foreground">{basicInfo?.venue}</span>
-                </div>
+
                 <div>
                   <span className="text-muted-foreground block uppercase">Capacity Limit</span>
                   <span className="font-semibold text-foreground">{basicInfo?.maxParticipants} Attendees</span>
@@ -682,7 +663,7 @@ export default function CreateEventWizard({ role }: { role: "ADMIN" | "VOLUNTEER
               className="bg-primary text-primary-foreground font-mono text-xs uppercase tracking-widest py-3 px-6 hover:bg-primary-container transition-all active:scale-95 disabled:opacity-50"
               disabled={publishing}
             >
-              {publishing ? "COMMITTING PROTOCOL..." : "Publish Event"}
+              {publishing ? "Creating Event..." : "Publish Event"}
             </button>
           </div>
         </div>
