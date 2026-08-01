@@ -16,19 +16,14 @@ export default function MatrixLoadingScreen({
 }: MatrixLoadingScreenProps) {
   const pathname = usePathname() || "";
   const path = pathname.toLowerCase();
+  const isLandingPage = path === "/" || path === "" || path === "/home";
 
-  // Completely suppress loader on all Auth & Sign-in screens
-  if (
-    path.startsWith("/login") ||
-    path.startsWith("/forgot-password") ||
-    path.startsWith("/reset-password") ||
-    path.startsWith("/change-password")
-  ) {
+  // Loader screen should ONLY show on landing page, never on dashboard or other sections
+  if (!isLandingPage) {
     return null;
   }
 
   const activeMessage = message || getLoadingMessage(pathname);
-  const isLandingPage = path === "/" || path === "" || path === "/home";
 
   // Enforce at least 2 seconds (2000ms) minimum display duration
   const [phase, setPhase] = useState<"EXEC" | "VERIFY" | "OK">("EXEC");
@@ -48,12 +43,8 @@ export default function MatrixLoadingScreen({
     };
   }, [minDurationMs]);
 
-  // Terminal Loader Container Styling:
-  // - Landing page: full-bleed overlay
-  // - Dashboard sections: scoped STRICTLY to main content area (never covers top bar or sidebar)
-  const containerClasses = isLandingPage
-    ? "fixed inset-0 z-50 flex flex-col items-center justify-center bg-background text-foreground overflow-hidden select-none px-4 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]"
-    : "relative w-full min-h-[calc(100vh-7rem)] flex flex-col items-center justify-center bg-background text-foreground overflow-hidden rounded-xl border border-border/50 p-6 my-2 select-none";
+  const containerClasses =
+    "fixed inset-0 z-50 flex flex-col items-center justify-center bg-background text-foreground overflow-hidden select-none px-4 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]";
 
   return (
     <motion.div
