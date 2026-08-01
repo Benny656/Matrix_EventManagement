@@ -3,6 +3,7 @@ import Script from "next/script";
 import { Inter, Geist, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
 import PWARegister from "@/components/pwa-register";
+import AuthListener from "@/components/auth-listener";
 import { ThemeProvider } from "@/components/theme-provider";
 
 const inter = Inter({
@@ -79,6 +80,7 @@ export default function RootLayout({
       <body className="min-h-full flex flex-col">
         <ThemeProvider>
           <PWARegister />
+          <AuthListener />
           {children}
         </ThemeProvider>
       </body>

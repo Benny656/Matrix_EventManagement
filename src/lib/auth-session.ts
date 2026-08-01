@@ -34,10 +34,15 @@ export const getCurrentUser = cache(async (): Promise<UserProfile | null> => {
 
     if (token) {
       try {
-        const decodedToken = await adminAuth.verifyIdToken(token);
+        const decodedToken = await adminAuth.verifySessionCookie(token, true);
         uid = decodedToken.uid;
       } catch (err) {
-        // Token verification failed or expired
+        try {
+          const decodedToken = await adminAuth.verifyIdToken(token);
+          uid = decodedToken.uid;
+        } catch (idErr) {
+          // Token verification failed or expired
+        }
       }
     }
 
