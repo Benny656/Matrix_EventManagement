@@ -6,7 +6,7 @@ import { adminDb } from "@/lib/firebase-admin";
 import { getEventsAction } from "@/actions/event";
 import FacultyEventList from "@/components/events/faculty-event-list";
 import { Button } from "@/components/ui/button";
-import { CalendarDays, MapPin } from "lucide-react";
+import { CalendarDays } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -127,10 +127,6 @@ export default async function FacultyDashboardPage() {
                       <div className="flex items-center gap-2">
                         <CalendarDays size={13} className="text-muted-foreground" />
                         <span>{formatEventTime(event)}</span>
-                      </div>
-                      <div className="flex items-center gap-2">
-                        <MapPin size={13} className="text-muted-foreground" />
-                        <span className="truncate">{event.venue}</span>
                       </div>
                     </div>
                   </div>

@@ -3,7 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { usePathname } from "next/navigation";
 import { motion } from "framer-motion";
-import { getLoadingMessage } from "./LoadingMessages";
+import { getSectionLoadingMeta } from "./LoadingMessages";
 
 interface MatrixLoadingScreenProps {
   message?: string;
@@ -12,26 +12,24 @@ interface MatrixLoadingScreenProps {
 
 export default function MatrixLoadingScreen({
   message,
-  minDurationMs = 2000,
+  minDurationMs = 1000,
 }: MatrixLoadingScreenProps) {
   const pathname = usePathname() || "";
   const path = pathname.toLowerCase();
   const isLandingPage = path === "/" || path === "" || path === "/home";
 
-  // Loader screen should ONLY show on landing page, never on dashboard or other sections
-  if (!isLandingPage) {
-    return null;
-  }
+  const sectionMeta = getSectionLoadingMeta(pathname);
+  const activeMessage = message || sectionMeta.message;
+  const headerTag = sectionMeta.headerTag;
+  const commandText = sectionMeta.command;
 
-  const activeMessage = message || getLoadingMessage(pathname);
-
-  // Enforce at least 2 seconds (2000ms) minimum display duration
+  // Enforce 1 second (1000ms) minimum display duration
   const [phase, setPhase] = useState<"EXEC" | "VERIFY" | "OK">("EXEC");
 
   useEffect(() => {
     const timer1 = setTimeout(() => {
       setPhase("VERIFY");
-    }, 1000);
+    }, Math.floor(minDurationMs / 2));
 
     const timer2 = setTimeout(() => {
       setPhase("OK");
@@ -44,17 +42,17 @@ export default function MatrixLoadingScreen({
   }, [minDurationMs]);
 
   const containerClasses =
-    "fixed inset-0 z-50 flex flex-col items-center justify-center bg-background text-foreground overflow-hidden select-none px-4 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]";
+    "fixed inset-0 z-50 flex flex-col items-center justify-center bg-background/95 backdrop-blur-xs text-foreground overflow-hidden select-none px-4 pt-[env(safe-area-inset-top)] pb-[env(safe-area-inset-bottom)]";
 
   return (
     <motion.div
       className={containerClasses}
-      initial={{ opacity: 0, scale: isLandingPage ? 1 : 0.99 }}
+      initial={{ opacity: 0, scale: 0.99 }}
       animate={{ opacity: 1, scale: 1 }}
       exit={{ opacity: 0 }}
-      transition={{ duration: 0.3, ease: "easeOut" }}
+      transition={{ duration: 0.2, ease: "easeOut" }}
     >
-      {/* Top Indeterminate Progress Bar (Synced to 2s) */}
+      {/* Top Indeterminate Progress Bar (Synced to 1s) */}
       <div className="absolute top-0 left-0 right-0 h-1 bg-surface-container overflow-hidden z-20">
         <motion.div
           className="h-full bg-primary"
@@ -62,7 +60,7 @@ export default function MatrixLoadingScreen({
           animate={{ x: "100%" }}
           transition={{
             repeat: Infinity,
-            duration: 2.0,
+            duration: 1.0,
             ease: "easeInOut",
           }}
         />
@@ -94,7 +92,7 @@ export default function MatrixLoadingScreen({
             <span className="w-2.5 h-2.5 rounded-full bg-emerald-500/80 inline-block" />
           </div>
           <span className="font-mono text-[10px] uppercase tracking-widest text-muted-foreground font-semibold">
-            MATRIX_OS // EXEC_STREAM
+            {headerTag}
           </span>
         </div>
 
@@ -127,7 +125,7 @@ export default function MatrixLoadingScreen({
           <div className="space-y-1.5 pt-1 text-left">
             <div className="flex items-center gap-2 text-[11px] text-muted-foreground/80 truncate">
               <span className="text-primary font-bold">$</span>
-              <span className="truncate">matrix --fetch --route={pathname || "/"}</span>
+              <span className="truncate">{commandText}</span>
             </div>
 
             <div className="flex items-center gap-2 text-xs text-foreground font-semibold">
@@ -144,13 +142,7 @@ export default function MatrixLoadingScreen({
           {/* Sub-status Bar */}
           <div className="pt-2.5 flex justify-between items-center text-[10px] text-muted-foreground border-t border-border/30">
             <span className="uppercase tracking-widest font-mono">
-              {isLandingPage
-                ? "STATUS: INITIALIZING"
-                : phase === "EXEC"
-                ? "STATUS: STREAMING DATA..."
-                : phase === "VERIFY"
-                ? "STATUS: VERIFYING INTEGRITY..."
-                : "STATUS: COMPLETED"}
+              {phase === "OK" ? "STATUS: COMPLETED" : sectionMeta.subStatus}
             </span>
             <span className="text-primary font-mono font-bold">
               {phase}

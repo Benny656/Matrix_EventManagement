@@ -114,7 +114,7 @@ export default async function StudentEventDetailsPage({ params }: PageProps) {
             {event.title}
           </h1>
           <p className="font-sans text-xs text-muted-foreground mt-1">
-            Venue: {event.venue} • Status: {isRegistrationOpen ? "Open for Registration" : "Registration Closed"}
+            Status: {isRegistrationOpen ? "Open for Registration" : "Registration Closed"}
           </p>
         </div>
       </div>

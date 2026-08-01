@@ -11,7 +11,6 @@ import { Search, AlertCircle, Pencil, Archive, Lock, Unlock } from "lucide-react
 interface Session {
   id: string;
   title: string;
-  venue: string;
   startTime: Date;
   endTime?: Date | null;
 }
@@ -20,7 +19,6 @@ interface EventWithSessions {
   id: string;
   title: string;
   description: string;
-  venue: string;
   date: Date;
   registrationOpen: boolean;
   maxParticipants?: number | null;
@@ -180,7 +178,6 @@ export default function EventsTable({ initialEvents, role }: EventsTableProps) {
                   <div className="md:col-span-4 pr-4 flex flex-col">
                     <span className="text-[10px] text-primary uppercase font-bold tracking-widest">{event.category}</span>
                     <h4 className="font-sans text-sm font-bold text-foreground mt-0.5 line-clamp-2">{event.title}</h4>
-                    {event.venue ? <span className="text-muted-foreground text-[10px] block mt-0.5">Location: {event.venue}</span> : null}
                   </div>
 
                   {/* Mobile Meta Grid */}

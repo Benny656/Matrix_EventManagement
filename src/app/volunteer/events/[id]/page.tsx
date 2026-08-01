@@ -105,7 +105,7 @@ export default async function VolunteerEventDetailsPage({ params }: PageProps) {
             {event.title}
           </h1>
           <p className="font-sans text-xs text-muted-foreground mt-1">
-            Venue: {event.venue} • Coordinator: {event.coordinatorName}
+            Coordinator: {event.coordinatorName}
           </p>
         </div>
       </div>

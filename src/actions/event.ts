@@ -9,7 +9,6 @@ import * as z from "zod";
 
 const sessionSchema = z.object({
   title: z.string().min(2, "Session title is required"),
-  venue: z.string().optional().nullable(),
   startTime: z.string().or(z.date()).transform((val) => new Date(val)),
   endTime: z.string().or(z.date()).transform((val) => new Date(val)).optional().nullable(),
 });
@@ -46,7 +45,6 @@ const eventSchema = z.object({
   title: z.string().min(2, "Event title is required"),
   description: z.string().min(5, "Event description must be at least 5 characters"),
   posterUrl: z.string().optional().nullable(),
-  venue: z.string().optional().nullable(),
   date: z.string().or(z.date()).transform((val) => new Date(val)),
   registrationOpen: z.boolean().default(true),
   maxParticipants: z.number().min(1).optional().nullable(),
@@ -80,7 +78,6 @@ export async function createEventAction(input: EventInput) {
       id: sRef.id,
       eventId,
       title: s.title,
-      venue: s.venue,
       startTime: s.startTime.toISOString(),
       endTime: s.endTime ? s.endTime.toISOString() : null,
       createdAt: new Date().toISOString(),
@@ -108,7 +105,6 @@ export async function createEventAction(input: EventInput) {
     title: validated.title,
     description: validated.description,
     posterUrl: validated.posterUrl || null,
-    venue: validated.venue,
     date: validated.date.toISOString(),
     registrationOpen: validated.registrationOpen,
     maxParticipants: validated.maxParticipants,
@@ -157,7 +153,6 @@ export async function updateEventAction(id: string, input: Omit<EventInput, "ses
     title: validated.title,
     description: validated.description,
     posterUrl: validated.posterUrl || null,
-    venue: validated.venue,
     date: validated.date.toISOString(),
     registrationOpen: validated.registrationOpen,
     maxParticipants: validated.maxParticipants,

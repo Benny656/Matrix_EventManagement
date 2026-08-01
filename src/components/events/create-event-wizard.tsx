@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { AlertCircle, MapPin, Trash2, Users } from "lucide-react";
+import { AlertCircle, Trash2, Users } from "lucide-react";
 
 const whatsappInviteLinkSchema = z
   .string()
@@ -40,7 +40,6 @@ const basicInfoSchema = z.object({
   description: z.string().min(5, "Event description must be at least 5 characters"),
   eventDate: z.string().min(1, "Event date is required"),
   category: z.string().min(1, "Please select a category"),
-  venue: z.string().optional().nullable(),
   maxParticipants: z.preprocess(
     (val) => (val === "" || val === undefined || val === null || (typeof val === "number" && isNaN(val)) ? null : Number(val)),
     z.number().min(1, "Capacity must be at least 1").optional().nullable()
@@ -56,7 +55,6 @@ type BasicInfoValues = z.infer<typeof basicInfoSchema>;
 
 interface SessionItem {
   title: string;
-  venue?: string;
   startTime: string;
   endTime?: string;
 }
@@ -152,7 +150,6 @@ export default function CreateEventWizard({ role }: { role: "ADMIN" | "VOLUNTEER
         },
         sessions: sessions.map((s) => ({
           title: s.title,
-          venue: s.venue,
           startTime: new Date(s.startTime),
           endTime: s.endTime ? new Date(s.endTime) : undefined,
         })),

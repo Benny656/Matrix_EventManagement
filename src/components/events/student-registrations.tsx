@@ -14,7 +14,6 @@ interface RegistrationWithEvent {
     id: string;
     title: string;
     description: string;
-    venue: string;
     date: Date;
     category: string;
     whatsappInviteLink?: string | null;
@@ -99,7 +98,7 @@ export default function StudentRegistrations({ initialRegistrations }: { initial
                       </div>
                       <h3 className="font-heading text-base font-bold text-foreground">{reg.event.title}</h3>
                       <p className="font-mono text-xs text-muted-foreground mt-1">
-                        Venue: {reg.event.venue} • Date: {dateStr}
+                        Date: {dateStr}
                       </p>
                     </div>
 

@@ -43,7 +43,6 @@ const COOLDOWN_MS = 2500;
 interface ActiveSession {
   id: string;
   title: string;
-  venue: string;
   event: { title: string };
 }
 

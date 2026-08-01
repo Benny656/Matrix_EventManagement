@@ -121,7 +121,7 @@ export default async function VolunteerDashboardPage() {
                             {event.title}
                           </h3>
                           <p className="font-mono text-xs text-muted-foreground mt-1">
-                            {event.venue} • {eventDateStr} • {eventTimeStr}
+                            {eventDateStr} • {eventTimeStr}
                           </p>
                         </div>
                         <div className="flex items-center gap-2">

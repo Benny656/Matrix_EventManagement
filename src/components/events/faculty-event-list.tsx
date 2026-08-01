@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import { Input } from "@/components/ui/input";
-import { Search, CalendarDays, MapPin } from "lucide-react";
+import { Search, CalendarDays } from "lucide-react";
 
 interface Session {
   id: string;
@@ -15,7 +15,6 @@ interface EventWithCount {
   id: string;
   title: string;
   description: string;
-  venue: string;
   date: Date;
   registrationOpen: boolean;
   maxParticipants?: number | null;
@@ -115,12 +114,6 @@ export default function FacultyEventList({ events }: { events: EventWithCount[] 
                       <CalendarDays size={12} />
                       <span>{dateStr}</span>
                     </div>
-                    {event.venue ? (
-                      <div className="flex items-center gap-2">
-                        <MapPin size={12} />
-                        <span>{event.venue}</span>
-                      </div>
-                    ) : null}
                     <div className="flex items-center justify-between mt-2 pt-2 border-t border-dashed border-border">
                       <span>CAPACITY:</span>
                       <span className={isFull ? "text-primary font-bold" : "text-foreground font-semibold"}>
