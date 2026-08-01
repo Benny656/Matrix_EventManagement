@@ -55,7 +55,7 @@ const socialLinks = [
     description: "Queries, collaborations, guest talks & partnerships.",
     bgColor: "hover:bg-primary/5 hover:border-primary/30",
     iconColor: "text-primary",
-    tag: "matrix@karunya.edu.in",
+    tag: "matrixkarunya@gmail.com",
   },
 ];
 
@@ -222,7 +222,14 @@ export default async function Home() {
             </div>
             <div className="flex items-center gap-1.5 font-mono text-[9px] text-muted-foreground">
               <span>Developed by</span>
-              <span className="font-semibold text-foreground">Benny Manuel</span>
+              <a
+                href="https://benny656.github.io/"
+                target="_blank"
+                rel="noopener noreferrer"
+                className="font-semibold text-foreground hover:text-primary transition-colors hover:underline underline-offset-2"
+              >
+                Benny Manuel
+              </a>
               <a
                 href="https://www.linkedin.com/in/benman656"
                 target="_blank"

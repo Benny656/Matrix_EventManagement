@@ -131,19 +131,19 @@ export default function RegisterActionButton({
                   </p>
                 </div>
 
-                <div className="flex flex-col sm:flex-row gap-3 pt-4 border-t border-border">
+                <div className="flex flex-col sm:flex-row gap-3 pt-5 border-t border-border">
                   <Button
                     variant="outline"
                     onClick={() => setShowConfirmModal(false)}
                     disabled={isPending}
-                    className="flex-1 border-border font-mono text-xs uppercase tracking-wider rounded-none h-10 shadow-none"
+                    className="flex-1 border-2 border-border font-mono text-sm uppercase tracking-wider rounded-none h-12 py-3 hover:bg-surface-container font-semibold transition-all active:scale-[0.98] shadow-none"
                   >
                     Go Back
                   </Button>
                   <Button
                     onClick={confirmAndRegister}
                     disabled={isPending}
-                    className="flex-1 bg-primary text-primary-foreground font-mono text-xs uppercase tracking-wider rounded-none h-10 shadow-none"
+                    className="flex-1 bg-primary text-primary-foreground font-mono text-sm uppercase tracking-wider rounded-none h-12 py-3 hover:bg-primary/90 font-bold transition-all active:scale-[0.98] shadow-sm"
                   >
                     Confirm & Register
                   </Button>
@@ -166,7 +166,7 @@ export default function RegisterActionButton({
               </p>
             </div>
 
-            <div className="flex flex-col sm:flex-row gap-3 pt-4 border-t border-border">
+            <div className="flex flex-col sm:flex-row gap-3 pt-5 border-t border-border">
               {registeredWhatsappLink ? (
                 <a
                   href={registeredWhatsappLink}
@@ -174,7 +174,7 @@ export default function RegisterActionButton({
                   rel="noopener noreferrer"
                   className="flex-1"
                 >
-                  <Button className="w-full bg-[#25D366] hover:bg-[#20bd5a] text-white font-mono text-xs uppercase tracking-wider rounded-none h-10 shadow-none">
+                  <Button className="w-full bg-[#25D366] hover:bg-[#20bd5a] text-white font-mono text-sm uppercase tracking-wider rounded-none h-12 py-3 font-bold shadow-md transition-all active:scale-[0.98]">
                     Join WhatsApp Group
                   </Button>
                 </a>
@@ -182,7 +182,7 @@ export default function RegisterActionButton({
               <Button
                 variant="outline"
                 onClick={() => setShowSuccessModal(false)}
-                className="flex-1 border-border font-mono text-xs uppercase tracking-wider rounded-none h-10 shadow-none"
+                className="flex-1 border-2 border-border font-mono text-sm uppercase tracking-wider rounded-none h-12 py-3 font-semibold hover:bg-surface-container transition-all active:scale-[0.98] shadow-none"
               >
                 Close
               </Button>
