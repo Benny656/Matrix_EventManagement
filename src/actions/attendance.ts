@@ -190,8 +190,8 @@ export async function getActiveSessionsAction() {
       return {
         id: doc.id,
         ...data,
-        startTime: new Date(data.startTime),
-        endTime: data.endTime ? new Date(data.endTime) : null,
+        startTime: typeof data.startTime === "string" ? data.startTime : (data.startTime ? new Date(data.startTime).toISOString() : new Date().toISOString()),
+        endTime: data.endTime ? (typeof data.endTime === "string" ? data.endTime : new Date(data.endTime).toISOString()) : null,
         event: {
           title: event.title,
         },
@@ -199,7 +199,11 @@ export async function getActiveSessionsAction() {
     })
     .filter(Boolean);
 
-  sessions.sort((a: any, b: any) => a.startTime.getTime() - b.startTime.getTime());
+  sessions.sort((a: any, b: any) => {
+    const timeA = a.startTime ? new Date(a.startTime).getTime() : 0;
+    const timeB = b.startTime ? new Date(b.startTime).getTime() : 0;
+    return timeA - timeB;
+  });
   return sessions;
 }
 

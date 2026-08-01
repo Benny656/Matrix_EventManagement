@@ -32,8 +32,8 @@ const profileSchema = z.object({
   name: z.string().min(2, "Full name must be at least 2 characters"),
   phoneNumber: z.string().refine((val) => {
     if (!val) return true;
-    return /^[+]?[0-9]{10,15}$/.test(val.replace(/[\s-()]/g, ""));
-  }, "Enter a valid phone number (10-15 digits)"),
+    return /^[6-9]\d{9}$/.test(val);
+  }, "Enter a valid 10-digit phone number (e.g. 9876543210)"),
 });
 
 const passwordSchema = z
@@ -83,7 +83,7 @@ export default function ProfileForm({ user, stats }: ProfileFormProps) {
     resolver: zodResolver(profileSchema),
     defaultValues: {
       name: user.name,
-      phoneNumber: user.phoneNumber,
+      phoneNumber: user.phoneNumber ? user.phoneNumber.replace(/\D/g, "").slice(0, 10) : "",
     },
   });
 
@@ -329,12 +329,19 @@ export default function ProfileForm({ user, stats }: ProfileFormProps) {
                 <div className="flex items-center gap-2 px-3 bg-background/50 border border-border rounded-md focus-within:ring-1 focus-within:ring-primary transition-all">
                   <Smartphone size={14} className="text-muted-foreground shrink-0" />
                   <Input
-                    {...registerProfile("phoneNumber")}
+                    {...registerProfile("phoneNumber", {
+                      onChange: (e) => {
+                        e.target.value = e.target.value.replace(/\D/g, "").slice(0, 10);
+                      },
+                    })}
                     id="phoneNumber"
                     disabled={profileLoading}
                     className="flex-1 py-2.5 bg-transparent border-none focus-visible:ring-0 focus-visible:ring-offset-0 font-sans text-sm text-foreground shadow-none placeholder:text-muted-foreground/30 h-auto"
-                    placeholder="+91 9876543210"
+                    placeholder="9876543210"
                     type="tel"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    maxLength={10}
                   />
                 </div>
                 {profileErrors.phoneNumber && (

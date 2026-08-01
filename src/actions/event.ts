@@ -68,7 +68,7 @@ async function verifyAuth(allowedRoles: ("ADMIN" | "FACULTY_ADMIN" | "VOLUNTEER"
 }
 
 export async function createEventAction(input: EventInput) {
-  const user = await verifyAuth(["ADMIN", "FACULTY_ADMIN"]);
+  const user = await verifyAuth(["ADMIN", "FACULTY_ADMIN", "VOLUNTEER"]);
   const validated = eventSchema.parse(input);
 
   const eventRef = adminDb.collection("events").doc();
@@ -168,11 +168,11 @@ export async function updateEventAction(id: string, input: Omit<EventInput, "ses
     updatedAt: new Date().toISOString(),
   });
 
+  revalidatePath("/student");
+  revalidatePath("/volunteer");
+  revalidatePath("/admin");
   revalidatePath(`/student/events/${id}`);
-  revalidatePath(`/faculty/events/${id}`);
   revalidatePath(`/volunteer/events/${id}`);
-  revalidatePath("/volunteer/events");
-  revalidatePath("/admin/events");
   return { success: true };
 }
 
@@ -319,15 +319,17 @@ export async function getEventsAction(
       (r: any) => r.eventId === doc.id && r.status === "REGISTERED" && r.eventRole === "volunteer"
     ).length;
 
+    const dateStr = typeof data.date === "string" ? data.date : (data.date ? new Date(data.date).toISOString() : new Date().toISOString());
+
     return {
       ...data,
       id: doc.id,
-      date: new Date(data.date),
+      date: dateStr,
       registrationOpen: data.registrationOpen ?? true,
       sessions: eventSessions.map((s: any) => ({
         ...s,
-        startTime: new Date(s.startTime),
-        endTime: s.endTime ? new Date(s.endTime) : null,
+        startTime: typeof s.startTime === "string" ? s.startTime : (s.startTime ? new Date(s.startTime).toISOString() : new Date().toISOString()),
+        endTime: s.endTime ? (typeof s.endTime === "string" ? s.endTime : new Date(s.endTime).toISOString()) : null,
       })),
       _count: {
         registrations: regCount,
@@ -352,11 +354,18 @@ export async function getEventsAction(
     let newStatus: "UPCOMING" | "ONGOING" | "COMPLETED" = "UPCOMING";
 
     const hasOngoingSession = event.sessions.some(
-      (s: any) => s.startTime && now >= s.startTime && (!s.endTime || now <= s.endTime)
+      (s: any) => {
+        const start = s.startTime ? new Date(s.startTime) : null;
+        const end = s.endTime ? new Date(s.endTime) : null;
+        return start && now >= start && (!end || now <= end);
+      }
     );
     const allSessionsFinished =
       event.sessions.length > 0 &&
-      event.sessions.every((s: any) => (s.endTime ? now > s.endTime : false));
+      event.sessions.every((s: any) => {
+        const end = s.endTime ? new Date(s.endTime) : null;
+        return end ? now > end : false;
+      });
 
     if (hasOngoingSession) {
       newStatus = "ONGOING";
@@ -376,6 +385,10 @@ export async function getEventsAction(
     return event;
   });
 
-  updatedEvents.sort((a: any, b: any) => a.date.getTime() - b.date.getTime());
+  updatedEvents.sort((a: any, b: any) => {
+    const timeA = a.date ? new Date(a.date).getTime() : 0;
+    const timeB = b.date ? new Date(b.date).getTime() : 0;
+    return timeA - timeB;
+  });
   return updatedEvents;
 }

@@ -239,8 +239,11 @@ export default function OnboardingForm({
         <Input
           id="phoneNumber"
           type="tel"
+          inputMode="numeric"
+          pattern="[0-9]*"
+          maxLength={10}
           value={phoneNumber}
-          onChange={(e) => setPhoneNumber(e.target.value)}
+          onChange={(e) => setPhoneNumber(e.target.value.replace(/\D/g, "").slice(0, 10))}
           placeholder="e.g. 9876543210"
           required
         />
