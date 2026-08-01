@@ -2,7 +2,7 @@ import type { UserProfile } from "./auth-session";
 
 // ─── Types ────────────────────────────────────────────────────────────────────
 
-export type TargetAudience = "ALL" | "STUDENTS" | "FACULTY";
+export type TargetAudience = "ALL" | "STUDENTS" | "FACULTY" | "BOTH";
 export type DegreeTarget = "UG" | "PG" | "ALL";
 export type YearTarget =
   | "1st Year"
@@ -13,13 +13,13 @@ export type YearTarget =
 
 export interface EventEligibility {
   targetAudience: TargetAudience;
-  /** Legacy single degree target when targetAudience === "STUDENTS" */
+  /** Legacy single degree target when targetAudience === "STUDENTS" or "BOTH" */
   degree?: DegreeTarget;
-  /** Multi-select degree/program targets when targetAudience === "STUDENTS" */
+  /** Multi-select degree/program targets when targetAudience === "STUDENTS" or "BOTH" */
   degrees?: (DegreeTarget | string)[];
-  /** Multi-select year targets when targetAudience === "STUDENTS" */
+  /** Multi-select year targets when targetAudience === "STUDENTS" or "BOTH" */
   years?: YearTarget[];
-  /** Multi-select department targets when targetAudience === "STUDENTS" */
+  /** Multi-select department targets when targetAudience === "STUDENTS" or "BOTH" */
   departments?: string[];
 }
 
@@ -35,10 +35,10 @@ export interface EligibleEvent {
  *
  * Rules:
  *  - ADMIN, FACULTY_ADMIN, VOLUNTEER → always eligible
- *  - FACULTY → eligible when targetAudience is "ALL" or "FACULTY"
+ *  - FACULTY → eligible when targetAudience is "ALL", "FACULTY", or "BOTH"
  *  - STUDENT → eligible when:
  *      targetAudience is "ALL"   OR
- *      targetAudience is "STUDENTS" AND degree/program matches AND year matches AND department matches
+ *      targetAudience is ("STUDENTS" OR "BOTH") AND degree/program matches AND year matches AND department matches
  *  - Events without an eligibility field → treated as targetAudience "ALL"
  */
 export function isEligible(event: EligibleEvent, user: UserProfile): boolean {
@@ -59,12 +59,12 @@ export function isEligible(event: EligibleEvent, user: UserProfile): boolean {
 
   // Faculty check
   if (user.role === "FACULTY") {
-    return targetAudience === "FACULTY";
+    return targetAudience === "FACULTY" || targetAudience === "BOTH";
   }
 
   // Student check
   if (user.role === "STUDENT") {
-    if (targetAudience !== "STUDENTS") return false;
+    if (targetAudience !== "STUDENTS" && targetAudience !== "BOTH") return false;
 
     // Degree / Program level match
     let degreeOk = true;

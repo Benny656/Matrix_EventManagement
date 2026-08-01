@@ -183,9 +183,11 @@ export default async function AdminEventDetailsPage({ params }: PageProps) {
                   <>
                     <div className="flex justify-between border-b border-dashed border-border pb-2">
                       <span className="text-muted-foreground">Target Audience:</span>
-                      <span className="font-semibold text-foreground uppercase">{audience}</span>
+                      <span className="font-semibold text-foreground uppercase">
+                        {audience === "BOTH" ? "BOTH (STUDENTS & FACULTY)" : audience}
+                      </span>
                     </div>
-                    {audience === "STUDENTS" && (
+                    {(audience === "STUDENTS" || audience === "BOTH") && (
                       <>
                         <div className="flex justify-between border-b border-dashed border-border pb-2">
                           <span className="text-muted-foreground">Degree Level(s):</span>

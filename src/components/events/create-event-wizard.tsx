@@ -69,7 +69,7 @@ export default function CreateEventWizard({ role }: { role: "ADMIN" | "VOLUNTEER
   const [sessions, setSessions] = useState<SessionItem[]>([]);
 
   // Eligibility state (controlled separately for multi-checkbox)
-  const [audience, setAudience] = useState<"ALL" | "STUDENTS" | "FACULTY">("ALL");
+  const [audience, setAudience] = useState<"ALL" | "STUDENTS" | "FACULTY" | "BOTH">("ALL");
   const [selectedDegrees, setSelectedDegrees] = useState<DegreeOption[]>([]);
   const [selectedYears, setSelectedYears] = useState<YearOption[]>([]);
   const [selectedDepts, setSelectedDepts] = useState<DeptOption[]>([]);
@@ -338,7 +338,7 @@ export default function CreateEventWizard({ role }: { role: "ADMIN" | "VOLUNTEER
                   Target Audience
                 </span>
                 <div className="flex flex-wrap gap-3">
-                  {(["ALL", "STUDENTS", "FACULTY"] as const).map((opt) => (
+                  {(["ALL", "STUDENTS", "FACULTY", "BOTH"] as const).map((opt) => (
                     <label
                       key={opt}
                       className={`flex items-center gap-2 px-3 py-2 border cursor-pointer transition-colors font-mono text-xs uppercase tracking-wide ${
@@ -355,21 +355,27 @@ export default function CreateEventWizard({ role }: { role: "ADMIN" | "VOLUNTEER
                         checked={audience === opt}
                         onChange={() => {
                           setAudience(opt);
-                          if (opt !== "STUDENTS") {
+                          if (opt !== "STUDENTS" && opt !== "BOTH") {
                             setSelectedDegrees([]);
                             setSelectedYears([]);
                             setSelectedDepts([]);
                           }
                         }}
                       />
-                      {opt === "ALL" ? "All" : opt === "STUDENTS" ? "Students" : "Faculty"}
+                      {opt === "ALL"
+                        ? "All"
+                        : opt === "STUDENTS"
+                        ? "Students"
+                        : opt === "FACULTY"
+                        ? "Faculty"
+                        : "Both (Students & Faculty)"}
                     </label>
                   ))}
                 </div>
               </div>
 
               {/* Student sub-fields */}
-              {audience === "STUDENTS" && (
+              {(audience === "STUDENTS" || audience === "BOTH") && (
                 <div className="space-y-4 pl-2 border-l-2 border-primary/30">
                   {/* Degree Level */}
                   <div className="flex flex-col gap-2">
@@ -702,6 +708,11 @@ export default function CreateEventWizard({ role }: { role: "ADMIN" | "VOLUNTEER
                     {audience === "STUDENTS" && (
                       <>
                         Students — Degree: {selectedDegrees.length === 0 ? "All" : selectedDegrees.join(", ")} | Years: {selectedYears.length === 0 ? "All" : selectedYears.join(", ")} | Depts: {selectedDepts.length === 0 ? "All" : selectedDepts.join(", ")}
+                      </>
+                    )}
+                    {audience === "BOTH" && (
+                      <>
+                        Both (Students & Faculty) — Degree: {selectedDegrees.length === 0 ? "All" : selectedDegrees.join(", ")} | Years: {selectedYears.length === 0 ? "All" : selectedYears.join(", ")} | Depts: {selectedDepts.length === 0 ? "All" : selectedDepts.join(", ")}
                       </>
                     )}
                   </span>

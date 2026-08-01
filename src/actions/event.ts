@@ -33,7 +33,7 @@ const whatsappInviteLinkSchema = z
   );
 
 const eligibilitySchema = z.object({
-  targetAudience: z.enum(["ALL", "STUDENTS", "FACULTY"]).default("ALL"),
+  targetAudience: z.enum(["ALL", "STUDENTS", "FACULTY", "BOTH"]).default("ALL"),
   degree: z.enum(["UG", "PG", "ALL"]).optional().nullable(),
   degrees: z.array(z.string()).optional().nullable(),
   years: z
@@ -90,12 +90,13 @@ export async function createEventAction(input: EventInput) {
   const batch = adminDb.batch();
 
   const eligibility = validated.eligibility ?? { targetAudience: "ALL" as const };
-  // Normalise: clear degree/years/departments when not targeting students
+  const isStudentOrBoth = eligibility.targetAudience === "STUDENTS" || eligibility.targetAudience === "BOTH";
+  // Normalise: clear degree/years/departments when not targeting students or both
   const eligibilityToStore = {
     targetAudience: eligibility.targetAudience,
-    degree: eligibility.targetAudience === "STUDENTS" ? (eligibility.degree ?? "ALL") : null,
+    degree: isStudentOrBoth ? (eligibility.degree ?? "ALL") : null,
     degrees:
-      eligibility.targetAudience === "STUDENTS"
+      isStudentOrBoth
         ? eligibility.degrees && eligibility.degrees.length > 0
           ? eligibility.degrees
           : eligibility.degree
@@ -103,13 +104,13 @@ export async function createEventAction(input: EventInput) {
           : ["ALL"]
         : null,
     years:
-      eligibility.targetAudience === "STUDENTS"
+      isStudentOrBoth
         ? eligibility.years && eligibility.years.length > 0
           ? eligibility.years
           : ["ALL"]
         : null,
     departments:
-      eligibility.targetAudience === "STUDENTS"
+      isStudentOrBoth
         ? eligibility.departments && eligibility.departments.length > 0
           ? eligibility.departments
           : ["ALL"]
@@ -158,11 +159,12 @@ export async function updateEventAction(id: string, input: Omit<EventInput, "ses
   const validated = baseSchema.parse(input);
 
   const eligibility = validated.eligibility ?? { targetAudience: "ALL" as const };
+  const isStudentOrBoth = eligibility.targetAudience === "STUDENTS" || eligibility.targetAudience === "BOTH";
   const eligibilityToStore = {
     targetAudience: eligibility.targetAudience,
-    degree: eligibility.targetAudience === "STUDENTS" ? (eligibility.degree ?? "ALL") : null,
+    degree: isStudentOrBoth ? (eligibility.degree ?? "ALL") : null,
     degrees:
-      eligibility.targetAudience === "STUDENTS"
+      isStudentOrBoth
         ? eligibility.degrees && eligibility.degrees.length > 0
           ? eligibility.degrees
           : eligibility.degree
@@ -170,13 +172,13 @@ export async function updateEventAction(id: string, input: Omit<EventInput, "ses
           : ["ALL"]
         : null,
     years:
-      eligibility.targetAudience === "STUDENTS"
+      isStudentOrBoth
         ? eligibility.years && eligibility.years.length > 0
           ? eligibility.years
           : ["ALL"]
         : null,
     departments:
-      eligibility.targetAudience === "STUDENTS"
+      isStudentOrBoth
         ? eligibility.departments && eligibility.departments.length > 0
           ? eligibility.departments
           : ["ALL"]
