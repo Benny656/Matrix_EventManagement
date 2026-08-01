@@ -34,7 +34,6 @@ export default function RegisterActionButton({
   const [showConfirmModal, setShowConfirmModal] = useState(false);
 
   const confirmAndRegister = async () => {
-    setShowConfirmModal(false);
     setError(null);
     startTransition(async () => {
       setOptimisticStatus("REGISTERED");
@@ -42,12 +41,16 @@ export default function RegisterActionButton({
         const res = await registerForEventAction(eventId);
         if (res.success) {
           setStatus(res.status as any);
+          setShowConfirmModal(false);
           if (res.status === "REGISTERED") {
             setRegisteredWhatsappLink(res.whatsappInviteLink || null);
             setShowSuccessModal(true);
           }
+        } else {
+          setShowConfirmModal(false);
         }
       } catch (err: any) {
+        setShowConfirmModal(false);
         setError(err.message || "Failed to register");
       }
     });

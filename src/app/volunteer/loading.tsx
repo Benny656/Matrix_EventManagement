@@ -1,5 +1,5 @@
-import { DashboardSkeleton } from "@/components/ui/skeleton-loaders";
+import MatrixLoadingScreen from "@/components/loading/MatrixLoadingScreen";
 
 export default function Loading() {
-  return <DashboardSkeleton />;
+  return <MatrixLoadingScreen />;
 }
