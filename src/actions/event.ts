@@ -391,3 +391,122 @@ export async function getEventsAction(
   });
   return updatedEvents;
 }
+
+const sessionManagementSchema = z.object({
+  title: z.string().min(2, "Session title is required"),
+  startTime: z.string().min(1, "Start time is required"),
+  endTime: z.string().nullable().optional(),
+});
+
+export async function addSessionAction(
+  eventId: string,
+  sessionData: { title: string; startTime: string; endTime?: string | null }
+) {
+  await verifyAuth(["ADMIN", "FACULTY_ADMIN"]);
+
+  if (!eventId) throw new Error("Event ID is required");
+
+  const eventDoc = await adminDb.collection("events").doc(eventId).get();
+  if (!eventDoc.exists) throw new Error("Event not found");
+
+  const validated = sessionManagementSchema.parse(sessionData);
+
+  const startD = new Date(validated.startTime);
+  if (isNaN(startD.getTime())) throw new Error("Invalid start time format");
+
+  let endIso: string | null = null;
+  if (validated.endTime && validated.endTime.trim() !== "") {
+    const endD = new Date(validated.endTime);
+    if (isNaN(endD.getTime())) throw new Error("Invalid end time format");
+    if (endD <= startD) throw new Error("End time must be after start time");
+    endIso = endD.toISOString();
+  }
+
+  const newDocRef = adminDb.collection("sessions").doc();
+  await newDocRef.set({
+    id: newDocRef.id,
+    eventId,
+    title: validated.title,
+    startTime: startD.toISOString(),
+    endTime: endIso,
+    createdAt: new Date().toISOString(),
+  });
+
+  revalidatePath(`/admin/events/${eventId}`);
+  revalidatePath(`/faculty/events/${eventId}`);
+  revalidatePath(`/student/events/${eventId}`);
+  revalidatePath(`/volunteer/events/${eventId}`);
+  revalidatePath("/admin/events");
+  revalidatePath("/faculty/events");
+  revalidatePath("/student");
+  return { success: true, sessionId: newDocRef.id };
+}
+
+export async function updateSessionAction(
+  sessionId: string,
+  sessionData: { title: string; startTime: string; endTime?: string | null }
+) {
+  await verifyAuth(["ADMIN", "FACULTY_ADMIN"]);
+
+  if (!sessionId) throw new Error("Session ID is required");
+
+  const sessionDoc = await adminDb.collection("sessions").doc(sessionId).get();
+  if (!sessionDoc.exists) throw new Error("Session not found");
+
+  const existingData = sessionDoc.data() as any;
+  const eventId = existingData.eventId;
+
+  const validated = sessionManagementSchema.parse(sessionData);
+
+  const startD = new Date(validated.startTime);
+  if (isNaN(startD.getTime())) throw new Error("Invalid start time format");
+
+  let endIso: string | null = null;
+  if (validated.endTime && validated.endTime.trim() !== "") {
+    const endD = new Date(validated.endTime);
+    if (isNaN(endD.getTime())) throw new Error("Invalid end time format");
+    if (endD <= startD) throw new Error("End time must be after start time");
+    endIso = endD.toISOString();
+  }
+
+  await adminDb.collection("sessions").doc(sessionId).update({
+    title: validated.title,
+    startTime: startD.toISOString(),
+    endTime: endIso,
+    updatedAt: new Date().toISOString(),
+  });
+
+  revalidatePath(`/admin/events/${eventId}`);
+  revalidatePath(`/faculty/events/${eventId}`);
+  revalidatePath(`/student/events/${eventId}`);
+  revalidatePath(`/volunteer/events/${eventId}`);
+  revalidatePath("/admin/events");
+  revalidatePath("/faculty/events");
+  revalidatePath("/student");
+  return { success: true };
+}
+
+export async function deleteSessionAction(sessionId: string) {
+  await verifyAuth(["ADMIN", "FACULTY_ADMIN"]);
+
+  if (!sessionId) throw new Error("Session ID is required");
+
+  const sessionDoc = await adminDb.collection("sessions").doc(sessionId).get();
+  if (!sessionDoc.exists) throw new Error("Session not found");
+
+  const eventId = sessionDoc.data()?.eventId;
+
+  await adminDb.collection("sessions").doc(sessionId).delete();
+
+  if (eventId) {
+    revalidatePath(`/admin/events/${eventId}`);
+    revalidatePath(`/faculty/events/${eventId}`);
+    revalidatePath(`/student/events/${eventId}`);
+    revalidatePath(`/volunteer/events/${eventId}`);
+  }
+  revalidatePath("/admin/events");
+  revalidatePath("/faculty/events");
+  revalidatePath("/student");
+  return { success: true };
+}
+

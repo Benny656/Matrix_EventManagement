@@ -118,12 +118,6 @@ export default function StudentEventList({ events }: { events: EventItem[] }) {
                       <CalendarDays size={12} />
                       <span>{dateStr}</span>
                     </div>
-                    <div className="flex items-center justify-between mt-2 pt-2 border-t border-dashed border-border">
-                      <span>CAPACITY:</span>
-                      <span className={isFull ? "text-primary font-bold" : "text-foreground font-semibold"}>
-                        {event.maxParticipants ? `${event._count.registrations} / ${event.maxParticipants} ${isFull ? "(FULL)" : ""}` : `${event._count.registrations} (UNLIMITED)`}
-                      </span>
-                    </div>
                   </div>
                 </div>
 

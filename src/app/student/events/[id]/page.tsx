@@ -4,6 +4,7 @@ import { getCurrentUser } from "@/lib/auth-session";
 import { adminDb } from "@/lib/firebase-admin";
 import { isEligible } from "@/lib/eligibility";
 import RegisterActionButton from "@/components/events/register-action-button";
+import { CalendarDays } from "lucide-react";
 
 export const dynamic = "force-dynamic";
 
@@ -133,6 +134,56 @@ export default async function StudentEventDetailsPage({ params }: PageProps) {
             </p>
           </div>
 
+          {/* Event Schedule (When) */}
+          <div className="border border-border bg-card p-6 space-y-4">
+            <h3 className="font-mono text-xs uppercase tracking-widest text-foreground font-semibold border-b border-border pb-2 flex items-center justify-between">
+              <span>Event Schedule & Time</span>
+              <CalendarDays size={14} className="text-muted-foreground" />
+            </h3>
+            {sessions.length === 0 ? (
+              <p className="font-mono text-xs text-muted-foreground uppercase py-1">
+                {event.date
+                  ? `Date: ${new Date(event.date).toLocaleDateString("en-US", {
+                      weekday: "short",
+                      month: "short",
+                      day: "numeric",
+                      year: "numeric",
+                    })}`
+                  : "Schedule details to be announced."}
+              </p>
+            ) : (
+              <div className="space-y-3 font-mono text-xs">
+                {sessions.map((sess) => {
+                  const startStr = new Date(sess.startTime).toLocaleTimeString("en-US", {
+                    hour: "2-digit",
+                    minute: "2-digit",
+                    hour12: true,
+                  });
+                  const endStr = sess.endTime
+                    ? new Date(sess.endTime).toLocaleTimeString("en-US", {
+                        hour: "2-digit",
+                        minute: "2-digit",
+                        hour12: true,
+                      })
+                    : null;
+                  const dateStr = new Date(sess.startTime).toLocaleDateString("en-US", {
+                    month: "short",
+                    day: "numeric",
+                    year: "numeric",
+                  });
+                  return (
+                    <div key={sess.id} className="flex flex-col sm:flex-row sm:items-center justify-between p-3 border border-border bg-surface-container/30 gap-2">
+                      <span className="font-sans font-bold text-foreground">{sess.title}</span>
+                      <span className="text-muted-foreground text-[11px]">
+                        {dateStr} | {startStr}{endStr ? ` - ${endStr}` : ""}
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
           {/* Attendance Marked Table (only if registered) */}
           {registrationStatus === "REGISTERED" && (
             <div className="border border-border bg-card p-6 space-y-4">
@@ -197,14 +248,19 @@ export default async function StudentEventDetailsPage({ params }: PageProps) {
             </h3>
 
             <div className="space-y-4 font-mono text-xs">
-              <div className="flex justify-between border-b border-border pb-2 border-dashed">
-                <span className="text-muted-foreground">Capacity Limit:</span>
-                <span className="text-foreground font-semibold">{event.maxParticipants ? `${event.maxParticipants} Attendees` : "Unlimited"}</span>
-              </div>
-              <div className="flex justify-between border-b border-border pb-2 border-dashed">
-                <span className="text-muted-foreground">Registered:</span>
-                <span className="text-foreground font-semibold">{activeRegistrationsCount} Students</span>
-              </div>
+              {event.date && (
+                <div className="flex justify-between border-b border-border pb-2 border-dashed">
+                  <span className="text-muted-foreground">Date:</span>
+                  <span className="text-foreground font-semibold">
+                    {new Date(event.date).toLocaleDateString("en-US", {
+                      weekday: "short",
+                      month: "short",
+                      day: "numeric",
+                      year: "numeric",
+                    })}
+                  </span>
+                </div>
+              )}
               <div className="flex justify-between border-b border-border pb-2 border-dashed">
                 <span className="text-muted-foreground">Status:</span>
                 <span className="text-foreground font-semibold">{isRegistrationOpen ? "Open" : "Closed"}</span>
