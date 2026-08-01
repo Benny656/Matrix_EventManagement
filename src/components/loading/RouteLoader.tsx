@@ -2,9 +2,11 @@
 
 import React from "react";
 import { usePathname } from "next/navigation";
-import MatrixLoader from "./MatrixLoader";
+import MatrixLoadingScreen from "./MatrixLoadingScreen";
+import { getLoadingMessage } from "./LoadingMessages";
 
 export default function RouteLoader() {
   const pathname = usePathname() || "";
-  return <MatrixLoader pathname={pathname} />;
+  const message = getLoadingMessage(pathname);
+  return <MatrixLoadingScreen message={message} />;
 }

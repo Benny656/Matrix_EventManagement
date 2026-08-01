@@ -106,8 +106,8 @@ export default function DashboardLayout({ user, children }: DashboardLayoutProps
       {/* Sidebar (Desktop) */}
       <nav className="hidden md:flex flex-col h-full py-5 px-3 bg-surface-container border-r border-border w-60 fixed left-0 top-0 z-40">
         {/* Brand */}
-        <Link href="/" className="mb-7 px-3 pb-5 border-b border-border flex items-center gap-3 hover:opacity-90 transition-opacity">
-          <img src="/logo.png" alt="Matrix Logo" className="h-7 w-7 object-contain opacity-90 dark:invert" />
+        <Link href="/" className="mb-7 px-3 pb-5 border-b border-border flex items-center gap-3 hover:opacity-90 transition-opacity" title="Go to landing page">
+          <img src="/logo.svg" alt="Matrix Logo" className="h-7 w-7 object-contain opacity-90 dark:invert" />
           <div>
             <span className="font-heading text-base font-bold text-foreground tracking-tighter uppercase">
               Matrix
@@ -170,9 +170,12 @@ export default function DashboardLayout({ user, children }: DashboardLayoutProps
             >
               <Menu size={18} />
             </button>
-            <h1 className="font-heading text-base font-bold uppercase tracking-tighter text-foreground">
-              {user.name.split(" ")[0]}
-            </h1>
+            <Link href="/" className="flex items-center gap-2 hover:opacity-85 transition-opacity" title="Go to landing page">
+              <img src="/logo.svg" alt="Matrix Logo" className="h-6 w-6 object-contain dark:invert" />
+              <h1 className="font-heading text-base font-bold uppercase tracking-tighter text-foreground">
+                Matrix
+              </h1>
+            </Link>
           </div>
 
           <div className="flex items-center gap-1.5">
@@ -217,8 +220,8 @@ export default function DashboardLayout({ user, children }: DashboardLayoutProps
                 onClick={(e) => e.stopPropagation()}
               >
                 <div className="mb-5 px-3 pb-5 border-b border-border flex justify-between items-center">
-                  <Link href="/" className="flex items-center gap-3 hover:opacity-90 transition-opacity">
-                    <img src="/logo.png" alt="Matrix Logo" className="h-7 w-7 object-contain opacity-90 dark:invert" />
+                  <Link href="/" className="flex items-center gap-3 hover:opacity-90 transition-opacity" title="Go to landing page">
+                    <img src="/logo.svg" alt="Matrix Logo" className="h-7 w-7 object-contain opacity-90 dark:invert" />
                     <div>
                       <span className="font-heading text-base font-bold text-foreground tracking-tighter uppercase">Matrix</span>
                       <p className="font-mono text-[9px] text-muted-foreground uppercase tracking-widest mt-0.5">{roleLabel}</p>
@@ -272,9 +275,15 @@ export default function DashboardLayout({ user, children }: DashboardLayoutProps
 
         {/* Content */}
         <div className="flex-1 overflow-y-auto p-4 md:p-6 pb-[calc(1rem+env(safe-area-inset-bottom))] md:pb-6 bg-background">
-          <div className="w-full">
+          <motion.div
+            key={pathname}
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.45, ease: [0.16, 1, 0.3, 1] }}
+            className="w-full"
+          >
             {children}
-          </div>
+          </motion.div>
         </div>
       </div>
     </div>

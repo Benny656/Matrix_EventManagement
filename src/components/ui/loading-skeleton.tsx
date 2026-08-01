@@ -1,10 +1,10 @@
 import React from "react";
-import DashboardSkeleton from "../loading/DashboardSkeleton";
+import MatrixLoadingScreen from "../loading/MatrixLoadingScreen";
 
 interface LoadingSkeletonProps {
   message?: string;
 }
 
 export default function LoadingSkeleton({ message }: LoadingSkeletonProps) {
-  return <DashboardSkeleton />;
+  return <MatrixLoadingScreen message={message} />;
 }

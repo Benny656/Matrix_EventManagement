@@ -299,15 +299,14 @@ export async function getEventsAction(
   includeArchived = false,
   requestingUser?: UserProfile | null
 ) {
-  let query = adminDb.collection("events");
+  const [snapshot, sessionsSnapshot, registrationsSnapshot] = await Promise.all([
+    adminDb.collection("events").get(),
+    adminDb.collection("sessions").get(),
+    adminDb.collection("registrations").get(),
+  ]);
 
-  const snapshot = await query.get();
   const now = new Date();
-
-  const sessionsSnapshot = await adminDb.collection("sessions").get();
   const allSessions = sessionsSnapshot.docs.map((d: any) => ({ id: d.id, ...d.data() })) as any[];
-
-  const registrationsSnapshot = await adminDb.collection("registrations").get();
   const allRegistrations = registrationsSnapshot.docs.map((d: any) => d.data()) as any[];
 
   let events = snapshot.docs.map((doc: any) => {
@@ -346,37 +345,36 @@ export async function getEventsAction(
     events = events.filter((e: any) => isEligible(e, requestingUser));
   }
 
-  // Dynamically update status based on current time
-  const updatedEvents = await Promise.all(
-    events.map(async (event: any) => {
-      if (event.status === "ARCHIVED") return event;
+  // Dynamically update status based on current time (non-blocking async updates)
+  const updatedEvents = events.map((event: any) => {
+    if (event.status === "ARCHIVED") return event;
 
-      let newStatus: "UPCOMING" | "ONGOING" | "COMPLETED" = "UPCOMING";
+    let newStatus: "UPCOMING" | "ONGOING" | "COMPLETED" = "UPCOMING";
 
-      const hasOngoingSession = event.sessions.some(
-        (s: any) => s.startTime && now >= s.startTime && (!s.endTime || now <= s.endTime)
-      );
-      const allSessionsFinished =
-        event.sessions.length > 0 &&
-        event.sessions.every((s: any) => (s.endTime ? now > s.endTime : false));
+    const hasOngoingSession = event.sessions.some(
+      (s: any) => s.startTime && now >= s.startTime && (!s.endTime || now <= s.endTime)
+    );
+    const allSessionsFinished =
+      event.sessions.length > 0 &&
+      event.sessions.every((s: any) => (s.endTime ? now > s.endTime : false));
 
-      if (hasOngoingSession) {
-        newStatus = "ONGOING";
-      } else if (allSessionsFinished && event.sessions.length > 0) {
-        newStatus = "COMPLETED";
-      }
+    if (hasOngoingSession) {
+      newStatus = "ONGOING";
+    } else if (allSessionsFinished && event.sessions.length > 0) {
+      newStatus = "COMPLETED";
+    }
 
-      if (newStatus !== event.status) {
-        await adminDb.collection("events").doc(event.id).update({
-          status: newStatus,
-          updatedAt: new Date().toISOString(),
-        });
-        event.status = newStatus;
-      }
+    if (newStatus !== event.status) {
+      // Async non-blocking Firestore update
+      adminDb.collection("events").doc(event.id).update({
+        status: newStatus,
+        updatedAt: new Date().toISOString(),
+      }).catch((err) => console.error("Error updating event status asynchronously:", err));
+      event.status = newStatus;
+    }
 
-      return event;
-    })
-  );
+    return event;
+  });
 
   updatedEvents.sort((a: any, b: any) => a.date.getTime() - b.date.getTime());
   return updatedEvents;

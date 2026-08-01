@@ -1,3 +1,4 @@
+import { cache } from "react";
 import { cookies, headers } from "next/headers";
 import { adminAuth, adminDb } from "./firebase-admin";
 
@@ -24,7 +25,7 @@ export interface UserProfile {
   updatedAt?: string;
 }
 
-export async function getCurrentUser(): Promise<UserProfile | null> {
+export const getCurrentUser = cache(async (): Promise<UserProfile | null> => {
   try {
     const cookieStore = await cookies();
     const token = cookieStore.get("__session")?.value || cookieStore.get("token")?.value;
@@ -86,7 +87,7 @@ export async function getCurrentUser(): Promise<UserProfile | null> {
     console.error("getCurrentUser error:", error);
     return null;
   }
-}
+});
 
 export async function verifyAdmin(): Promise<UserProfile> {
   const user = await getCurrentUser();

@@ -7,28 +7,33 @@ import { cn } from "@/lib/utils";
 
 // --- StatsGrid Component ---
 export async function StatsGrid() {
-  const usersSnapshot = await adminDb.collection("users").get();
-  const users = usersSnapshot.docs.map((d: any) => d.data());
+  const [
+    usersSnapshot,
+    eventsSnapshot,
+    sessionsSnapshot,
+    regsSnapshot,
+    attsSnapshot,
+    volAttsSnapshot,
+  ] = await Promise.all([
+    adminDb.collection("users").get(),
+    adminDb.collection("events").get(),
+    adminDb.collection("sessions").get(),
+    adminDb.collection("registrations").get(),
+    adminDb.collection("attendances").get(),
+    adminDb.collection("volunteer_attendances").get(),
+  ]);
 
+  const users = usersSnapshot.docs.map((d: any) => d.data());
   const totalStudents = users.filter((u: any) => u.role === "STUDENT").length;
   const totalVolunteers = users.filter((u: any) => u.role === "VOLUNTEER").length;
 
-  const eventsSnapshot = await adminDb.collection("events").get();
   const events = eventsSnapshot.docs.map((d: any) => ({ id: d.id, ...d.data() })) as any[];
-
   const activeEvents = events.filter((e: any) => e.status === "UPCOMING" || e.status === "ONGOING").length;
   const completedEvents = events.filter((e: any) => e.status === "COMPLETED");
 
-  const sessionsSnapshot = await adminDb.collection("sessions").get();
   const allSessions = sessionsSnapshot.docs.map((d: any) => ({ id: d.id, ...d.data() })) as any[];
-
-  const regsSnapshot = await adminDb.collection("registrations").get();
   const allRegs = regsSnapshot.docs.map((d: any) => d.data()) as any[];
-
-  const attsSnapshot = await adminDb.collection("attendances").get();
   const allAtts = attsSnapshot.docs.map((d: any) => d.data()) as any[];
-
-  const volAttsSnapshot = await adminDb.collection("volunteer_attendances").get();
   const allVolAtts = volAttsSnapshot.docs.map((d: any) => d.data()) as any[];
 
   const assignedVolunteersCount = allRegs.filter((r: any) => r.eventRole === "volunteer" && r.status === "REGISTERED").length;
@@ -110,20 +115,21 @@ export async function StatsGrid() {
 
 // --- EventHistoryChart Component ---
 export async function EventHistoryChart() {
-  const eventsSnapshot = await adminDb.collection("events").get();
+  const [eventsSnapshot, sessionsSnapshot, regsSnapshot, attsSnapshot] = await Promise.all([
+    adminDb.collection("events").get(),
+    adminDb.collection("sessions").get(),
+    adminDb.collection("registrations").get(),
+    adminDb.collection("attendances").get(),
+  ]);
+
   const allEvents = eventsSnapshot.docs.map((d: any) => ({ id: d.id, ...d.data() })) as any[];
   allEvents.sort((a: any, b: any) => (b.date || "").localeCompare(a.date || ""));
 
   const chartEventsRaw = allEvents.slice(0, 6);
   const chartEvents = [...chartEventsRaw].reverse();
 
-  const sessionsSnapshot = await adminDb.collection("sessions").get();
   const allSessions = sessionsSnapshot.docs.map((d: any) => ({ id: d.id, ...d.data() })) as any[];
-
-  const regsSnapshot = await adminDb.collection("registrations").get();
   const allRegs = regsSnapshot.docs.map((d: any) => d.data()) as any[];
-
-  const attsSnapshot = await adminDb.collection("attendances").get();
   const allAtts = attsSnapshot.docs.map((d: any) => d.data()) as any[];
 
   const chartData = chartEvents.map((evt: any) => {
@@ -216,25 +222,33 @@ export async function EventHistoryChart() {
 
 // --- SystemFeed Component ---
 export async function SystemFeed() {
-  const usersSnapshot = await adminDb.collection("users").get();
+  const [
+    usersSnapshot,
+    eventsSnapshot,
+    sessionsSnapshot,
+    regsSnapshot,
+    attsSnapshot,
+    updatesSnapshot,
+  ] = await Promise.all([
+    adminDb.collection("users").get(),
+    adminDb.collection("events").get(),
+    adminDb.collection("sessions").get(),
+    adminDb.collection("registrations").get(),
+    adminDb.collection("attendances").get(),
+    adminDb.collection("updates").get(),
+  ]);
+
   const userMap = new Map<string, any>();
   usersSnapshot.docs.forEach((d: any) => userMap.set(d.id, d.data()));
 
-  const eventsSnapshot = await adminDb.collection("events").get();
   const eventMap = new Map<string, any>();
   eventsSnapshot.docs.forEach((d: any) => eventMap.set(d.id, d.data()));
 
-  const sessionsSnapshot = await adminDb.collection("sessions").get();
   const sessionMap = new Map<string, any>();
   sessionsSnapshot.docs.forEach((d: any) => sessionMap.set(d.id, d.data()));
 
-  const regsSnapshot = await adminDb.collection("registrations").get();
   const recentRegistrations = regsSnapshot.docs.map((d: any) => d.data());
-
-  const attsSnapshot = await adminDb.collection("attendances").get();
   const recentAttendances = attsSnapshot.docs.map((d: any) => d.data());
-
-  const updatesSnapshot = await adminDb.collection("updates").get();
   const recentUpdates = updatesSnapshot.docs.map((d: any) => d.data());
 
   const activities = [

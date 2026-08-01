@@ -2,6 +2,8 @@ import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth-session";
 import OnboardingForm from "./onboarding-form";
 
+import PageFadeContainer from "@/components/page-fade-container";
+
 export const dynamic = "force-dynamic";
 
 export const metadata = {
@@ -24,7 +26,8 @@ export default async function OnboardingPage() {
   }
 
   return (
-    <div className="min-h-screen w-full flex items-center justify-center p-4 bg-background relative selection:bg-primary/20 selection:text-primary">
+    <PageFadeContainer>
+      <div className="min-h-screen w-full flex items-center justify-center p-4 bg-background relative selection:bg-primary/20 selection:text-primary">
       <div
         className="w-full max-w-sm mx-auto flex flex-col items-center gap-6"
         style={{ maxWidth: "380px" }}
@@ -57,6 +60,7 @@ export default async function OnboardingPage() {
           </div>
         </div>
       </div>
-    </div>
+      </div>
+    </PageFadeContainer>
   );
 }

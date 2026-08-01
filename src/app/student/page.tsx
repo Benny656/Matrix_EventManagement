@@ -52,17 +52,17 @@ export default async function StudentDashboardPage() {
     redirect("/login");
   }
 
-  // Fetch registrations
-  const regsSnapshot = await adminDb
-    .collection("registrations")
-    .where("studentId", "==", currentUser.id)
-    .get();
+  // Fetch registrations, events, sessions, and available events in parallel
+  const [regsSnapshot, eventsSnapshot, sessionsSnapshot, availableEvents] = await Promise.all([
+    adminDb.collection("registrations").where("studentId", "==", currentUser.id).get(),
+    adminDb.collection("events").get(),
+    adminDb.collection("sessions").get(),
+    getEventsAction(false, currentUser),
+  ]);
 
-  const eventsSnapshot = await adminDb.collection("events").get();
   const eventMap = new Map<string, any>();
   eventsSnapshot.docs.forEach((d) => eventMap.set(d.id, d.data()));
 
-  const sessionsSnapshot = await adminDb.collection("sessions").get();
   const allSessions = sessionsSnapshot.docs.map((d) => ({ id: d.id, ...d.data() })) as any[];
 
   const registrations = regsSnapshot.docs
@@ -89,9 +89,6 @@ export default async function StudentDashboardPage() {
     .filter((r) => r && r.status !== "CANCELLED");
 
   registrations.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
-
-  // Fetch all available eligible events
-  const availableEvents = await getEventsAction(false, currentUser);
 
   return (
     <div className="space-y-8">

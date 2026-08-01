@@ -31,23 +31,6 @@ export default function LandingAnimations() {
       "-=0.3"
     );
 
-    // Animate Features section with ScrollTrigger
-    gsap.fromTo(
-      ".feature-card",
-      { y: 40, opacity: 0 },
-      {
-        y: 0,
-        opacity: 1,
-        duration: 0.7,
-        stagger: 0.15,
-        ease: "power2.out",
-        scrollTrigger: {
-          trigger: "#matrix-features",
-          start: "top 80%",
-        },
-      }
-    );
-
     return () => {
       ScrollTrigger.getAll().forEach(t => t.kill());
     };
