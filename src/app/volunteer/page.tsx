@@ -8,16 +8,9 @@ import VolunteerClock from "@/components/volunteer-clock";
 
 export const dynamic = "force-dynamic";
 
-export default async function VolunteerDashboardPage() {
-  let user;
-  try {
-    user = await verifyStaff();
-  } catch {
-    redirect("/login");
-  }
+import { DashboardSkeleton } from "@/components/ui/skeleton-loaders";
 
-  const userId = user.id;
-
+async function VolunteerDashboardData({ userId }: { userId: string }) {
   const eventsSnapshot = await adminDb.collection("events").get();
   const allEvents = eventsSnapshot.docs.map((d) => ({ id: d.id, ...d.data() })) as any[];
 
@@ -160,5 +153,20 @@ export default async function VolunteerDashboardPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+export default async function VolunteerDashboardPage() {
+  let user;
+  try {
+    user = await verifyStaff();
+  } catch {
+    redirect("/login");
+  }
+
+  return (
+    <React.Suspense fallback={<DashboardSkeleton />}>
+      <VolunteerDashboardData userId={user.id} />
+    </React.Suspense>
   );
 }

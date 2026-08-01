@@ -45,13 +45,9 @@ const formatEventTime = (event: any) => {
 };
 
 
-export default async function FacultyDashboardPage() {
-  const currentUser = await getCurrentUser();
+import { DashboardSkeleton } from "@/components/ui/skeleton-loaders";
 
-  if (!currentUser || (currentUser.role !== "FACULTY" && currentUser.role !== "ADMIN")) {
-    redirect("/login");
-  }
-
+async function FacultyDashboardData({ currentUser }: { currentUser: any }) {
   // Fetch registrations
   const regsSnapshot = await adminDb
     .collection("registrations")
@@ -154,5 +150,19 @@ export default async function FacultyDashboardPage() {
         <FacultyEventList events={availableEvents as any} />
       </section>
     </div>
+  );
+}
+
+export default async function FacultyDashboardPage() {
+  const currentUser = await getCurrentUser();
+
+  if (!currentUser || (currentUser.role !== "FACULTY" && currentUser.role !== "ADMIN")) {
+    redirect("/login");
+  }
+
+  return (
+    <React.Suspense fallback={<DashboardSkeleton />}>
+      <FacultyDashboardData currentUser={currentUser} />
+    </React.Suspense>
   );
 }

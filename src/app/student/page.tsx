@@ -45,13 +45,9 @@ const formatEventTime = (event: any) => {
 };
 
 
-export default async function StudentDashboardPage() {
-  const currentUser = await getCurrentUser();
+import { DashboardSkeleton } from "@/components/ui/skeleton-loaders";
 
-  if (!currentUser || (currentUser.role !== "STUDENT" && currentUser.role !== "ADMIN")) {
-    redirect("/login");
-  }
-
+async function StudentDashboardData({ currentUser }: { currentUser: any }) {
   // Fetch registrations, events, sessions, and available events in parallel
   const [regsSnapshot, eventsSnapshot, sessionsSnapshot, availableEvents] = await Promise.all([
     adminDb.collection("registrations").where("studentId", "==", currentUser.id).get(),
@@ -151,5 +147,19 @@ export default async function StudentDashboardPage() {
         <StudentEventList events={availableEvents as any} />
       </section>
     </div>
+  );
+}
+
+export default async function StudentDashboardPage() {
+  const currentUser = await getCurrentUser();
+
+  if (!currentUser || (currentUser.role !== "STUDENT" && currentUser.role !== "ADMIN")) {
+    redirect("/login");
+  }
+
+  return (
+    <React.Suspense fallback={<DashboardSkeleton />}>
+      <StudentDashboardData currentUser={currentUser} />
+    </React.Suspense>
   );
 }
