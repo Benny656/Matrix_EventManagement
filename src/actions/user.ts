@@ -24,8 +24,15 @@ export async function getUsersAction(search?: string, roleFilter?: string) {
       name: data.name || "",
       email: data.email || "",
       rollNumber: data.rollNumber || null,
+      phoneNumber: data.phoneNumber || null,
+      department: data.department || null,
+      programType: data.programType || null,
+      degree: data.degree || null,
+      yearOfStudy: data.yearOfStudy || null,
       role: (data.role as Role) || "STUDENT",
+      onboardingCompleted: data.onboardingCompleted ?? false,
       createdAt: data.createdAt || new Date().toISOString(),
+      updatedAt: data.updatedAt || null,
       mustChangePassword: data.mustChangePassword || false,
     };
   });
@@ -36,12 +43,98 @@ export async function getUsersAction(search?: string, roleFilter?: string) {
       (u: any) =>
         u.name.toLowerCase().includes(lowerSearch) ||
         u.email.toLowerCase().includes(lowerSearch) ||
-        (u.rollNumber && u.rollNumber.toLowerCase().includes(lowerSearch))
+        (u.rollNumber && u.rollNumber.toLowerCase().includes(lowerSearch)) ||
+        (u.department && u.department.toLowerCase().includes(lowerSearch)) ||
+        (u.degree && u.degree.toLowerCase().includes(lowerSearch))
     );
   }
 
   users.sort((a: any, b: any) => a.name.localeCompare(b.name));
   return users;
+}
+
+export interface AdminUpdateUserProfileInput {
+  name?: string;
+  rollNumber?: string | null;
+  phoneNumber?: string | null;
+  department?: string | null;
+  programType?: "UG" | "PG" | string | null;
+  degree?: string | null;
+  yearOfStudy?: string | null;
+  role?: Role;
+}
+
+export async function updateUserProfileAdminAction(userId: string, input: AdminUpdateUserProfileInput) {
+  const currentUser = await verifyAdmin();
+
+  const userDoc = await adminDb.collection("users").doc(userId).get();
+  if (!userDoc.exists) {
+    throw new Error("User not found.");
+  }
+
+  const existingData = userDoc.data() || {};
+
+  // Safety check: prevent changing own role away from ADMIN/FACULTY_ADMIN
+  if (userId === currentUser.id && input.role && input.role !== currentUser.role) {
+    throw new Error("Safety lock: You cannot modify your own administrator role.");
+  }
+
+  const updates: Record<string, any> = {
+    updatedAt: new Date().toISOString(),
+  };
+
+  if (input.name !== undefined) {
+    const trimmed = input.name.trim();
+    if (!trimmed) throw new Error("Full name cannot be empty.");
+    updates.name = trimmed;
+  }
+
+  if (input.rollNumber !== undefined) {
+    updates.rollNumber = input.rollNumber ? input.rollNumber.trim().toUpperCase() : null;
+  }
+
+  if (input.phoneNumber !== undefined) {
+    if (input.phoneNumber) {
+      const cleanedPhone = input.phoneNumber.replace(/\D/g, "");
+      if (cleanedPhone && !/^[6-9]\d{9}$/.test(cleanedPhone)) {
+        throw new Error("Phone number must be a valid 10-digit mobile number starting with 6-9.");
+      }
+      updates.phoneNumber = cleanedPhone || null;
+    } else {
+      updates.phoneNumber = null;
+    }
+  }
+
+  if (input.department !== undefined) {
+    updates.department = input.department ? input.department.trim() : null;
+  }
+
+  if (input.programType !== undefined) {
+    updates.programType = input.programType || null;
+  }
+
+  if (input.degree !== undefined) {
+    updates.degree = input.degree ? input.degree.trim() : null;
+  }
+
+  if (input.yearOfStudy !== undefined) {
+    updates.yearOfStudy = input.yearOfStudy || null;
+  }
+
+  if (input.role !== undefined && input.role !== existingData.role) {
+    updates.role = input.role;
+    try {
+      await adminAuth.setCustomUserClaims(userId, { role: input.role });
+    } catch (err) {
+      console.error("Failed to set custom claims:", err);
+    }
+  }
+
+  await adminDb.collection("users").doc(userId).update(updates);
+
+  revalidatePath("/admin/users");
+  revalidatePath("/volunteer/users");
+  return { success: true };
 }
 
 // ─── Role management (Admin only) ─────────────────────────────────────────────

@@ -1,5 +1,5 @@
-import LoadingSkeleton from "@/components/ui/loading-skeleton";
+import { UsersListSkeleton } from "@/components/ui/skeleton-loaders";
 
 export default function Loading() {
-  return <LoadingSkeleton message="Scanning user directory..." />;
+  return <UsersListSkeleton />;
 }

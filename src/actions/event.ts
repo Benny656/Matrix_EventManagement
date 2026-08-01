@@ -128,6 +128,10 @@ export async function createEventAction(input: EventInput) {
   revalidatePath("/student");
   revalidatePath("/volunteer");
   revalidatePath("/admin");
+  revalidatePath("/student/events");
+  revalidatePath("/volunteer/events");
+  revalidatePath("/admin/events");
+  revalidatePath("/faculty/events");
   return { success: true, eventId };
 }
 

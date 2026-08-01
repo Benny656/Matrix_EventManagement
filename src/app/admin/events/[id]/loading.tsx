@@ -1,5 +1,5 @@
-import LoadingSkeleton from "@/components/ui/loading-skeleton";
+import { EventDetailsSkeleton } from "@/components/ui/skeleton-loaders";
 
 export default function Loading() {
-  return <LoadingSkeleton message="Querying event records..." />;
+  return <EventDetailsSkeleton />;
 }

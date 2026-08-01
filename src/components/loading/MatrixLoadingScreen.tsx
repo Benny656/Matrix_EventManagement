@@ -18,6 +18,10 @@ export default function MatrixLoadingScreen({
   const path = pathname.toLowerCase();
   const isLandingPage = path === "/" || path === "" || path === "/home";
 
+  if (!isLandingPage) {
+    return null;
+  }
+
   const sectionMeta = getSectionLoadingMeta(pathname);
   const activeMessage = message || sectionMeta.message;
   const headerTag = sectionMeta.headerTag;

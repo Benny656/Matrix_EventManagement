@@ -327,11 +327,16 @@ export async function SystemFeed() {
   );
 }
 
+import { SkeletonBox } from "@/components/ui/skeleton-loaders";
+
 export function SectionSkeleton() {
   return (
-    <div className="border border-border bg-card p-6 min-h-[350px] flex flex-col justify-center items-center font-mono text-[11px] text-muted-foreground tracking-widest animate-pulse">
-      <span className="w-1.5 h-1.5 bg-primary rounded-full animate-ping mb-2" />
-      <span>STREAMING COMPONENT...</span>
+    <div className="border border-border bg-card p-4 sm:p-6 min-h-[300px] sm:min-h-[350px] flex flex-col justify-between space-y-4 rounded-lg overflow-hidden w-full">
+      <div className="flex items-center justify-between gap-2">
+        <SkeletonBox className="h-5 w-40 max-w-[60%]" />
+        <SkeletonBox className="h-6 w-20 shrink-0" />
+      </div>
+      <SkeletonBox className="h-52 sm:h-60 w-full rounded-md" />
     </div>
   );
 }

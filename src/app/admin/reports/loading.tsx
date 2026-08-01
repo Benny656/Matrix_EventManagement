@@ -1,5 +1,5 @@
-import LoadingSkeleton from "@/components/ui/loading-skeleton";
+import { ReportsSkeleton } from "@/components/ui/skeleton-loaders";
 
 export default function Loading() {
-  return <LoadingSkeleton message="Compiling reports analytics..." />;
+  return <ReportsSkeleton />;
 }

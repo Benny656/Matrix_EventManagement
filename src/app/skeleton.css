@@ -1,0 +1,42 @@
+/* Skeleton Shimmer Engine — 1.5s cycle, vibrant stripe */
+
+@keyframes skeleton-shimmer {
+  0% {
+    background-position: 200% 0;
+  }
+  100% {
+    background-position: -100% 0;
+  }
+}
+
+/* Skeleton shimmer base — responsive & hardware accelerated across all mobile devices */
+.skeleton-box {
+  animation: skeleton-shimmer 1.5s ease-in-out infinite;
+  background: linear-gradient(
+    105deg,
+    var(--skeleton-base) 0%,
+    var(--skeleton-base) 38%,
+    var(--skeleton-shimmer) 50%,
+    var(--skeleton-base) 62%,
+    var(--skeleton-base) 100%
+  );
+  background-size: 200% 100%;
+  border-radius: var(--radius-md, 6px);
+  max-width: 100%;
+}
+
+/*
+  .skeleton — display:contents wrapper so parent layout is unaffected.
+  All direct non-.wrapper descendants automatically receive shimmer.
+*/
+.skeleton {
+  display: contents;
+}
+
+/* Respect reduced-motion preference */
+@media (prefers-reduced-motion: reduce) {
+  .skeleton-box {
+    animation: none !important;
+    background: var(--skeleton-base) !important;
+  }
+}

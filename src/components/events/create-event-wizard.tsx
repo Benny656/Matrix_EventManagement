@@ -11,7 +11,7 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { AlertCircle, Trash2, Users } from "lucide-react";
+import { AlertCircle, Loader2, Trash2, Users } from "lucide-react";
 
 const whatsappInviteLinkSchema = z
   .string()
@@ -123,6 +123,12 @@ export default function CreateEventWizard({ role }: { role: "ADMIN" | "VOLUNTEER
     setSessions(sessions.filter((_, i) => i !== index));
   };
 
+  React.useEffect(() => {
+    if (step === 3) {
+      router.prefetch(role === "ADMIN" ? "/admin/events" : "/volunteer/events");
+    }
+  }, [step, role, router]);
+
   const handlePublish = async () => {
     if (!basicInfo) return;
     setPublishing(true);
@@ -157,10 +163,12 @@ export default function CreateEventWizard({ role }: { role: "ADMIN" | "VOLUNTEER
 
       if (result.success) {
         router.push(role === "ADMIN" ? "/admin/events" : "/volunteer/events");
+        // Keep publishing true so the spinner and disabled state stay active during page transition
+      } else {
+        setPublishing(false);
       }
     } catch (err: any) {
       setWizardError(err.message || "Failed to publish event");
-    } finally {
       setPublishing(false);
     }
   };
@@ -657,10 +665,17 @@ export default function CreateEventWizard({ role }: { role: "ADMIN" | "VOLUNTEER
             <button
               type="button"
               onClick={handlePublish}
-              className="bg-primary text-primary-foreground font-mono text-xs uppercase tracking-widest py-3 px-6 hover:bg-primary-container transition-all active:scale-95 disabled:opacity-50"
+              className="bg-primary text-primary-foreground font-mono text-xs uppercase tracking-widest py-3 px-6 hover:bg-primary-container transition-all active:scale-95 disabled:opacity-50 flex items-center justify-center gap-2 cursor-pointer disabled:cursor-not-allowed"
               disabled={publishing}
             >
-              {publishing ? "Creating Event..." : "Publish Event"}
+              {publishing ? (
+                <>
+                  <Loader2 className="w-4 h-4 animate-spin shrink-0" />
+                  <span>Creating Event...</span>
+                </>
+              ) : (
+                "Publish Event"
+              )}
             </button>
           </div>
         </div>

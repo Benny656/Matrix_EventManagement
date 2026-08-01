@@ -62,7 +62,7 @@ function LoginContent() {
 
       if (!isStudentEmail && !isFacultyEmail && !isAdminEmail) {
         await signOut(auth);
-        setError("Only Karunya Google accounts (@karunya.edu.in) or authorized admins are allowed.");
+        setError("You are unauthorized. Only official Karunya Google accounts (@karunya.edu.in / @karunya.edu) or authorized administrators are permitted.");
         setLoading(false);
         return;
       }
@@ -180,10 +180,15 @@ function LoginContent() {
                   initial={{ opacity: 0, y: -6 }}
                   animate={{ opacity: 1, y: 0 }}
                   exit={{ opacity: 0, y: -6 }}
-                  className="flex items-start gap-2.5 bg-destructive/10 border border-destructive/20 p-3 rounded-xl text-destructive text-xs font-sans text-left leading-relaxed"
+                  className="flex items-start gap-3 bg-red-600 dark:bg-red-600 text-white border-2 border-red-700 dark:border-red-500 p-4 rounded-xl text-xs font-sans text-left leading-relaxed shadow-lg"
                 >
-                  <AlertCircle size={16} className="shrink-0 mt-0.5" />
-                  <span>{error}</span>
+                  <AlertCircle size={20} className="shrink-0 mt-0.5 text-white" />
+                  <div>
+                    <span className="font-heading font-black block uppercase text-[12px] tracking-wider mb-0.5 text-white">
+                      UNAUTHORIZED ACCESS
+                    </span>
+                    <span className="font-semibold text-white/95">{error}</span>
+                  </div>
                 </motion.div>
               )}
             </AnimatePresence>

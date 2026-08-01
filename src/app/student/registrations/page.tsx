@@ -24,7 +24,7 @@ export default async function StudentRegistrationsPage() {
 
   const registrations = regsSnapshot.docs.map((doc) => {
     const data = doc.data() as any;
-    const event = eventMap.get(data.eventId) || { title: "Unknown Event", date: "" };
+    const event = eventMap.get(data.eventId) || { title: "Unknown Event", venue: "", date: "" };
     const isRegistered = data.status === "REGISTERED";
     return {
       ...data,

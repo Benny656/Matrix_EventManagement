@@ -1,6 +1,7 @@
 @import "tailwindcss";
 @import "tw-animate-css";
 @import "shadcn/tailwind.css";
+@import "./skeleton.css";
 
 @custom-variant dark (&:where(.dark, .dark *));
 
@@ -111,6 +112,9 @@
   --sidebar-accent-foreground: #0f766e;
   --sidebar-border: #e2e8f0;
   --sidebar-ring: #0f766e;
+  /* Skeleton shimmer theme variables */
+  --skeleton-base: #e2e8f0;
+  --skeleton-shimmer: #ffffff;
 }
 
 :root.dark, .dark {
@@ -137,6 +141,10 @@
   --input: #222733;
   --ring: #2dd4bf;
   --radius: 8px;
+  
+  /* Skeleton shimmer dark variables */
+  --skeleton-base: #1a1f2e;
+  --skeleton-shimmer: #2e3650;
   
   --surface-container: #15171e;
   --surface-container-low: #0d0e11;
@@ -254,7 +262,7 @@
   }
 }
 
-/* Respect reduced-motion preference — required per the frontend-design quality floor */
+/* Skeleton shimmer base */
 @media (prefers-reduced-motion: reduce) {
   .animate-rocket-float,
   .animate-circuit-pulse {
