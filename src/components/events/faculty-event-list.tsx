@@ -3,7 +3,7 @@
 import React, { useState } from "react";
 import Link from "next/link";
 import { Input } from "@/components/ui/input";
-import { Search, CalendarDays } from "lucide-react";
+import { Search, CalendarDays, CheckCircle2 } from "lucide-react";
 
 interface Session {
   id: string;
@@ -20,6 +20,7 @@ interface EventWithCount {
   maxParticipants?: number | null;
   category: string;
   status: "UPCOMING" | "ONGOING" | "COMPLETED" | "ARCHIVED";
+  isUserRegistered?: boolean;
   sessions: Session[];
   _count: {
     registrations: number;
@@ -125,10 +126,21 @@ export default function FacultyEventList({ events }: { events: EventWithCount[] 
 
                 <div className="px-4 py-3 border-t border-border bg-surface-container-low">
                   <Link
-                    href={`/Faculty/events/${event.id}`}
-                    className="w-full bg-background border border-border text-foreground hover:bg-surface-container font-mono text-xs uppercase tracking-wider py-2 flex items-center justify-center gap-1 active:scale-98 transition-all"
+                    href={`/faculty/events/${event.id}`}
+                    className={`w-full font-mono text-xs uppercase tracking-wider py-2 flex items-center justify-center gap-1.5 active:scale-98 transition-all border ${
+                      event.isUserRegistered
+                        ? "bg-tertiary/15 text-tertiary border-tertiary/40 hover:bg-tertiary/25 font-bold"
+                        : "bg-background border-border text-foreground hover:bg-surface-container"
+                    }`}
                   >
-                    View & Register
+                    {event.isUserRegistered ? (
+                      <>
+                        <CheckCircle2 size={14} className="text-tertiary" />
+                        <span>Registered</span>
+                      </>
+                    ) : (
+                      "View & Register"
+                    )}
                   </Link>
                 </div>
               </article>

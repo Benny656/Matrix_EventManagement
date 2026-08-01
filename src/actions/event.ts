@@ -350,6 +350,15 @@ export async function getEventsAction(
       (r: any) => r.eventId === doc.id && r.status === "REGISTERED" && r.eventRole === "volunteer"
     ).length;
 
+    const isUserRegistered = requestingUser
+      ? allRegistrations.some(
+          (r: any) =>
+            r.eventId === doc.id &&
+            r.status === "REGISTERED" &&
+            (r.studentId === requestingUser.id || r.FacultyId === requestingUser.id || r.userId === requestingUser.id)
+        )
+      : false;
+
     const dateStr = typeof data.date === "string" ? data.date : (data.date ? new Date(data.date).toISOString() : new Date().toISOString());
 
     return {
@@ -357,6 +366,7 @@ export async function getEventsAction(
       id: doc.id,
       date: dateStr,
       registrationOpen: data.registrationOpen ?? true,
+      isUserRegistered,
       sessions: eventSessions.map((s: any) => ({
         ...s,
         startTime: typeof s.startTime === "string" ? s.startTime : (s.startTime ? new Date(s.startTime).toISOString() : new Date().toISOString()),
