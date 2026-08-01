@@ -32,8 +32,14 @@ const whatsappInviteLinkSchema = z
     }
   );
 
+const DEGREE_OPTIONS = ["UG", "PG"] as const;
+type DegreeOption = (typeof DEGREE_OPTIONS)[number];
+
 const YEAR_OPTIONS = ["1st Year", "2nd Year", "3rd Year", "4th Year"] as const;
 type YearOption = (typeof YEAR_OPTIONS)[number];
+
+const DEPT_OPTIONS = ["AI", "AIML"] as const;
+type DeptOption = (typeof DEPT_OPTIONS)[number];
 
 const basicInfoSchema = z.object({
   title: z.string().min(2, "Event title is required"),
@@ -46,9 +52,6 @@ const basicInfoSchema = z.object({
   ),
   registrationOpen: z.boolean().default(true),
   whatsappInviteLink: whatsappInviteLinkSchema,
-  eligibilityAudience: z.enum(["ALL", "STUDENTS", "FACULTY"]).default("ALL"),
-  eligibilityDegree: z.enum(["UG", "PG", "ALL"]).optional(),
-  eligibilityYears: z.array(z.string()).optional(),
 });
 
 type BasicInfoValues = z.infer<typeof basicInfoSchema>;
@@ -67,9 +70,10 @@ export default function CreateEventWizard({ role }: { role: "ADMIN" | "VOLUNTEER
 
   // Eligibility state (controlled separately for multi-checkbox)
   const [audience, setAudience] = useState<"ALL" | "STUDENTS" | "FACULTY">("ALL");
-  const [degree, setDegree] = useState<"UG" | "PG" | "ALL">("ALL");
+  const [selectedDegrees, setSelectedDegrees] = useState<DegreeOption[]>([]);
   const [selectedYears, setSelectedYears] = useState<YearOption[]>([]);
-  
+  const [selectedDepts, setSelectedDepts] = useState<DeptOption[]>([]);
+
   // Single Session Form States
   const [sessionTitle, setSessionTitle] = useState("");
   const [sessionStart, setSessionStart] = useState("");
@@ -82,20 +86,17 @@ export default function CreateEventWizard({ role }: { role: "ADMIN" | "VOLUNTEER
     register: registerBasic,
     handleSubmit: handleBasicSubmit,
     formState: { errors: basicErrors },
-    watch: watchBasic,
   } = useForm<BasicInfoValues>({
     resolver: zodResolver(basicInfoSchema) as any,
     defaultValues: {
       registrationOpen: true,
       eventDate: "",
-      eligibilityAudience: "ALL",
       ...basicInfo,
     } as any,
   });
 
   const nextStepBasic = (data: BasicInfoValues) => {
     setBasicInfo(data);
-    setAudience(data.eligibilityAudience ?? "ALL");
     setStep(2);
   };
 
@@ -146,11 +147,22 @@ export default function CreateEventWizard({ role }: { role: "ADMIN" | "VOLUNTEER
         coordinatorName: role === "ADMIN" ? "Admin Team" : "Volunteer Coordinator",
         eligibility: {
           targetAudience: audience,
-          degree: audience === "STUDENTS" ? degree : undefined,
+          degrees:
+            audience === "STUDENTS"
+              ? selectedDegrees.length > 0
+                ? selectedDegrees
+                : ["ALL"]
+              : undefined,
           years:
             audience === "STUDENTS"
               ? selectedYears.length > 0
-                ? (selectedYears as any)
+                ? selectedYears
+                : ["ALL"]
+              : undefined,
+          departments:
+            audience === "STUDENTS"
+              ? selectedDepts.length > 0
+                ? selectedDepts
                 : ["ALL"]
               : undefined,
         },
@@ -344,8 +356,9 @@ export default function CreateEventWizard({ role }: { role: "ADMIN" | "VOLUNTEER
                         onChange={() => {
                           setAudience(opt);
                           if (opt !== "STUDENTS") {
-                            setDegree("ALL");
+                            setSelectedDegrees([]);
                             setSelectedYears([]);
+                            setSelectedDepts([]);
                           }
                         }}
                       />
@@ -358,30 +371,50 @@ export default function CreateEventWizard({ role }: { role: "ADMIN" | "VOLUNTEER
               {/* Student sub-fields */}
               {audience === "STUDENTS" && (
                 <div className="space-y-4 pl-2 border-l-2 border-primary/30">
-                  {/* Degree */}
+                  {/* Degree Level */}
                   <div className="flex flex-col gap-2">
                     <span className="font-mono text-[10px] text-muted-foreground uppercase tracking-wider">
-                      Degree
+                      Degree Level(s)
                     </span>
                     <div className="flex flex-wrap gap-3">
-                      {(["UG", "PG", "ALL"] as const).map((d) => (
+                      {/* All option */}
+                      <label
+                        className={`flex items-center gap-2 px-3 py-2 border cursor-pointer transition-colors font-mono text-xs uppercase tracking-wide ${
+                          selectedDegrees.length === 0
+                            ? "bg-primary text-primary-foreground border-primary"
+                            : "bg-background border-border text-muted-foreground hover:border-primary/50"
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          className="sr-only"
+                          checked={selectedDegrees.length === 0}
+                          onChange={() => setSelectedDegrees([])}
+                        />
+                        All
+                      </label>
+                      {DEGREE_OPTIONS.map((d) => (
                         <label
                           key={d}
                           className={`flex items-center gap-2 px-3 py-2 border cursor-pointer transition-colors font-mono text-xs uppercase tracking-wide ${
-                            degree === d
+                            selectedDegrees.includes(d)
                               ? "bg-primary text-primary-foreground border-primary"
                               : "bg-background border-border text-muted-foreground hover:border-primary/50"
                           }`}
                         >
                           <input
-                            type="radio"
-                            name="eligibilityDegree"
-                            value={d}
+                            type="checkbox"
                             className="sr-only"
-                            checked={degree === d}
-                            onChange={() => setDegree(d)}
+                            checked={selectedDegrees.includes(d)}
+                            onChange={() =>
+                              setSelectedDegrees((prev) =>
+                                prev.includes(d)
+                                  ? prev.filter((deg) => deg !== d)
+                                  : [...prev, d]
+                              )
+                            }
                           />
-                          {d === "ALL" ? "All" : d}
+                          {d}
                         </label>
                       ))}
                     </div>
@@ -390,7 +423,7 @@ export default function CreateEventWizard({ role }: { role: "ADMIN" | "VOLUNTEER
                   {/* Year(s) */}
                   <div className="flex flex-col gap-2">
                     <span className="font-mono text-[10px] text-muted-foreground uppercase tracking-wider">
-                      Year(s)
+                      Year(s) of Study
                     </span>
                     <div className="flex flex-wrap gap-3">
                       {/* All option */}
@@ -434,9 +467,55 @@ export default function CreateEventWizard({ role }: { role: "ADMIN" | "VOLUNTEER
                         </label>
                       ))}
                     </div>
-                    <p className="font-mono text-[10px] text-muted-foreground">
-                      Select specific years or leave "All" for all years.
-                    </p>
+                  </div>
+
+                  {/* Department(s) */}
+                  <div className="flex flex-col gap-2">
+                    <span className="font-mono text-[10px] text-muted-foreground uppercase tracking-wider">
+                      Department(s)
+                    </span>
+                    <div className="flex flex-wrap gap-3">
+                      {/* All option */}
+                      <label
+                        className={`flex items-center gap-2 px-3 py-2 border cursor-pointer transition-colors font-mono text-xs uppercase tracking-wide ${
+                          selectedDepts.length === 0
+                            ? "bg-primary text-primary-foreground border-primary"
+                            : "bg-background border-border text-muted-foreground hover:border-primary/50"
+                        }`}
+                      >
+                        <input
+                          type="checkbox"
+                          className="sr-only"
+                          checked={selectedDepts.length === 0}
+                          onChange={() => setSelectedDepts([])}
+                        />
+                        All
+                      </label>
+                      {DEPT_OPTIONS.map((dept) => (
+                        <label
+                          key={dept}
+                          className={`flex items-center gap-2 px-3 py-2 border cursor-pointer transition-colors font-mono text-xs uppercase tracking-wide ${
+                            selectedDepts.includes(dept)
+                              ? "bg-primary text-primary-foreground border-primary"
+                              : "bg-background border-border text-muted-foreground hover:border-primary/50"
+                          }`}
+                        >
+                          <input
+                            type="checkbox"
+                            className="sr-only"
+                            checked={selectedDepts.includes(dept)}
+                            onChange={() =>
+                              setSelectedDepts((prev) =>
+                                prev.includes(dept)
+                                  ? prev.filter((dep) => dep !== dept)
+                                  : [...prev, dept]
+                              )
+                            }
+                          />
+                          {dept}
+                        </label>
+                      ))}
+                    </div>
                   </div>
                 </div>
               )}
@@ -621,10 +700,8 @@ export default function CreateEventWizard({ role }: { role: "ADMIN" | "VOLUNTEER
                     {audience === "ALL" && "All Users"}
                     {audience === "FACULTY" && "Faculty Only"}
                     {audience === "STUDENTS" && (
-                      <>Students — {degree}{" "}
-                        {selectedYears.length === 0
-                          ? "(All Years)"
-                          : `(${selectedYears.join(", ")})`}
+                      <>
+                        Students — Degree: {selectedDegrees.length === 0 ? "All" : selectedDegrees.join(", ")} | Years: {selectedYears.length === 0 ? "All" : selectedYears.join(", ")} | Depts: {selectedDepts.length === 0 ? "All" : selectedDepts.join(", ")}
                       </>
                     )}
                   </span>

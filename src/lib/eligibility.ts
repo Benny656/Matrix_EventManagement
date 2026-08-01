@@ -13,10 +13,14 @@ export type YearTarget =
 
 export interface EventEligibility {
   targetAudience: TargetAudience;
-  /** Only relevant when targetAudience === "STUDENTS" */
+  /** Legacy single degree target when targetAudience === "STUDENTS" */
   degree?: DegreeTarget;
-  /** Only relevant when targetAudience === "STUDENTS" */
+  /** Multi-select degree/program targets when targetAudience === "STUDENTS" */
+  degrees?: (DegreeTarget | string)[];
+  /** Multi-select year targets when targetAudience === "STUDENTS" */
   years?: YearTarget[];
+  /** Multi-select department targets when targetAudience === "STUDENTS" */
+  departments?: string[];
 }
 
 /** Shape of the event doc fields needed for eligibility checks */
@@ -34,7 +38,7 @@ export interface EligibleEvent {
  *  - FACULTY → eligible when targetAudience is "ALL" or "FACULTY"
  *  - STUDENT → eligible when:
  *      targetAudience is "ALL"   OR
- *      targetAudience is "STUDENTS" AND degree matches AND year matches
+ *      targetAudience is "STUDENTS" AND degree/program matches AND year matches AND department matches
  *  - Events without an eligibility field → treated as targetAudience "ALL"
  */
 export function isEligible(event: EligibleEvent, user: UserProfile): boolean {
@@ -48,7 +52,7 @@ export function isEligible(event: EligibleEvent, user: UserProfile): boolean {
   }
 
   const eligibility = event.eligibility ?? { targetAudience: "ALL" };
-  const { targetAudience, degree, years } = eligibility;
+  const { targetAudience, degree, degrees, years, departments } = eligibility;
 
   // Events open to everyone
   if (targetAudience === "ALL") return true;
@@ -62,11 +66,19 @@ export function isEligible(event: EligibleEvent, user: UserProfile): boolean {
   if (user.role === "STUDENT") {
     if (targetAudience !== "STUDENTS") return false;
 
-    // Degree match
-    const degreeOk =
-      !degree ||
-      degree === "ALL" ||
-      degree === (user.programType as string); // programType stores "UG" | "PG"
+    // Degree / Program level match
+    let degreeOk = true;
+    if (degrees && degrees.length > 0) {
+      degreeOk =
+        degrees.includes("ALL") ||
+        (Boolean(user.programType) && degrees.includes(user.programType as string)) ||
+        (Boolean(user.degree) && degrees.includes(user.degree as string));
+    } else if (degree) {
+      degreeOk =
+        degree === "ALL" ||
+        degree === (user.programType as string) ||
+        degree === (user.degree as string);
+    }
 
     if (!degreeOk) return false;
 
@@ -75,9 +87,18 @@ export function isEligible(event: EligibleEvent, user: UserProfile): boolean {
       !years ||
       years.length === 0 ||
       years.includes("ALL") ||
-      years.includes(user.yearOfStudy as YearTarget);
+      (Boolean(user.yearOfStudy) && years.includes(user.yearOfStudy as YearTarget));
 
-    return yearsOk;
+    if (!yearsOk) return false;
+
+    // Department match
+    const departmentsOk =
+      !departments ||
+      departments.length === 0 ||
+      departments.includes("ALL") ||
+      (Boolean(user.department) && departments.includes(user.department as string));
+
+    return departmentsOk;
   }
 
   return false;

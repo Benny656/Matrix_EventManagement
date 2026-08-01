@@ -35,10 +35,12 @@ const whatsappInviteLinkSchema = z
 const eligibilitySchema = z.object({
   targetAudience: z.enum(["ALL", "STUDENTS", "FACULTY"]).default("ALL"),
   degree: z.enum(["UG", "PG", "ALL"]).optional().nullable(),
+  degrees: z.array(z.string()).optional().nullable(),
   years: z
-    .array(z.enum(["1st Year", "2nd Year", "3rd Year", "4th Year", "ALL"]))
+    .array(z.string())
     .optional()
     .nullable(),
+  departments: z.array(z.string()).optional().nullable(),
 });
 
 const eventSchema = z.object({
@@ -88,14 +90,28 @@ export async function createEventAction(input: EventInput) {
   const batch = adminDb.batch();
 
   const eligibility = validated.eligibility ?? { targetAudience: "ALL" as const };
-  // Normalise: clear degree/years when not targeting students
+  // Normalise: clear degree/years/departments when not targeting students
   const eligibilityToStore = {
     targetAudience: eligibility.targetAudience,
     degree: eligibility.targetAudience === "STUDENTS" ? (eligibility.degree ?? "ALL") : null,
+    degrees:
+      eligibility.targetAudience === "STUDENTS"
+        ? eligibility.degrees && eligibility.degrees.length > 0
+          ? eligibility.degrees
+          : eligibility.degree
+          ? [eligibility.degree]
+          : ["ALL"]
+        : null,
     years:
       eligibility.targetAudience === "STUDENTS"
         ? eligibility.years && eligibility.years.length > 0
           ? eligibility.years
+          : ["ALL"]
+        : null,
+    departments:
+      eligibility.targetAudience === "STUDENTS"
+        ? eligibility.departments && eligibility.departments.length > 0
+          ? eligibility.departments
           : ["ALL"]
         : null,
   };
@@ -145,10 +161,24 @@ export async function updateEventAction(id: string, input: Omit<EventInput, "ses
   const eligibilityToStore = {
     targetAudience: eligibility.targetAudience,
     degree: eligibility.targetAudience === "STUDENTS" ? (eligibility.degree ?? "ALL") : null,
+    degrees:
+      eligibility.targetAudience === "STUDENTS"
+        ? eligibility.degrees && eligibility.degrees.length > 0
+          ? eligibility.degrees
+          : eligibility.degree
+          ? [eligibility.degree]
+          : ["ALL"]
+        : null,
     years:
       eligibility.targetAudience === "STUDENTS"
         ? eligibility.years && eligibility.years.length > 0
           ? eligibility.years
+          : ["ALL"]
+        : null,
+    departments:
+      eligibility.targetAudience === "STUDENTS"
+        ? eligibility.departments && eligibility.departments.length > 0
+          ? eligibility.departments
           : ["ALL"]
         : null,
   };

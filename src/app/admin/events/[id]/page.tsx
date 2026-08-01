@@ -188,14 +188,26 @@ export default async function AdminEventDetailsPage({ params }: PageProps) {
                     {audience === "STUDENTS" && (
                       <>
                         <div className="flex justify-between border-b border-dashed border-border pb-2">
-                          <span className="text-muted-foreground">Degree:</span>
-                          <span className="font-semibold text-foreground">{elig?.degree ?? "ALL"}</span>
+                          <span className="text-muted-foreground">Degree Level(s):</span>
+                          <span className="font-semibold text-foreground">
+                            {elig?.degrees && elig.degrees.length > 0
+                              ? elig.degrees.join(", ")
+                              : elig?.degree ?? "ALL"}
+                          </span>
                         </div>
-                        <div className="flex justify-between">
+                        <div className="flex justify-between border-b border-dashed border-border pb-2">
                           <span className="text-muted-foreground">Year(s):</span>
                           <span className="font-semibold text-foreground text-right">
                             {elig?.years && elig.years.length > 0
                               ? elig.years.join(", ")
+                              : "All"}
+                          </span>
+                        </div>
+                        <div className="flex justify-between">
+                          <span className="text-muted-foreground">Department(s):</span>
+                          <span className="font-semibold text-foreground text-right">
+                            {elig?.departments && elig.departments.length > 0
+                              ? elig.departments.join(", ")
                               : "All"}
                           </span>
                         </div>
