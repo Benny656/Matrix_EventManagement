@@ -103,43 +103,50 @@ export default function RegisterActionButton({
       {showConfirmModal && (
         <div className="fixed inset-0 z-50 bg-black/60 backdrop-blur-sm flex items-center justify-center p-4">
           <div className="bg-card border border-border max-w-md w-full p-6 space-y-4 shadow-xl rounded-none">
-            <div className="space-y-2">
-              <h3 className="font-heading text-xl font-bold text-foreground">
-                Confirm Registration
-              </h3>
-              <div className="border border-destructive/30 bg-destructive/5 text-destructive p-3 font-mono text-xs uppercase">
-                <span className="font-bold block mb-1">Important Notice:</span>
-                Once registered, you cannot cancel your registration.
+            {isPending ? (
+              <div className="flex flex-col items-center justify-center space-y-4 py-8">
+                <Loader2 size={48} className="animate-spin text-primary" />
+                <h3 className="font-heading text-xl font-bold text-foreground text-center uppercase tracking-wider">
+                  Wait, you are not done...
+                </h3>
+                <p className="font-sans text-sm text-muted-foreground text-center">
+                  Processing your registration. Please do not close this window.
+                </p>
               </div>
-              <p className="font-sans text-xs text-muted-foreground leading-relaxed">
-                Are you sure you want to proceed with registering for this event?
-              </p>
-            </div>
+            ) : (
+              <>
+                <div className="space-y-2">
+                  <h3 className="font-heading text-xl font-bold text-foreground">
+                    Confirm Registration
+                  </h3>
+                  <div className="border border-destructive/30 bg-destructive/5 text-destructive p-3 font-mono text-xs uppercase">
+                    <span className="font-bold block mb-1">Important Notice:</span>
+                    Once registered, you cannot cancel your registration.
+                  </div>
+                  <p className="font-sans text-xs text-muted-foreground leading-relaxed">
+                    Are you sure you want to proceed with registering for this event?
+                  </p>
+                </div>
 
-            <div className="flex flex-col sm:flex-row gap-3 pt-4 border-t border-border">
-              <Button
-                variant="outline"
-                onClick={() => setShowConfirmModal(false)}
-                disabled={isPending}
-                className="flex-1 border-border font-mono text-xs uppercase tracking-wider rounded-none h-10 shadow-none"
-              >
-                Go Back
-              </Button>
-              <Button
-                onClick={confirmAndRegister}
-                disabled={isPending}
-                className="flex-1 bg-primary text-primary-foreground font-mono text-xs uppercase tracking-wider rounded-none h-10 shadow-none"
-              >
-                {isPending ? (
-                  <span className="flex items-center justify-center gap-2">
-                    <Loader2 size={14} className="animate-spin shrink-0" />
-                    <span>Submitting...</span>
-                  </span>
-                ) : (
-                  "Confirm & Register"
-                )}
-              </Button>
-            </div>
+                <div className="flex flex-col sm:flex-row gap-3 pt-4 border-t border-border">
+                  <Button
+                    variant="outline"
+                    onClick={() => setShowConfirmModal(false)}
+                    disabled={isPending}
+                    className="flex-1 border-border font-mono text-xs uppercase tracking-wider rounded-none h-10 shadow-none"
+                  >
+                    Go Back
+                  </Button>
+                  <Button
+                    onClick={confirmAndRegister}
+                    disabled={isPending}
+                    className="flex-1 bg-primary text-primary-foreground font-mono text-xs uppercase tracking-wider rounded-none h-10 shadow-none"
+                  >
+                    Confirm & Register
+                  </Button>
+                </div>
+              </>
+            )}
           </div>
         </div>
       )}
