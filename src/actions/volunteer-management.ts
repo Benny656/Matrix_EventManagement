@@ -102,13 +102,15 @@ export async function getEventVolunteersAction(eventId: string): Promise<Volunte
     return [];
   }
 
-  // Fetch users details
+  // Fetch only the specific users we need, instead of the whole collection.
   const userIds = Array.from(new Set(volunteerRegs.map((r) => r.studentId)));
-  const usersSnapshot = await adminDb.collection("users").get();
+  const userRefs = userIds.map((id) => adminDb.collection("users").doc(id));
+  const userDocs = await adminDb.getAll(...userRefs);
+
   const userMap = new Map<string, any>();
-  usersSnapshot.docs.forEach((d) => {
-    if (userIds.includes(d.id)) {
-      userMap.set(d.id, { id: d.id, ...d.data() });
+  userDocs.forEach((doc) => {
+    if (doc.exists) {
+      userMap.set(doc.id, { id: doc.id, ...doc.data() });
     }
   });
 
@@ -217,9 +219,18 @@ export async function getEventRegistrationsForVolunteerAssignmentAction(eventId:
 
   if (regs.length === 0) return [];
 
-  const usersSnapshot = await adminDb.collection("users").get();
+  // Fetch only the specific users referenced by these registrations,
+  // instead of the whole users collection.
+  const userIds = Array.from(new Set(regs.map((r) => r.studentId)));
+  const userRefs = userIds.map((id) => adminDb.collection("users").doc(id));
+  const userDocs = await adminDb.getAll(...userRefs);
+
   const userMap = new Map<string, any>();
-  usersSnapshot.docs.forEach((d) => userMap.set(d.id, d.data()));
+  userDocs.forEach((doc) => {
+    if (doc.exists) {
+      userMap.set(doc.id, doc.data());
+    }
+  });
 
   const result = regs.map((r) => {
     const u = userMap.get(r.studentId) || { name: "Unknown", email: "", rollNumber: null, department: null };

@@ -330,36 +330,66 @@ export async function getEventsAction(
   includeArchived = false,
   requestingUser?: UserProfile | null
 ) {
+  // Push the archived filter into the query itself instead of fetching
+  // every event (including archived ones) and filtering in memory.
+  const eventsQuery = includeArchived
+    ? adminDb.collection("events")
+    : adminDb.collection("events").where("status", "!=", "ARCHIVED");
+
   const [snapshot, sessionsSnapshot, registrationsSnapshot] = await Promise.all([
-    adminDb.collection("events").get(),
+    eventsQuery.get(),
     adminDb.collection("sessions").get(),
     adminDb.collection("registrations").get(),
   ]);
 
   const now = new Date();
-  const allSessions = sessionsSnapshot.docs.map((d: any) => ({ id: d.id, ...d.data() })) as any[];
-  const allRegistrations = registrationsSnapshot.docs.map((d: any) => d.data()) as any[];
+
+  // Group sessions by eventId once (O(N)) instead of re-filtering the full
+  // sessions array for every event (O(events * sessions)).
+  const sessionsByEvent = new Map<string, any[]>();
+  sessionsSnapshot.docs.forEach((d: any) => {
+    const s = { id: d.id, ...d.data() };
+    const list = sessionsByEvent.get(s.eventId) ?? [];
+    list.push(s);
+    sessionsByEvent.set(s.eventId, list);
+  });
+
+  // Group registrations by eventId once, and precompute counts/flags per
+  // event in the same pass instead of scanning the full array per event.
+  const regCountByEvent = new Map<string, number>();
+  const volCountByEvent = new Map<string, number>();
+  const registeredUserEventPairs = new Set<string>();
+
+  registrationsSnapshot.docs.forEach((d: any) => {
+    const r = d.data();
+    if (r.status !== "REGISTERED") return;
+
+    if (r.eventRole === "volunteer") {
+      volCountByEvent.set(r.eventId, (volCountByEvent.get(r.eventId) ?? 0) + 1);
+    } else {
+      regCountByEvent.set(r.eventId, (regCountByEvent.get(r.eventId) ?? 0) + 1);
+    }
+
+    const uid = r.studentId ?? r.FacultyId ?? r.userId;
+    if (uid) {
+      registeredUserEventPairs.add(`${r.eventId}::${uid}`);
+    }
+  });
 
   let events = snapshot.docs.map((doc: any) => {
     const data = doc.data() as any;
-    const eventSessions = allSessions.filter((s: any) => s.eventId === doc.id);
-    const regCount = allRegistrations.filter(
-      (r: any) => r.eventId === doc.id && r.status === "REGISTERED" && r.eventRole !== "volunteer"
-    ).length;
-    const volCount = allRegistrations.filter(
-      (r: any) => r.eventId === doc.id && r.status === "REGISTERED" && r.eventRole === "volunteer"
-    ).length;
+    const eventSessions = sessionsByEvent.get(doc.id) ?? [];
 
     const isUserRegistered = requestingUser
-      ? allRegistrations.some(
-          (r: any) =>
-            r.eventId === doc.id &&
-            r.status === "REGISTERED" &&
-            (r.studentId === requestingUser.id || r.FacultyId === requestingUser.id || r.userId === requestingUser.id)
-        )
+      ? registeredUserEventPairs.has(`${doc.id}::${requestingUser.id}`)
       : false;
 
-    const dateStr = typeof data.date === "string" ? data.date : (data.date ? new Date(data.date).toISOString() : new Date().toISOString());
+    const dateStr =
+      typeof data.date === "string"
+        ? data.date
+        : data.date
+        ? new Date(data.date).toISOString()
+        : new Date().toISOString();
 
     return {
       ...data,
@@ -369,19 +399,24 @@ export async function getEventsAction(
       isUserRegistered,
       sessions: eventSessions.map((s: any) => ({
         ...s,
-        startTime: typeof s.startTime === "string" ? s.startTime : (s.startTime ? new Date(s.startTime).toISOString() : new Date().toISOString()),
-        endTime: s.endTime ? (typeof s.endTime === "string" ? s.endTime : new Date(s.endTime).toISOString()) : null,
+        startTime:
+          typeof s.startTime === "string"
+            ? s.startTime
+            : s.startTime
+            ? new Date(s.startTime).toISOString()
+            : new Date().toISOString(),
+        endTime: s.endTime
+          ? typeof s.endTime === "string"
+            ? s.endTime
+            : new Date(s.endTime).toISOString()
+          : null,
       })),
       _count: {
-        registrations: regCount,
-        volunteers: volCount,
+        registrations: regCountByEvent.get(doc.id) ?? 0,
+        volunteers: volCountByEvent.get(doc.id) ?? 0,
       },
     };
   });
-
-  if (!includeArchived) {
-    events = events.filter((e: any) => e.status !== "ARCHIVED");
-  }
 
   // Apply eligibility filter when a requesting user is provided
   if (requestingUser) {
@@ -394,13 +429,11 @@ export async function getEventsAction(
 
     let newStatus: "UPCOMING" | "ONGOING" | "COMPLETED" = "UPCOMING";
 
-    const hasOngoingSession = event.sessions.some(
-      (s: any) => {
-        const start = s.startTime ? new Date(s.startTime) : null;
-        const end = s.endTime ? new Date(s.endTime) : null;
-        return start && now >= start && (!end || now <= end);
-      }
-    );
+    const hasOngoingSession = event.sessions.some((s: any) => {
+      const start = s.startTime ? new Date(s.startTime) : null;
+      const end = s.endTime ? new Date(s.endTime) : null;
+      return start && now >= start && (!end || now <= end);
+    });
     const allSessionsFinished =
       event.sessions.length > 0 &&
       event.sessions.every((s: any) => {
@@ -416,10 +449,14 @@ export async function getEventsAction(
 
     if (newStatus !== event.status) {
       // Async non-blocking Firestore update
-      adminDb.collection("events").doc(event.id).update({
-        status: newStatus,
-        updatedAt: new Date().toISOString(),
-      }).catch((err) => console.error("Error updating event status asynchronously:", err));
+      adminDb
+        .collection("events")
+        .doc(event.id)
+        .update({
+          status: newStatus,
+          updatedAt: new Date().toISOString(),
+        })
+        .catch((err) => console.error("Error updating event status asynchronously:", err));
       event.status = newStatus;
     }
 

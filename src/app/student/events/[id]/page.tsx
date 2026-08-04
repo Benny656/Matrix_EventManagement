@@ -12,6 +12,16 @@ interface PageProps {
   params: Promise<{ id: string }>;
 }
 
+// Firestore `in` queries are capped at 30 values per query.
+// Chunk larger ID sets and fan out with Promise.all.
+function chunk<T>(arr: T[], size: number): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < arr.length; i += size) {
+    out.push(arr.slice(i, i + size));
+  }
+  return out;
+}
+
 export default async function StudentEventDetailsPage({ params }: PageProps) {
   const currentUser = await getCurrentUser();
 
@@ -33,36 +43,70 @@ export default async function StudentEventDetailsPage({ params }: PageProps) {
     notFound();
   }
 
-  const sessionsSnapshot = await adminDb
-    .collection("sessions")
-    .where("eventId", "==", id)
-    .get();
+  // Independent reads — no data dependency between them — run in parallel.
+  // NOTE: parallelizing here only helps latency, not read cost.
+  const [sessionsSnapshot, userRegSnapshot, activeCountSnapshot] = await Promise.all([
+    // Sort at the query level instead of in JS (requires composite index:
+    // sessions: eventId ASC, startTime ASC)
+    adminDb
+      .collection("sessions")
+      .where("eventId", "==", id)
+      .orderBy("startTime", "asc")
+      .get(),
+
+    // Look up this student's registration directly instead of pulling every
+    // registration for the event and scanning in JS.
+    // (requires composite index: registrations: eventId ASC, studentId ASC)
+    adminDb
+      .collection("registrations")
+      .where("eventId", "==", id)
+      .where("studentId", "==", currentUser.id)
+      .limit(1)
+      .get(),
+
+    // Only the count of active registrations is needed — use an aggregation
+    // count query instead of pulling full docs just to read .length.
+    // (requires composite index: registrations: eventId ASC, status ASC)
+    adminDb
+      .collection("registrations")
+      .where("eventId", "==", id)
+      .where("status", "==", "REGISTERED")
+      .count()
+      .get(),
+  ]);
+
   const sessions = sessionsSnapshot.docs.map((d) => ({ id: d.id, ...d.data() })) as any[];
-  sessions.sort((a, b) => (a.startTime || "").localeCompare(b.startTime || ""));
 
-  const regsSnapshot = await adminDb
-    .collection("registrations")
-    .where("eventId", "==", id)
-    .get();
+  const userRegistration = userRegSnapshot.empty ? null : userRegSnapshot.docs[0].data();
+  const activeRegistrationsCount = activeCountSnapshot.data().count;
 
-  const registrations = regsSnapshot.docs.map((d) => d.data());
-  const userRegistration = registrations.find((r) => r.studentId === currentUser.id);
-
-  const activeRegistrationsCount = registrations.filter((r) => r.status === "REGISTERED").length;
   const isFull = event.maxParticipants ? activeRegistrationsCount >= event.maxParticipants : false;
   const isRegistrationOpen = event.registrationOpen ?? true;
 
   const registrationStatus = userRegistration ? userRegistration.status : null;
 
-  // Fetch student's attendance records for this event if registered
+  // Fetch student's attendance records scoped to this event's sessions only,
+  // instead of the student's entire attendance history across all events.
+  // (requires composite index: attendances: studentId ASC, sessionId ASC)
   let userAttendedSessionIds = new Set<string>();
-  if (registrationStatus === "REGISTERED") {
-    const userAttsSnapshot = await adminDb
-      .collection("attendances")
-      .where("studentId", "==", currentUser.id)
-      .get();
-    userAttsSnapshot.docs.forEach((d) => {
-      userAttendedSessionIds.add(d.data().sessionId);
+  if (registrationStatus === "REGISTERED" && sessions.length > 0) {
+    const sessionIds = sessions.map((s) => s.id);
+    const sessionIdChunks = chunk(sessionIds, 30);
+
+    const attSnapshots = await Promise.all(
+      sessionIdChunks.map((idsChunk) =>
+        adminDb
+          .collection("attendances")
+          .where("studentId", "==", currentUser.id)
+          .where("sessionId", "in", idsChunk)
+          .get()
+      )
+    );
+
+    attSnapshots.forEach((snap) => {
+      snap.docs.forEach((d) => {
+        userAttendedSessionIds.add(d.data().sessionId);
+      });
     });
   }
 

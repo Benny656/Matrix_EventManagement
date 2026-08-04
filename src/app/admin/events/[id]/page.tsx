@@ -20,6 +20,16 @@ interface PageProps {
   params: Promise<{ id: string }>;
 }
 
+// Firestore `in` queries are capped at 30 values per query.
+// Chunk larger ID sets and fan out with Promise.all.
+function chunk<T>(arr: T[], size: number): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < arr.length; i += size) {
+    out.push(arr.slice(i, i + size));
+  }
+  return out;
+}
+
 export default async function AdminEventDetailsPage({ params }: PageProps) {
   try {
     await verifyAdmin();
@@ -29,51 +39,74 @@ export default async function AdminEventDetailsPage({ params }: PageProps) {
 
   const { id } = await params;
 
-  const eventDoc = await adminDb.collection("events").doc(id).get();
+  // Independent reads that only need `id` — kick them all off together
+  // instead of waiting on each other sequentially.
+  const [eventDoc, sessionsSnapshot, regsSnapshot, volunteers, allRegsForVolunteer] = await Promise.all([
+    adminDb.collection("events").doc(id).get(),
+    adminDb.collection("sessions").where("eventId", "==", id).get(),
+    adminDb.collection("registrations").where("eventId", "==", id).get(),
+    getEventVolunteersAction(id),
+    getEventRegistrationsForVolunteerAssignmentAction(id),
+  ]);
+
   if (!eventDoc.exists) {
     notFound();
   }
 
   const event = { id: eventDoc.id, ...eventDoc.data() } as any;
 
-  const sessionsSnapshot = await adminDb
-    .collection("sessions")
-    .where("eventId", "==", id)
-    .get();
   const sessions = sessionsSnapshot.docs.map((d) => ({ id: d.id, ...d.data() })) as any[];
   sessions.sort((a: any, b: any) => (a.startTime || "").localeCompare(b.startTime || ""));
 
-  const regsSnapshot = await adminDb
-    .collection("registrations")
-    .where("eventId", "==", id)
-    .get();
-
-  const usersSnapshot = await adminDb.collection("users").get();
-  const userMap = new Map<string, any>();
-  usersSnapshot.docs.forEach((d: any) => userMap.set(d.id, d.data()));
-
-  const registrations = regsSnapshot.docs
+  const activeRegistrations = regsSnapshot.docs
     .map((d: any) => d.data())
-    .filter((r: any) => r.status !== "CANCELLED")
-    .map((r: any) => {
-      const student = userMap.get(r.studentId) || { name: "Unknown", email: "" };
-      return {
-        ...r,
-        eventRole: r.eventRole || "participant",
-        student: {
-          id: r.studentId,
-          name: student.name,
-          email: student.email,
-          rollNumber: student.rollNumber || null,
-        },
-      };
-    });
+    .filter((r: any) => r.status !== "CANCELLED");
 
+  const studentIds = [...new Set(activeRegistrations.map((r: any) => r.studentId))];
   const sessionIds = sessions.map((s: any) => s.id);
-  const attsSnapshot = await adminDb.collection("attendances").get();
-  const attendances = attsSnapshot.docs
-    .map((d: any) => d.data())
-    .filter((a: any) => sessionIds.includes(a.sessionId));
+
+  // Fetch only the specific users referenced by this event's registrations
+  // (via getAll on known refs), instead of scanning the entire `users`
+  // collection. Fetch only attendances belonging to this event's sessions
+  // (via chunked `in` queries), instead of scanning the entire
+  // `attendances` collection. Both depend on IDs known from the reads
+  // above, so they run after those resolve.
+  const [userDocs, attSnapshots] = await Promise.all([
+    studentIds.length > 0
+      ? adminDb.getAll(...studentIds.map((studentId) => adminDb.collection("users").doc(studentId)))
+      : Promise.resolve([]),
+    sessionIds.length > 0
+      ? Promise.all(
+          chunk(sessionIds, 30).map((idsChunk) =>
+            adminDb.collection("attendances").where("sessionId", "in", idsChunk).get()
+          )
+        )
+      : Promise.resolve([]),
+  ]);
+
+  const userMap = new Map<string, any>();
+  userDocs.forEach((doc) => {
+    if (doc.exists) userMap.set(doc.id, doc.data());
+  });
+
+  const registrations = activeRegistrations.map((r: any) => {
+    const student = userMap.get(r.studentId) || { name: "Unknown", email: "" };
+    return {
+      ...r,
+      eventRole: r.eventRole || "participant",
+      student: {
+        id: r.studentId,
+        name: student.name,
+        email: student.email,
+        rollNumber: student.rollNumber || null,
+      },
+    };
+  });
+
+  const attendances: any[] = [];
+  attSnapshots.forEach((snapshot) => {
+    snapshot.docs.forEach((d) => attendances.push(d.data()));
+  });
 
   const sessionAttMap = new Map<string, number>();
   attendances.forEach((a: any) => {
@@ -87,9 +120,6 @@ export default async function AdminEventDetailsPage({ params }: PageProps) {
   const waitlistedCount = participantRegs.filter((r: any) => r.status === "WAITLISTED").length;
   const checkedInCount = checkedInStudentIds.size;
 
-  // Fetch Volunteers and all registrations for volunteer assignment
-  const volunteers = await getEventVolunteersAction(id);
-  const allRegsForVolunteer = await getEventRegistrationsForVolunteerAssignmentAction(id);
   const volunteerPresentCount = volunteers.filter((v) => v.attendanceStatus === "PRESENT").length;
 
   const sessionsWithCount = sessions.map((s: any) => ({

@@ -59,6 +59,17 @@ const nextConfig: NextConfig = {
   poweredByHeader: false,
   transpilePackages: ["lucide-react"],
   serverExternalPackages: ["firebase-admin"],
+  experimental: {
+    serverActions: {
+      allowedOrigins: [
+        "yourdomain.com",
+        "www.yourdomain.com",
+        // add any preview/staging domains, e.g.:
+        // "*.vercel.app",
+        ...(isDev ? ["localhost:3000"] : []),
+      ],
+    },
+  },
   async headers() {
     return [
       {

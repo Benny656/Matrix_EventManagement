@@ -33,20 +33,30 @@ export async function registerForEventAction(eventId: string) {
     throw new Error("Registration is closed.");
   }
 
-  // Fetch all registrations for this event to count confirmed
-  const regSnapshot = await adminDb
+  // Cheap aggregate count for capacity check — reads zero documents,
+  // instead of pulling every registration for the event just to count them.
+  const activeCountSnapshot = await adminDb
     .collection("registrations")
     .where("eventId", "==", eventId)
+    .where("status", "==", "REGISTERED")
+    .count()
     .get();
+  const activeCount = activeCountSnapshot.data().count;
 
-  const eventRegs = regSnapshot.docs.map((d) => d.data());
-  const existingRegDoc = regSnapshot.docs.find((d) => d.data().studentId === user.id);
+  // Targeted lookup for this user's own registration only, instead of
+  // fetching every registration for the event to find it.
+  const existingRegSnapshot = await adminDb
+    .collection("registrations")
+    .where("eventId", "==", eventId)
+    .where("studentId", "==", user.id)
+    .limit(1)
+    .get();
+  const existingRegDoc = existingRegSnapshot.docs[0];
 
   if (existingRegDoc && existingRegDoc.data().status !== "CANCELLED") {
     throw new Error("You are already registered for this event.");
   }
 
-  const activeCount = eventRegs.filter((r) => r.status === "REGISTERED").length;
   if (event.maxParticipants && activeCount >= event.maxParticipants) {
     throw new Error("Event capacity has been reached. Registration is closed.");
   }

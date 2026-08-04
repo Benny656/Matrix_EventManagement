@@ -9,7 +9,13 @@ import { verifyAdmin } from "@/lib/auth-session";
 export async function getAdminEventsAction() {
   await verifyAdmin();
 
-  const eventsSnapshot = await adminDb.collection("events").get();
+  // Sort at the query level instead of pulling everything into memory
+  // and sorting in JS.
+  const eventsSnapshot = await adminDb
+    .collection("events")
+    .orderBy("date", "desc")
+    .get();
+
   const events = eventsSnapshot.docs.map((doc) => {
     const data = doc.data();
     return {
@@ -20,7 +26,6 @@ export async function getAdminEventsAction() {
     };
   });
 
-  events.sort((a, b) => (b.date || "").localeCompare(a.date || ""));
   return events;
 }
 
@@ -79,20 +84,20 @@ export async function getSessionAttendanceAction(sessionId: string) {
     };
   });
 
-  // 2. Fetch all student profiles who checked in
+  // 2. Fetch all student profiles who checked in (deduped, batched via getAll
+  // for a single RPC instead of N parallel single-doc gets).
   const studentIds = Array.from(new Set(attendances.map((a) => a.studentId)));
-  
-  // Fetch users in parallel via doc refs.
-  const userDocs = await Promise.all(
-    studentIds.map((id) => adminDb.collection("users").doc(id).get())
-  );
 
   const userMap = new Map<string, any>();
-  userDocs.forEach((doc) => {
-    if (doc.exists) {
-      userMap.set(doc.id, doc.data());
-    }
-  });
+  if (studentIds.length > 0) {
+    const userRefs = studentIds.map((id) => adminDb.collection("users").doc(id));
+    const userDocs = await adminDb.getAll(...userRefs);
+    userDocs.forEach((doc) => {
+      if (doc.exists) {
+        userMap.set(doc.id, doc.data());
+      }
+    });
+  }
 
   // 3. Map records
   const result = attendances.map((att) => {

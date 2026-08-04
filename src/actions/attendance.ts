@@ -27,15 +27,17 @@ export async function markAttendanceAction(params: {
   }
   const { sessionId, rollNumber, method } = params;
 
-  // 1. Fetch student by roll number
+  // 1. Fetch student by roll number directly — query by the field instead
+  // of scanning every student and filtering client-side.
+  const rollNumberUpper = rollNumber.trim().toUpperCase();
   const usersSnapshot = await adminDb
     .collection("users")
+    .where("rollNumber", "==", rollNumberUpper)
     .where("role", "==", "STUDENT")
+    .limit(1)
     .get();
 
-  const studentDoc = usersSnapshot.docs.find(
-    (doc) => (doc.data().rollNumber || "").toLowerCase() === rollNumber.toLowerCase()
-  );
+  const studentDoc = usersSnapshot.docs[0];
 
   if (!studentDoc) {
     return {
@@ -178,11 +180,28 @@ export async function getActiveSessionsAction() {
     .where("status", "!=", "ARCHIVED")
     .get();
 
+  if (eventsSnapshot.empty) return [];
+
   const eventMap = new Map<string, any>();
   eventsSnapshot.docs.forEach((d) => eventMap.set(d.id, d.data()));
+  const eventIds = Array.from(eventMap.keys());
 
-  const sessionsSnapshot = await adminDb.collection("sessions").get();
-  const sessions = sessionsSnapshot.docs
+  // Only fetch sessions belonging to non-archived events, instead of every
+  // session ever created. Firestore 'in' queries cap at 30 values, so chunk.
+  const CHUNK_SIZE = 30;
+  const chunks: string[][] = [];
+  for (let i = 0; i < eventIds.length; i += CHUNK_SIZE) {
+    chunks.push(eventIds.slice(i, i + CHUNK_SIZE));
+  }
+
+  const sessionSnapshots = await Promise.all(
+    chunks.map((chunk) =>
+      adminDb.collection("sessions").where("eventId", "in", chunk).get()
+    )
+  );
+
+  const sessions = sessionSnapshots
+    .flatMap((snap) => snap.docs)
     .map((doc) => {
       const data = doc.data() as any;
       const event = eventMap.get(data.eventId);
@@ -301,16 +320,17 @@ export async function getRegisteredStudentsAction(sessionId: string) {
   const studentIds = regSnapshot.docs.map((d) => d.data().studentId);
   if (studentIds.length === 0) return [];
 
-  const students = await Promise.all(
-    studentIds.map(async (id) => {
-      const uDoc = await adminDb.collection("users").doc(id).get();
-      if (!uDoc.exists) return null;
-      const data = uDoc.data() as any;
-      return { id: uDoc.id, name: data.name, rollNumber: data.rollNumber };
-    })
-  );
+  // Batched multi-get instead of N parallel single-doc gets.
+  const studentRefs = studentIds.map((id) => adminDb.collection("users").doc(id));
+  const userDocs = await adminDb.getAll(...studentRefs);
 
-  const result = students.filter(Boolean) as any[];
+  const result = userDocs
+    .filter((doc) => doc.exists)
+    .map((doc) => {
+      const data = doc.data() as any;
+      return { id: doc.id, name: data.name, rollNumber: data.rollNumber };
+    });
+
   result.sort((a, b) => (a.name || "").localeCompare(b.name || ""));
   return result;
 }

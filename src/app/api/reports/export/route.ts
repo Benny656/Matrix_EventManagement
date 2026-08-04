@@ -11,6 +11,47 @@ function escapeCSV(val: any) {
   return str;
 }
 
+/** Fetch documents by ID via getAll, chunked defensively, returned as a Map. */
+async function fetchDocsAsMap(
+  collection: string,
+  ids: string[]
+): Promise<Map<string, any>> {
+  const map = new Map<string, any>();
+  const uniqueIds = Array.from(new Set(ids)).filter(Boolean);
+  if (uniqueIds.length === 0) return map;
+
+  const refs = uniqueIds.map((id) => adminDb.collection(collection).doc(id));
+  const docs = await adminDb.getAll(...refs);
+  docs.forEach((doc) => {
+    if (doc.exists) {
+      map.set(doc.id, doc.data());
+    }
+  });
+  return map;
+}
+
+/** Query a collection by a field being 'in' a list of values, chunked at Firestore's 30-item limit. */
+async function fetchByFieldIn(
+  collection: string,
+  field: string,
+  values: string[]
+): Promise<any[]> {
+  const uniqueValues = Array.from(new Set(values)).filter(Boolean);
+  if (uniqueValues.length === 0) return [];
+
+  const CHUNK_SIZE = 30;
+  const chunks: string[][] = [];
+  for (let i = 0; i < uniqueValues.length; i += CHUNK_SIZE) {
+    chunks.push(uniqueValues.slice(i, i + CHUNK_SIZE));
+  }
+
+  const snapshots = await Promise.all(
+    chunks.map((chunk) => adminDb.collection(collection).where(field, "in", chunk).get())
+  );
+
+  return snapshots.flatMap((snap) => snap.docs.map((d) => d.data()));
+}
+
 export async function GET(req: NextRequest) {
   const currentUser = await getCurrentUser();
 
@@ -58,15 +99,16 @@ export async function GET(req: NextRequest) {
         .get();
       const registrations = regsSnapshot.docs.map((d: any) => d.data()) as any[];
 
-      const usersSnapshot = await adminDb.collection("users").get();
-      const userMap = new Map<string, any>();
-      usersSnapshot.docs.forEach((d: any) => userMap.set(d.id, d.data()));
+      // Only fetch the specific students referenced by these registrations.
+      const userMap = await fetchDocsAsMap(
+        "users",
+        registrations.map((r) => r.studentId)
+      );
 
+      // Only fetch attendances for this event's sessions, instead of the
+      // entire attendances collection.
       const sessionIds = sessions.map((s) => s.id);
-      const attsSnapshot = await adminDb.collection("attendances").get();
-      const attendances = attsSnapshot.docs
-        .map((d: any) => d.data())
-        .filter((a: any) => sessionIds.includes(a.sessionId));
+      const attendances = await fetchByFieldIn("attendances", "sessionId", sessionIds);
 
       const sessionTitleMap = new Map<string, string>();
       sessions.forEach((s) => sessionTitleMap.set(s.id, s.title));
@@ -124,6 +166,36 @@ export async function GET(req: NextRequest) {
       const attsSnapshot = await adminDb.collection("attendances").get();
       const allAtts = attsSnapshot.docs.map((d: any) => d.data()) as any[];
 
+      // Pre-group everything by eventId once (O(N)) instead of re-filtering
+      // the full arrays for every event inside the loop below (O(events*N)).
+      const regsByEvent = new Map<string, any[]>();
+      allRegs.forEach((r: any) => {
+        const list = regsByEvent.get(r.eventId) ?? [];
+        list.push(r);
+        regsByEvent.set(r.eventId, list);
+      });
+
+      const sessionIdsByEvent = new Map<string, Set<string>>();
+      allSessions.forEach((s: any) => {
+        const set = sessionIdsByEvent.get(s.eventId) ?? new Set<string>();
+        set.add(s.id);
+        sessionIdsByEvent.set(s.eventId, set);
+      });
+
+      // Map sessionId -> eventId once, so attendance records can be grouped
+      // by event in a single pass instead of a nested membership check.
+      const eventIdBySessionId = new Map<string, string>();
+      allSessions.forEach((s: any) => eventIdBySessionId.set(s.id, s.eventId));
+
+      const checkedInStudentIdsByEvent = new Map<string, Set<string>>();
+      allAtts.forEach((att: any) => {
+        const eventId = eventIdBySessionId.get(att.sessionId);
+        if (!eventId) return;
+        const set = checkedInStudentIdsByEvent.get(eventId) ?? new Set<string>();
+        set.add(att.studentId);
+        checkedInStudentIdsByEvent.set(eventId, set);
+      });
+
       filename = "events_summary_report.csv";
 
       const headersList = [
@@ -143,20 +215,12 @@ export async function GET(req: NextRequest) {
       csvContent += headersList.map(escapeCSV).join(",") + "\n";
 
       events.forEach((evt: any) => {
-        const eventRegs = allRegs.filter((r: any) => r.eventId === evt.id);
+        const eventRegs = regsByEvent.get(evt.id) ?? [];
         const rsvps = eventRegs.filter((r: any) => r.status === "REGISTERED").length;
         const waitlisted = eventRegs.filter((r: any) => r.status === "WAITLISTED").length;
         const cancelled = eventRegs.filter((r: any) => r.status === "CANCELLED").length;
 
-        const eventSessionIds = allSessions.filter((s: any) => s.eventId === evt.id).map((s: any) => s.id);
-        const checkedInStudentIds = new Set<string>();
-        allAtts.forEach((att: any) => {
-          if (eventSessionIds.includes(att.sessionId)) {
-            checkedInStudentIds.add(att.studentId);
-          }
-        });
-
-        const uniqueCheckIns = checkedInStudentIds.size;
+        const uniqueCheckIns = checkedInStudentIdsByEvent.get(evt.id)?.size ?? 0;
         const rate = rsvps > 0 ? ((uniqueCheckIns / rsvps) * 100).toFixed(1) : "0.0";
 
         const row = [
@@ -189,6 +253,14 @@ export async function GET(req: NextRequest) {
       const attsSnapshot = await adminDb.collection("attendances").get();
       const allAtts = attsSnapshot.docs.map((d: any) => d.data()) as any[];
 
+      // Pre-count validations per volunteer once, instead of filtering the
+      // full attendance array inside the volunteers.forEach loop below.
+      const validatedCountByMarker = new Map<string, number>();
+      allAtts.forEach((a: any) => {
+        if (!a.markedById) return;
+        validatedCountByMarker.set(a.markedById, (validatedCountByMarker.get(a.markedById) ?? 0) + 1);
+      });
+
       filename = "volunteers_performance_report.csv";
 
       const headersList = [
@@ -200,7 +272,7 @@ export async function GET(req: NextRequest) {
       csvContent += headersList.map(escapeCSV).join(",") + "\n";
 
       volunteers.forEach((v: any) => {
-        const validatedCount = allAtts.filter((a: any) => a.markedById === v.id).length;
+        const validatedCount = validatedCountByMarker.get(v.id) ?? 0;
         const row = [
           v.name || "Volunteer",
           v.email || "",
@@ -217,13 +289,12 @@ export async function GET(req: NextRequest) {
       const regsSnapshot = await adminDb.collection("registrations").get();
       const registrations = regsSnapshot.docs.map((d: any) => d.data()) as any[];
 
-      const usersSnapshot = await adminDb.collection("users").get();
-      const userMap = new Map<string, any>();
-      usersSnapshot.docs.forEach((d: any) => userMap.set(d.id, d.data()));
-
-      const eventsSnapshot = await adminDb.collection("events").get();
-      const eventMap = new Map<string, any>();
-      eventsSnapshot.docs.forEach((d: any) => eventMap.set(d.id, d.data()));
+      // Only fetch the specific users and events referenced by these
+      // registrations, instead of scanning both entire collections.
+      const [userMap, eventMap] = await Promise.all([
+        fetchDocsAsMap("users", registrations.map((r) => r.studentId)),
+        fetchDocsAsMap("events", registrations.map((r) => r.eventId)),
+      ]);
 
       filename = "students_registration_log.csv";
 

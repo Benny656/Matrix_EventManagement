@@ -21,9 +21,20 @@ export default async function proxy(request: NextRequest) {
 
   const cookieHeader = request.headers.get("cookie") || "";
 
+  // In local dev, `request.nextUrl.origin` can reflect an https:// origin
+  // (e.g. behind a tunnel or forwarded-proto header) even though the Next
+  // dev server itself only speaks plain HTTP. Fetching https:// against a
+  // plain-HTTP port throws ERR_SSL_WRONG_VERSION_NUMBER. Force http for the
+  // internal self-fetch in development; trust the real origin in production
+  // where TLS is actually terminated correctly.
+  const internalOrigin =
+    process.env.NODE_ENV === "production"
+      ? request.nextUrl.origin
+      : `http://${request.nextUrl.host}`;
+
   let sessionData: any = null;
   try {
-    const response = await fetch(`${request.nextUrl.origin}/api/auth/get-session`, {
+    const response = await fetch(`${internalOrigin}/api/auth/get-session`, {
       headers: {
         cookie: cookieHeader,
       },

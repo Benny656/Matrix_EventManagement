@@ -56,9 +56,12 @@ export async function completeOnboardingAction(data: {
       }
       validYearOfStudy = yearOfStudy;
 
-      // Check for duplicate roll number
+      // Check for duplicate roll number. limit(2) is sufficient: we only
+      // need to know whether a match exists that isn't the current user,
+      // so there's no need to pull back every matching document.
       const duplicateCheck = await adminDb.collection("users")
         .where("rollNumber", "==", trimmedRollNumber)
+        .limit(2)
         .get();
 
       // If another user has this roll number, reject.

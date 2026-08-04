@@ -14,39 +14,46 @@ export default async function ProfilePage() {
     redirect("/login");
   }
 
-  // Fetch role-specific statistics
+  // Fetch role-specific statistics. All of these only need a count, so use
+  // Firestore's count() aggregation instead of reading full documents.
   let stats: { label: string; value: number }[] = [];
   if (currentUser.role === "STUDENT") {
-    const regSnapshot = await adminDb
-      .collection("registrations")
-      .where("studentId", "==", currentUser.id)
-      .where("status", "==", "REGISTERED")
-      .get();
-
-    const attSnapshot = await adminDb
-      .collection("attendances")
-      .where("studentId", "==", currentUser.id)
-      .get();
+    const [regCountSnapshot, attCountSnapshot] = await Promise.all([
+      adminDb
+        .collection("registrations")
+        .where("studentId", "==", currentUser.id)
+        .where("status", "==", "REGISTERED")
+        .count()
+        .get(),
+      adminDb
+        .collection("attendances")
+        .where("studentId", "==", currentUser.id)
+        .count()
+        .get(),
+    ]);
 
     stats = [
-      { label: "Events Registered", value: regSnapshot.size },
-      { label: "Sessions Attended", value: attSnapshot.size },
+      { label: "Events Registered", value: regCountSnapshot.data().count },
+      { label: "Sessions Attended", value: attCountSnapshot.data().count },
     ];
   } else if (currentUser.role === "VOLUNTEER") {
-    const evtSnapshot = await adminDb
-      .collection("events")
-      .where("createdById", "==", currentUser.id)
-      .get();
-
-    const attSnapshot = await adminDb
-      .collection("attendances")
-      .where("markedById", "==", currentUser.id)
-      .where("checkInMethod", "==", "SCANNED")
-      .get();
+    const [evtCountSnapshot, attCountSnapshot] = await Promise.all([
+      adminDb
+        .collection("events")
+        .where("createdById", "==", currentUser.id)
+        .count()
+        .get(),
+      adminDb
+        .collection("attendances")
+        .where("markedById", "==", currentUser.id)
+        .where("checkInMethod", "==", "SCANNED")
+        .count()
+        .get(),
+    ]);
 
     stats = [
-      { label: "Events Organized", value: evtSnapshot.size },
-      { label: "Attendees Scanned", value: attSnapshot.size },
+      { label: "Events Organized", value: evtCountSnapshot.data().count },
+      { label: "Attendees Scanned", value: attCountSnapshot.data().count },
     ];
   }
 

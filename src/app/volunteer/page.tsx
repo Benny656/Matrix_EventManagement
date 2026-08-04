@@ -11,18 +11,33 @@ export const dynamic = "force-dynamic";
 import { DashboardSkeleton } from "@/components/ui/skeleton-loaders";
 
 async function VolunteerDashboardData({ userId }: { userId: string }) {
-  const eventsSnapshot = await adminDb.collection("events").get();
-  const allEvents = eventsSnapshot.docs.map((d) => ({ id: d.id, ...d.data() })) as any[];
+  // All three reads are independent of each other — run in parallel.
+  const [eventsCreatedCountSnapshot, attendeesScannedCountSnapshot, activeEventsSnapshot] = await Promise.all([
+    // Only a count is needed — use an aggregation count query instead of
+    // pulling every event doc just to filter+length in JS.
+    // (requires composite index? no — single-field filter, default index covers it)
+    adminDb.collection("events").where("createdById", "==", userId).count().get(),
 
-  const eventsCreated = allEvents.filter((e) => e.createdById === userId).length;
+    // Only a count is needed — use an aggregation count query instead of
+    // pulling every attendance doc ever created just to filter+length in JS.
+    // This was the most expensive read in the file: it scanned the entire
+    // attendances history on every dashboard load.
+    adminDb.collection("attendances").where("markedById", "==", userId).count().get(),
 
-  const attsSnapshot = await adminDb.collection("attendances").get();
-  const attendeesScanned = attsSnapshot.docs.filter((d) => d.data().markedById === userId).length;
+    // Filter and sort/limit at the query level instead of pulling every
+    // event in the system and doing it in JS.
+    // (requires composite index: events: status ASC, date ASC)
+    adminDb
+      .collection("events")
+      .where("status", "in", ["ONGOING", "UPCOMING"])
+      .orderBy("date", "asc")
+      .limit(4)
+      .get(),
+  ]);
 
-  const activeEvents = allEvents
-    .filter((e) => e.status === "ONGOING" || e.status === "UPCOMING")
-    .sort((a, b) => (a.date || "").localeCompare(b.date || ""))
-    .slice(0, 4);
+  const eventsCreated = eventsCreatedCountSnapshot.data().count;
+  const attendeesScanned = attendeesScannedCountSnapshot.data().count;
+  const activeEvents = activeEventsSnapshot.docs.map((d) => ({ id: d.id, ...d.data() })) as any[];
 
   return (
     <div className="space-y-6">

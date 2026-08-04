@@ -292,7 +292,17 @@ export default function AttendanceScanner({ sessions }: AttendanceScannerProps) 
       videoEl.srcObject = stream;
       container.appendChild(videoEl);
 
-      await videoEl.play().catch((e) => console.warn("Video play error:", e));
+      // Guard against the play() promise resolving/rejecting after this
+      // effect has already been cleaned up (session switched, tab changed,
+      // component unmounted). Without this check, an AbortError from a
+      // stale play() call can still fall through to the checks below and
+      // act on a video element or stream that no longer belongs to the
+      // current run.
+      try {
+        await videoEl.play();
+      } catch (e) {
+        console.warn("Video play error:", e);
+      }
 
       if (!isMounted) {
         stream.getTracks().forEach((t) => t.stop());
@@ -430,6 +440,25 @@ export default function AttendanceScanner({ sessions }: AttendanceScannerProps) 
         cancelAnimationFrame(animFrameRef.current);
         animFrameRef.current = null;
       }
+
+      // Pause any in-flight video before it's removed from the DOM below.
+      // If videoEl.play() hasn't resolved yet when the container is cleared
+      // a few lines down, the browser throws an unhandled AbortError
+      // ("The play() request was interrupted because the media was removed
+      // from the document"). Explicitly pausing and detaching the stream
+      // from the element first avoids that race.
+      const existingVideo = document.querySelector(
+        "#reader-container video"
+      ) as HTMLVideoElement | null;
+      if (existingVideo) {
+        try {
+          existingVideo.pause();
+          existingVideo.srcObject = null;
+        } catch (e) {
+          // Element may already be mid-teardown — safe to ignore.
+        }
+      }
+
       if (mediaStreamRef.current) {
         mediaStreamRef.current.getTracks().forEach((track) => track.stop());
         mediaStreamRef.current = null;

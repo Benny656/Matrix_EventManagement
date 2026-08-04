@@ -47,33 +47,82 @@ const formatEventTime = (event: any) => {
 
 import { DashboardSkeleton } from "@/components/ui/skeleton-loaders";
 
+// Firestore `in` queries are capped at 30 values per query.
+// Chunk larger ID sets and fan out with Promise.all.
+function chunk<T>(arr: T[], size: number): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < arr.length; i += size) {
+    out.push(arr.slice(i, i + size));
+  }
+  return out;
+}
+
 async function StudentDashboardData({ currentUser }: { currentUser: any }) {
-  // Fetch registrations, events, sessions, and available events in parallel
-  const [regsSnapshot, eventsSnapshot, sessionsSnapshot, availableEvents] = await Promise.all([
+  // Registrations and the independent `getEventsAction` call have no
+  // dependency on each other, so they run in parallel.
+  const [regsSnapshot, availableEvents] = await Promise.all([
     adminDb.collection("registrations").where("studentId", "==", currentUser.id).get(),
-    adminDb.collection("events").get(),
-    adminDb.collection("sessions").get(),
     getEventsAction(false, currentUser),
   ]);
 
+  const registrationDocs = regsSnapshot.docs
+    .map((doc) => ({ id: doc.id, data: doc.data() as any }))
+    .filter((r) => r.data.status !== "CANCELLED");
+
+  const eventIds = [...new Set(registrationDocs.map((r) => r.data.eventId))];
+
+  // Fetch only the specific events referenced by this student's
+  // registrations (via getAll on known refs), instead of scanning the
+  // entire `events` collection. Fetch only sessions belonging to those
+  // events (via chunked `in` queries), instead of scanning the entire
+  // `sessions` collection. Both depend on knowing eventIds first, so they
+  // run after regsSnapshot resolves rather than fully parallel with it.
+  const [eventDocs, sessionSnapshots] = await Promise.all([
+    eventIds.length > 0
+      ? adminDb.getAll(...eventIds.map((eventId) => adminDb.collection("events").doc(eventId)))
+      : Promise.resolve([]),
+    eventIds.length > 0
+      ? Promise.all(
+          chunk(eventIds, 30).map((idsChunk) =>
+            adminDb.collection("sessions").where("eventId", "in", idsChunk).get()
+          )
+        )
+      : Promise.resolve([]),
+  ]);
+
   const eventMap = new Map<string, any>();
-  eventsSnapshot.docs.forEach((d) => eventMap.set(d.id, d.data()));
+  eventDocs.forEach((doc) => {
+    if (doc.exists) eventMap.set(doc.id, doc.data());
+  });
 
-  const allSessions = sessionsSnapshot.docs.map((d) => ({ id: d.id, ...d.data() })) as any[];
+  // Pre-pass: build eventId -> sorted session[] once, so the per-registration
+  // lookup below is O(1) instead of a linear scan over all sessions.
+  const sessionsByEvent = new Map<string, any[]>();
+  sessionSnapshots.forEach((snapshot) => {
+    snapshot.docs.forEach((d) => {
+      const session = { id: d.id, ...d.data() } as any;
+      const bucket = sessionsByEvent.get(session.eventId);
+      if (bucket) {
+        bucket.push(session);
+      } else {
+        sessionsByEvent.set(session.eventId, [session]);
+      }
+    });
+  });
+  sessionsByEvent.forEach((sessions) => {
+    sessions.sort((a, b) => (a.startTime || "").localeCompare(b.startTime || ""));
+  });
 
-  const registrations = regsSnapshot.docs
-    .map((doc) => {
-      const data = doc.data() as any;
+  const registrations = registrationDocs
+    .map(({ id, data }) => {
       const eventData = eventMap.get(data.eventId);
       if (!eventData) return null;
 
-      const eventSessions = allSessions
-        .filter((s) => s.eventId === data.eventId)
-        .sort((a, b) => (a.startTime || "").localeCompare(b.startTime || ""));
+      const eventSessions = sessionsByEvent.get(data.eventId) || [];
 
       return {
         ...data,
-        id: doc.id,
+        id,
         createdAt: data.createdAt ? new Date(data.createdAt) : new Date(),
         event: {
           ...eventData,
@@ -82,7 +131,7 @@ async function StudentDashboardData({ currentUser }: { currentUser: any }) {
         },
       };
     })
-    .filter((r) => r && r.status !== "CANCELLED");
+    .filter((r) => r !== null) as any[];
 
   registrations.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
 
