@@ -175,7 +175,7 @@ export default async function Home() {
           <section className="w-full mt-10 pb-20 px-6 max-w-7xl mx-auto">
             <div className="text-center mb-8">
               <h2 className="font-heading text-xl font-bold uppercase tracking-tight text-foreground">
-                Connect With Matrix AIML
+                Connect With Matrix Karunya
               </h2>
               <p className="font-mono text-xs text-muted-foreground mt-1 uppercase tracking-widest">
                 Official Channels &amp; Handles
