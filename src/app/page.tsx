@@ -1,38 +1,110 @@
+"use client";
+
 // TEMPORARY MAINTENANCE PAGE - Restore original landing page after maintenance by uncommenting the code below.
 
-export default function Home() {
+import { useEffect, useMemo, useState } from "react";
+
+type TimeLeft = {
+  hours: number;
+  minutes: number;
+  seconds: number;
+};
+
+function getTargetTime(): Date {
+  const now = new Date();
+  const target = new Date(
+    now.getFullYear(),
+    now.getMonth(),
+    now.getDate(),
+    12,
+    30,
+    0
+  );
+  if (target.getTime() <= now.getTime()) {
+    target.setDate(target.getDate() + 1);
+  }
+  return target;
+}
+
+function calcTimeLeft(target: Date): TimeLeft {
+  const diff = Math.max(0, target.getTime() - Date.now());
+  const hours = Math.floor(diff / (1000 * 60 * 60));
+  const minutes = Math.floor((diff / (1000 * 60)) % 60);
+  const seconds = Math.floor((diff / 1000) % 60);
+  return { hours, minutes, seconds };
+}
+
+function useCountdown(target: Date): TimeLeft {
+  // Compute an initial value synchronously instead of starting at 0,0,0
+  // (avoids a visible flash of "00:00:00" before the first effect runs).
+  const [timeLeft, setTimeLeft] = useState<TimeLeft>(() => calcTimeLeft(target));
+
+  useEffect(() => {
+    // Re-sync immediately when the target changes, then tick every second.
+    setTimeLeft(calcTimeLeft(target));
+    const id = setInterval(() => setTimeLeft(calcTimeLeft(target)), 1000);
+    return () => clearInterval(id);
+    // target is a Date object; use its numeric value as the effect's
+    // dependency so the interval isn't torn down/recreated on every render.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [target.getTime()]);
+
+  return timeLeft;
+}
+
+function CountdownBox({ value, label }: { value: number; label: string }) {
   return (
-    <div
-      style={{
-        backgroundColor: "#FFFFFF",
-        color: "#000000",
-        minHeight: "100vh",
-        display: "flex",
-        flexDirection: "column",
-        alignItems: "center",
-        justifyContent: "center",
-        textAlign: "center",
-        fontFamily: 'system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif',
-        padding: "24px",
-        boxSizing: "border-box",
-      }}
-    >
-      <div style={{ maxWidth: "600px", display: "flex", flexDirection: "column", gap: "16px" }}>
-        <h1 style={{ fontSize: "24px", fontWeight: "bold", margin: 0, padding: 0 }}>
-          Server Under Maintenance
-        </h1>
-        <p style={{ fontSize: "16px", margin: 0, padding: 0, lineHeight: "1.5" }}>
-          Our application is currently undergoing scheduled maintenance.
+    <div className="flex flex-col items-center">
+      <div className="flex size-20 items-center justify-center rounded-2xl bg-white/15 text-4xl font-bold text-white sm:size-24 sm:text-5xl">
+        {String(value).padStart(2, "0")}
+      </div>
+      <span className="mt-3 text-xs font-semibold uppercase tracking-widest text-white/80">
+        {label}
+      </span>
+    </div>
+  );
+}
+
+export default function MaintenancePage() {
+  // Only compute the target time once per mount, not on every render,
+  // so the countdown effect doesn't get reset each time the component re-renders.
+  const target = useMemo(() => getTargetTime(), []);
+  const { hours, minutes, seconds } = useCountdown(target);
+
+  const backOnlineLabel = useMemo(
+    () =>
+      target.toLocaleTimeString([], {
+        hour: "numeric",
+        minute: "2-digit",
+      }),
+    [target]
+  );
+
+  return (
+    <div className="flex min-h-screen flex-col items-center justify-center bg-[#FAFAF9] px-6 py-12 text-center">
+      <h1 className="max-w-4xl text-4xl font-extrabold leading-tight text-[#0F172A] sm:text-5xl md:text-6xl">
+        We&apos;re currently under an update
+      </h1>
+
+      <p className="mt-6 max-w-xl text-lg text-[#8B8FA3]">
+        The platform is temporarily down while we roll out an update. We
+        request everyone to kindly wait until we&apos;re back online.
+      </p>
+
+      <div className="mt-10 w-full max-w-2xl rounded-3xl bg-[#4B5A47] px-6 py-10 text-white sm:px-12">
+        <p className="text-sm font-bold uppercase tracking-widest text-white/80">
+          Back online at
         </p>
-        <p style={{ fontSize: "16px", margin: 0, padding: 0, lineHeight: "1.5" }}>
-          Please wait until 12:30 PM.
+        <p className="mt-2 text-5xl font-extrabold tracking-tight sm:text-6xl md:text-7xl">
+          {backOnlineLabel}
         </p>
-        <p style={{ fontSize: "16px", margin: 0, padding: 0, lineHeight: "1.5" }}>
-          We sincerely apologize for the inconvenience and appreciate your patience.
-        </p>
-        <p style={{ fontSize: "16px", margin: 0, padding: 0, lineHeight: "1.5" }}>
-          Thank you.
-        </p>
+        <div className="mt-8 flex items-center justify-center gap-3 sm:gap-5">
+          <CountdownBox value={hours} label="Hours" />
+          <span className="mb-6 text-3xl font-bold text-white/50">:</span>
+          <CountdownBox value={minutes} label="Minutes" />
+          <span className="mb-6 text-3xl font-bold text-white/50">:</span>
+          <CountdownBox value={seconds} label="Seconds" />
+        </div>
       </div>
     </div>
   );
