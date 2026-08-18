@@ -12,7 +12,7 @@ import EditCapacityForm from "@/components/events/edit-capacity-form";
 import EditWhatsappLinkForm from "@/components/events/edit-whatsapp-link-form";
 import EditSessionsForm from "@/components/events/edit-sessions-form";
 import AdminEventTabs from "@/components/events/admin-event-tabs";
-import { getEventVolunteersAction, getEventRegistrationsForVolunteerAssignmentAction } from "@/actions/volunteer-management";
+import { VolunteerMember } from "@/actions/volunteer-management";
 
 export const dynamic = "force-dynamic";
 
@@ -39,14 +39,12 @@ export default async function AdminEventDetailsPage({ params }: PageProps) {
 
   const { id } = await params;
 
-  // Independent reads that only need `id` — kick them all off together
-  // instead of waiting on each other sequentially.
-  const [eventDoc, sessionsSnapshot, regsSnapshot, volunteers, allRegsForVolunteer] = await Promise.all([
+  // Single-pass initial fetch: event doc, sessions, registrations, and volunteer attendances
+  const [eventDoc, sessionsSnapshot, regsSnapshot, volAttSnapshot] = await Promise.all([
     adminDb.collection("events").doc(id).get(),
     adminDb.collection("sessions").where("eventId", "==", id).get(),
     adminDb.collection("registrations").where("eventId", "==", id).get(),
-    getEventVolunteersAction(id),
-    getEventRegistrationsForVolunteerAssignmentAction(id),
+    adminDb.collection("volunteer_attendances").where("eventId", "==", id).get(),
   ]);
 
   if (!eventDoc.exists) {
@@ -58,27 +56,36 @@ export default async function AdminEventDetailsPage({ params }: PageProps) {
   const sessions = sessionsSnapshot.docs.map((d) => ({ id: d.id, ...d.data() })) as any[];
   sessions.sort((a: any, b: any) => (a.startTime || "").localeCompare(b.startTime || ""));
 
-  const activeRegistrations = regsSnapshot.docs
-    .map((d: any) => d.data())
-    .filter((r: any) => r.status !== "CANCELLED");
+  const allEventRegs = regsSnapshot.docs.map((d: any) => ({ id: d.id, ...d.data() } as any));
+  const activeRegistrations = allEventRegs.filter((r: any) => r.status !== "CANCELLED");
 
-  const studentIds = [...new Set(activeRegistrations.map((r: any) => r.studentId))];
+  // Fallback ONLY for legacy registrations missing denormalized names
+  const missingStudentIds = Array.from(
+    new Set(
+      activeRegistrations
+        .filter((r: any) => !r.studentName)
+        .map((r: any) => r.studentId)
+        .filter(Boolean)
+    )
+  );
+
   const sessionIds = sessions.map((s: any) => s.id);
 
-  // Fetch only the specific users referenced by this event's registrations
-  // (via getAll on known refs), instead of scanning the entire `users`
-  // collection. Fetch only attendances belonging to this event's sessions
-  // (via chunked `in` queries), instead of scanning the entire
-  // `attendances` collection. Both depend on IDs known from the reads
-  // above, so they run after those resolve.
-  const [userDocs, attSnapshots] = await Promise.all([
-    studentIds.length > 0
-      ? adminDb.getAll(...studentIds.map((studentId) => adminDb.collection("users").doc(studentId)))
+  // Parallel fetch: legacy users fallback (if any) and lightweight session attendance counts (count queries)
+  const [userDocs, sessionCounts] = await Promise.all([
+    missingStudentIds.length > 0
+      ? adminDb.getAll(...missingStudentIds.map((studentId) => adminDb.collection("users").doc(studentId)))
       : Promise.resolve([]),
     sessionIds.length > 0
       ? Promise.all(
-          chunk(sessionIds, 30).map((idsChunk) =>
-            adminDb.collection("attendances").where("sessionId", "in", idsChunk).get()
+          sessionIds.map((sid) =>
+            adminDb
+              .collection("attendances")
+              .where("sessionId", "==", sid)
+              .count()
+              .get()
+              .then((snap) => ({ sessionId: sid, count: snap.data().count }))
+              .catch(() => ({ sessionId: sid, count: 0 }))
           )
         )
       : Promise.resolve([]),
@@ -89,42 +96,85 @@ export default async function AdminEventDetailsPage({ params }: PageProps) {
     if (doc.exists) userMap.set(doc.id, doc.data());
   });
 
+  const sessionAttCountMap = new Map<string, number>();
+  sessionCounts.forEach((sc) => {
+    sessionAttCountMap.set(sc.sessionId, sc.count);
+  });
+
+  const volAttMap = new Map<string, any>();
+  volAttSnapshot.docs.forEach((d) => {
+    const data = d.data();
+    volAttMap.set(data.volunteerId, data);
+  });
+
+  // Construct volunteers from denormalized registration properties directly
+  const volunteerRegs = activeRegistrations.filter((r: any) => r.eventRole === "volunteer");
+  const volunteers: VolunteerMember[] = volunteerRegs.map((r: any) => {
+    const fallbackUser = userMap.get(r.studentId);
+    const att = volAttMap.get(r.studentId);
+    return {
+      registrationId: r.id,
+      studentId: r.studentId,
+      eventId: r.eventId,
+      eventRole: "volunteer",
+      status: r.status,
+      name: r.studentName || fallbackUser?.name || "Unknown",
+      email: r.email || fallbackUser?.email || "",
+      rollNumber: r.rollNumber || fallbackUser?.rollNumber || null,
+      department: r.department || fallbackUser?.department || null,
+      attendanceStatus: att ? att.attendanceStatus : "NOT_MARKED",
+      markedBy: att?.markedBy || null,
+      markedByName: att?.markedByName || null,
+      markedAt: att?.markedAt || null,
+    };
+  });
+  volunteers.sort((a, b) => a.name.localeCompare(b.name));
+
+  // Construct allRegistrationsForVolunteerAssignment directly from denormalized registration properties
+  const allRegsForVolunteer = activeRegistrations.map((r: any) => {
+    const fallbackUser = userMap.get(r.studentId);
+    return {
+      registrationId: r.id,
+      studentId: r.studentId,
+      eventId: r.eventId,
+      eventRole: (r.eventRole as "participant" | "volunteer") || "participant",
+      status: r.status,
+      name: r.studentName || fallbackUser?.name || "Unknown",
+      email: r.email || fallbackUser?.email || "",
+      rollNumber: r.rollNumber || fallbackUser?.rollNumber || null,
+      department: r.department || fallbackUser?.department || null,
+    };
+  });
+  allRegsForVolunteer.sort((a, b) => a.name.localeCompare(b.name));
+
   const registrations = activeRegistrations.map((r: any) => {
-    const student = userMap.get(r.studentId) || { name: "Unknown", email: "" };
+    const fallbackUser = userMap.get(r.studentId);
     return {
       ...r,
       eventRole: r.eventRole || "participant",
       student: {
         id: r.studentId,
-        name: student.name,
-        email: student.email,
-        rollNumber: student.rollNumber || null,
+        name: r.studentName || fallbackUser?.name || "Unknown",
+        email: r.email || fallbackUser?.email || "",
+        rollNumber: r.rollNumber || fallbackUser?.rollNumber || null,
       },
     };
   });
 
-  const attendances: any[] = [];
-  attSnapshots.forEach((snapshot) => {
-    snapshot.docs.forEach((d) => attendances.push(d.data()));
-  });
-
-  const sessionAttMap = new Map<string, number>();
-  attendances.forEach((a: any) => {
-    sessionAttMap.set(a.sessionId, (sessionAttMap.get(a.sessionId) || 0) + 1);
-  });
-
-  const checkedInStudentIds = new Set(attendances.map((a: any) => a.studentId));
-
   const participantRegs = registrations.filter((r: any) => r.eventRole !== "volunteer");
   const confirmedCount = participantRegs.filter((r: any) => r.status === "REGISTERED").length;
   const waitlistedCount = participantRegs.filter((r: any) => r.status === "WAITLISTED").length;
-  const checkedInCount = checkedInStudentIds.size;
+  
+  // Use stored event uniqueCheckIns or max session attendance count
+  const checkedInCount = typeof event.uniqueCheckIns === "number"
+    ? event.uniqueCheckIns
+    : Math.max(...Array.from(sessionAttCountMap.values()), 0);
 
   const volunteerPresentCount = volunteers.filter((v) => v.attendanceStatus === "PRESENT").length;
 
   const sessionsWithCount = sessions.map((s: any) => ({
     ...s,
-    attendances: Array(sessionAttMap.get(s.id) || 0).fill(true),
+    attendances: Array(sessionAttCountMap.get(s.id) || 0).fill(true),
   }));
 
   return (

@@ -32,22 +32,25 @@ export default async function FacultyEventDetailsPage({ params }: PageProps) {
     notFound();
   }
 
-  const sessionsSnapshot = await adminDb
-    .collection("sessions")
-    .where("eventId", "==", id)
-    .get();
+  const [sessionsSnapshot, userRegSnapshot] = await Promise.all([
+    adminDb
+      .collection("sessions")
+      .where("eventId", "==", id)
+      .get(),
+    adminDb
+      .collection("registrations")
+      .where("eventId", "==", id)
+      .where("FacultyId", "==", currentUser.id)
+      .limit(1)
+      .get(),
+  ]);
+
   const sessions = sessionsSnapshot.docs.map((d) => ({ id: d.id, ...d.data() })) as any[];
   sessions.sort((a, b) => (a.startTime || "").localeCompare(b.startTime || ""));
 
-  const regsSnapshot = await adminDb
-    .collection("registrations")
-    .where("eventId", "==", id)
-    .get();
+  const userRegistration = userRegSnapshot.empty ? null : userRegSnapshot.docs[0].data();
 
-  const registrations = regsSnapshot.docs.map((d) => d.data());
-  const userRegistration = registrations.find((r) => r.FacultyId === currentUser.id);
-
-  const activeRegistrationsCount = registrations.filter((r) => r.status === "REGISTERED").length;
+  const activeRegistrationsCount = typeof event.registrationCount === "number" ? event.registrationCount : 0;
   const isFull = event.maxParticipants ? activeRegistrationsCount >= event.maxParticipants : false;
   const isRegistrationOpen = event.registrationOpen ?? true;
 
@@ -146,7 +149,7 @@ export default async function FacultyEventDetailsPage({ params }: PageProps) {
               <div className="flex justify-between border-b border-border pb-2 border-dashed">
                 <span className="text-muted-foreground">Waitlisted:</span>
                 <span className="text-foreground font-semibold">
-                  {registrations.filter((r) => r.status === "WAITLISTED").length} Facultys
+                  {typeof event.waitlistCount === "number" ? event.waitlistCount : 0} Facultys
                 </span>
               </div>
               <div className="flex justify-between border-b border-border pb-2 border-dashed">

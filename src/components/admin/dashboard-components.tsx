@@ -48,91 +48,16 @@ export async function StatsGrid() {
   const volunteerPresentCount = volunteerPresentCountSnapshot.data().count;
 
   const completedEvents = completedEventsSnapshot.docs.map((d: any) => ({ id: d.id, ...d.data() })) as any[];
-  const completedEventIds = completedEvents.map((e) => e.id);
 
   let totalRsvps = 0;
   let totalUniqueCheckedIn = 0;
 
-  if (completedEventIds.length > 0) {
-    // Scope registrations and sessions to only the completed events we care
-    // about, instead of pulling the entire collections, via chunked `in`
-    // queries on the known event-id set.
-    const idChunks = chunk(completedEventIds, 30);
-
-    const [regsSnapshots, sessionsSnapshots] = await Promise.all([
-      Promise.all(
-        idChunks.map((ids) =>
-          adminDb
-            .collection("registrations")
-            .where("eventId", "in", ids)
-            .where("status", "==", "REGISTERED")
-            .where("eventRole", "!=", "volunteer")
-            .get()
-        )
-      ),
-      Promise.all(
-        idChunks.map((ids) => adminDb.collection("sessions").where("eventId", "in", ids).get())
-      ),
-    ]);
-
-    const allRegs: any[] = [];
-    regsSnapshots.forEach((s) => s.docs.forEach((d) => allRegs.push(d.data())));
-
-    const allSessions: any[] = [];
-    sessionsSnapshots.forEach((s) => s.docs.forEach((d) => allSessions.push({ id: d.id, ...d.data() })));
-
-    // Pre-pass: build eventId -> sessionIds[] once, so the per-event lookup
-    // below is O(1) instead of a linear scan over all sessions.
-    const sessionIdsByEvent = new Map<string, string[]>();
-    allSessions.forEach((s) => {
-      const bucket = sessionIdsByEvent.get(s.eventId);
-      if (bucket) bucket.push(s.id);
-      else sessionIdsByEvent.set(s.eventId, [s.id]);
-    });
-
-    const allSessionIds = allSessions.map((s) => s.id);
-
-    // Fetch only attendances belonging to these completed events' sessions,
-    // instead of scanning the entire attendances collection.
-    const attSnapshots =
-      allSessionIds.length > 0
-        ? await Promise.all(
-            chunk(allSessionIds, 30).map((ids) =>
-              adminDb.collection("attendances").where("sessionId", "in", ids).get()
-            )
-          )
-        : [];
-
-    const allAtts: any[] = [];
-    attSnapshots.forEach((s) => s.docs.forEach((d) => allAtts.push(d.data())));
-
-    // Pre-pass: build sessionId -> Set<studentId> once, so per-event
-    // check-in counting is O(1) lookups instead of re-scanning all
-    // attendances for every event.
-    const attsBySession = new Map<string, string[]>();
-    allAtts.forEach((att: any) => {
-      const bucket = attsBySession.get(att.sessionId);
-      if (bucket) bucket.push(att.studentId);
-      else attsBySession.set(att.sessionId, [att.studentId]);
-    });
-
-    // Pre-pass: build eventId -> reg count once.
-    const regCountByEvent = new Map<string, number>();
-    allRegs.forEach((r: any) => {
-      regCountByEvent.set(r.eventId, (regCountByEvent.get(r.eventId) || 0) + 1);
-    });
-
-    completedEvents.forEach((evt: any) => {
-      totalRsvps += regCountByEvent.get(evt.id) || 0;
-
-      const eventSessionIds = sessionIdsByEvent.get(evt.id) || [];
-      const checkedInStudentIds = new Set<string>();
-      eventSessionIds.forEach((sessionId) => {
-        (attsBySession.get(sessionId) || []).forEach((studentId) => checkedInStudentIds.add(studentId));
-      });
-      totalUniqueCheckedIn += checkedInStudentIds.size;
-    });
-  }
+  completedEvents.forEach((evt: any) => {
+    const rsvps = typeof evt.registrationCount === "number" ? evt.registrationCount : (evt.rsvps ?? 0);
+    const unique = typeof evt.uniqueCheckIns === "number" ? evt.uniqueCheckIns : 0;
+    totalRsvps += rsvps;
+    totalUniqueCheckedIn += unique;
+  });
 
   const attendanceRate = totalRsvps > 0
     ? ((totalUniqueCheckedIn / totalRsvps) * 100).toFixed(1)
@@ -205,16 +130,22 @@ export async function EventHistoryChart() {
   const chartEvents = [...chartEventsRaw].reverse();
   const chartEventIds = chartEvents.map((e) => e.id);
 
-  let chartData: any[] = [];
+  // Identify which events need live computation (live/ongoing, or completed events without stored stats)
+  const liveEvents = chartEvents.filter(
+    (e) => e.status !== "COMPLETED" || typeof e.uniqueCheckIns !== "number"
+  );
+  const liveEventIds = liveEvents.map((e) => e.id);
 
-  if (chartEventIds.length > 0) {
-    // Scope sessions/registrations to just these 6 events, instead of
-    // pulling the entire sessions/registrations collections.
+  const sessionIdsByEvent = new Map<string, string[]>();
+  const regCountByEvent = new Map<string, number>();
+  const attsBySession = new Map<string, string[]>();
+
+  if (liveEventIds.length > 0) {
     const [sessionsSnapshot, regsSnapshot] = await Promise.all([
-      adminDb.collection("sessions").where("eventId", "in", chartEventIds).get(),
+      adminDb.collection("sessions").where("eventId", "in", liveEventIds).get(),
       adminDb
         .collection("registrations")
-        .where("eventId", "in", chartEventIds)
+        .where("eventId", "in", liveEventIds)
         .where("status", "==", "REGISTERED")
         .get(),
     ]);
@@ -222,24 +153,17 @@ export async function EventHistoryChart() {
     const allSessions = sessionsSnapshot.docs.map((d: any) => ({ id: d.id, ...d.data() })) as any[];
     const allRegs = regsSnapshot.docs.map((d: any) => d.data()) as any[];
 
-    // Pre-pass: eventId -> sessionIds[], so lookups below are O(1).
-    const sessionIdsByEvent = new Map<string, string[]>();
     allSessions.forEach((s) => {
       const bucket = sessionIdsByEvent.get(s.eventId);
       if (bucket) bucket.push(s.id);
       else sessionIdsByEvent.set(s.eventId, [s.id]);
     });
 
-    // Pre-pass: eventId -> rsvp count, so lookups below are O(1).
-    const regCountByEvent = new Map<string, number>();
     allRegs.forEach((r: any) => {
       regCountByEvent.set(r.eventId, (regCountByEvent.get(r.eventId) || 0) + 1);
     });
 
     const allSessionIds = allSessions.map((s) => s.id);
-
-    // Scope attendances to just this batch of sessions, instead of pulling
-    // the entire attendances collection.
     const attSnapshots =
       allSessionIds.length > 0
         ? await Promise.all(
@@ -249,30 +173,45 @@ export async function EventHistoryChart() {
           )
         : [];
 
-    const allAtts: any[] = [];
-    attSnapshots.forEach((s) => s.docs.forEach((d) => allAtts.push(d.data())));
-
-    // Pre-pass: sessionId -> studentIds[], so per-event membership check is
-    // O(1) lookups instead of scanning all attendances per event.
-    const attsBySession = new Map<string, string[]>();
-    allAtts.forEach((att: any) => {
-      const bucket = attsBySession.get(att.sessionId);
-      if (bucket) bucket.push(att.studentId);
-      else attsBySession.set(att.sessionId, [att.studentId]);
-    });
-
-    chartData = chartEvents.map((evt: any) => {
-      const rsvps = regCountByEvent.get(evt.id) || 0;
-
-      const eventSessionIds = sessionIdsByEvent.get(evt.id) || [];
-      const checkedInStudentIds = new Set<string>();
-      eventSessionIds.forEach((sessionId) => {
-        (attsBySession.get(sessionId) || []).forEach((studentId) => checkedInStudentIds.add(studentId));
-      });
-
-      return { id: evt.id, title: evt.title || "Event", uniqueCheckIns: checkedInStudentIds.size, rsvps, status: evt.status };
-    });
+    attSnapshots.forEach((s: any) =>
+      s.docs.forEach((d: any) => {
+        const att = d.data();
+        const bucket = attsBySession.get(att.sessionId);
+        if (bucket) bucket.push(att.studentId);
+        else attsBySession.set(att.sessionId, [att.studentId]);
+      })
+    );
   }
+
+  let chartData: any[] = chartEvents.map((evt: any) => {
+    // If completed and has stored stats, use stored snapshot directly
+    if (evt.status === "COMPLETED" && typeof evt.uniqueCheckIns === "number") {
+      const rsvps = typeof evt.registrationCount === "number" ? evt.registrationCount : (evt.rsvps ?? 0);
+      return {
+        id: evt.id,
+        title: evt.title || "Event",
+        uniqueCheckIns: evt.uniqueCheckIns,
+        rsvps,
+        status: evt.status,
+      };
+    }
+
+    // Otherwise use live computed data
+    const rsvps = regCountByEvent.get(evt.id) || (typeof evt.registrationCount === "number" ? evt.registrationCount : 0);
+    const eventSessionIds = sessionIdsByEvent.get(evt.id) || [];
+    const checkedInStudentIds = new Set<string>();
+    eventSessionIds.forEach((sessionId) => {
+      (attsBySession.get(sessionId) || []).forEach((studentId) => checkedInStudentIds.add(studentId));
+    });
+
+    return {
+      id: evt.id,
+      title: evt.title || "Event",
+      uniqueCheckIns: checkedInStudentIds.size,
+      rsvps,
+      status: evt.status,
+    };
+  });
 
   const maxVal = Math.max(...chartData.map((d: any) => d.uniqueCheckIns), 10);
 

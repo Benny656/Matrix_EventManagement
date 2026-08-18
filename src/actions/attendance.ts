@@ -61,11 +61,12 @@ export async function markAttendanceAction(params: {
 
   const session = { id: sessionDoc.id, ...sessionDoc.data() } as any;
 
-  // 3. Fetch existing attendance
+  // 3. Fetch existing attendance (capped at 1 doc)
   const attendanceSnapshot = await adminDb
     .collection("attendances")
     .where("sessionId", "==", sessionId)
     .where("studentId", "==", student.id)
+    .limit(1)
     .get();
 
   if (!attendanceSnapshot.empty) {
@@ -77,11 +78,12 @@ export async function markAttendanceAction(params: {
     };
   }
 
-  // 4. Fetch registration
+  // 4. Fetch registration (capped at 1 doc)
   const regSnapshot = await adminDb
     .collection("registrations")
     .where("studentId", "==", student.id)
     .where("eventId", "==", session.eventId)
+    .limit(1)
     .get();
 
   if (regSnapshot.empty) {
@@ -121,6 +123,11 @@ export async function markAttendanceAction(params: {
     id: attRef.id,
     sessionId,
     studentId: student.id,
+    studentName: student.name,
+    rollNumber: student.rollNumber || "N/A",
+    department: student.department || "N/A",
+    yearOfStudy: student.yearOfStudy || "N/A",
+    programType: student.programType || "N/A",
     checkInTime: new Date().toISOString(),
     checkInMethod: method,
     markedById: staff.id,
@@ -132,7 +139,9 @@ export async function markAttendanceAction(params: {
 
   return {
     success: true,
+    studentId: student.id,
     studentName: student.name,
+    rollNumber: student.rollNumber || null,
     message: `${student.name} successfully checked in.`,
   };
 }
@@ -158,11 +167,19 @@ export async function overrideWaitlistAction(params: {
     await regSnapshot.docs[0].ref.update({ status: "REGISTERED" });
   }
 
+  const studentDoc = await adminDb.collection("users").doc(studentId).get();
+  const student = studentDoc.exists ? (studentDoc.data() as any) : { name: "Unknown", rollNumber: "N/A" };
+
   const attRef = adminDb.collection("attendances").doc();
   await attRef.set({
     id: attRef.id,
     sessionId,
     studentId,
+    studentName: student.name || "Unknown",
+    rollNumber: student.rollNumber || "N/A",
+    department: student.department || "N/A",
+    yearOfStudy: student.yearOfStudy || "N/A",
+    programType: student.programType || "N/A",
     checkInTime: new Date().toISOString(),
     checkInMethod: "MANUAL",
     markedById: staff.id,
@@ -237,7 +254,14 @@ export async function markAttendanceByScan(sessionId: string, rollNumber: string
     }
     return { status: "error" as const, message: res.message };
   }
-  return { status: "success" as const, student: { name: res.studentName } };
+  return {
+    status: "success" as const,
+    student: {
+      id: res.studentId,
+      name: res.studentName,
+      rollNumber: res.rollNumber,
+    },
+  };
 }
 
 export async function markAttendanceManual(sessionId: string, studentId: string) {
@@ -262,6 +286,7 @@ export async function markAttendanceManual(sessionId: string, studentId: string)
     .collection("attendances")
     .where("sessionId", "==", sessionId)
     .where("studentId", "==", student.id)
+    .limit(1)
     .get();
 
   if (!attSnapshot.empty) {
@@ -272,6 +297,7 @@ export async function markAttendanceManual(sessionId: string, studentId: string)
     .collection("registrations")
     .where("studentId", "==", student.id)
     .where("eventId", "==", session.eventId)
+    .limit(1)
     .get();
 
   if (regSnapshot.empty) {
@@ -292,6 +318,11 @@ export async function markAttendanceManual(sessionId: string, studentId: string)
     id: attRef.id,
     sessionId,
     studentId: student.id,
+    studentName: student.name,
+    rollNumber: student.rollNumber || "N/A",
+    department: student.department || "N/A",
+    yearOfStudy: student.yearOfStudy || "N/A",
+    programType: student.programType || "N/A",
     checkInTime: new Date().toISOString(),
     checkInMethod: "MANUAL",
     markedById: staff.id,
@@ -317,19 +348,35 @@ export async function getRegisteredStudentsAction(sessionId: string) {
     .where("status", "==", "REGISTERED")
     .get();
 
-  const studentIds = regSnapshot.docs.map((d) => d.data().studentId);
-  if (studentIds.length === 0) return [];
+  const rawRegs = regSnapshot.docs.map((d) => ({ id: d.id, data: d.data() }));
 
-  // Batched multi-get instead of N parallel single-doc gets.
-  const studentRefs = studentIds.map((id) => adminDb.collection("users").doc(id));
-  const userDocs = await adminDb.getAll(...studentRefs);
+  // Fallback for legacy documents missing denormalized names
+  const missingUserIds = Array.from(
+    new Set(
+      rawRegs
+        .filter((r) => !r.data.studentName)
+        .map((r) => r.data.studentId)
+        .filter(Boolean)
+    )
+  );
 
-  const result = userDocs
-    .filter((doc) => doc.exists)
-    .map((doc) => {
-      const data = doc.data() as any;
-      return { id: doc.id, name: data.name, rollNumber: data.rollNumber };
+  let userMap = new Map<string, any>();
+  if (missingUserIds.length > 0) {
+    const studentRefs = missingUserIds.map((id) => adminDb.collection("users").doc(id));
+    const userDocs = await adminDb.getAll(...studentRefs);
+    userDocs.forEach((doc) => {
+      if (doc.exists) userMap.set(doc.id, doc.data());
     });
+  }
+
+  const result = rawRegs.map(({ data }) => {
+    const fallbackUser = userMap.get(data.studentId);
+    return {
+      id: data.studentId,
+      name: data.studentName || fallbackUser?.name || "Unknown Student",
+      rollNumber: data.rollNumber || fallbackUser?.rollNumber || null,
+    };
+  });
 
   result.sort((a, b) => (a.name || "").localeCompare(b.name || ""));
   return result;
@@ -340,6 +387,7 @@ export async function getSessionCheckInCountAction(sessionId: string) {
   const snapshot = await adminDb
     .collection("attendances")
     .where("sessionId", "==", sessionId)
+    .count()
     .get();
-  return snapshot.size;
+  return snapshot.data().count;
 }

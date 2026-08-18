@@ -7,48 +7,80 @@ import crypto from "crypto";
 
 // ─── User listing ─────────────────────────────────────────────────────────────
 
-export async function getUsersAction(search?: string, roleFilter?: string) {
+function mapUserDoc(doc: FirebaseFirestore.DocumentSnapshot) {
+  const data = doc.data() || {};
+  return {
+    id: doc.id,
+    name: data.name || "",
+    email: data.email || "",
+    rollNumber: data.rollNumber || null,
+    phoneNumber: data.phoneNumber || null,
+    department: data.department || null,
+    programType: data.programType || null,
+    degree: data.degree || null,
+    yearOfStudy: data.yearOfStudy || null,
+    role: (data.role as Role) || "STUDENT",
+    onboardingCompleted: data.onboardingCompleted ?? false,
+    createdAt: data.createdAt || new Date().toISOString(),
+    updatedAt: data.updatedAt || null,
+    mustChangePassword: data.mustChangePassword || false,
+  };
+}
+
+export async function getUsersAction(
+  search?: string,
+  roleFilter?: string,
+  limitCount = 50,
+  startAfterId?: string
+) {
   await verifyStaff();
 
-  let query = adminDb.collection("users");
+  const trimmedSearch = search?.trim();
+
+  let query: FirebaseFirestore.Query = adminDb.collection("users");
 
   if (roleFilter && roleFilter !== "ALL") {
-    query = query.where("role", "==", roleFilter) as any;
+    query = query.where("role", "==", roleFilter);
   }
+
+  if (trimmedSearch) {
+    const upperSearch = trimmedSearch.toUpperCase();
+
+    // Use indexed prefix queries
+    const [rollSnap, nameSnap] = await Promise.all([
+      query
+        .where("rollNumber", ">=", upperSearch)
+        .where("rollNumber", "<=", upperSearch + "\uf8ff")
+        .limit(limitCount)
+        .get(),
+      query
+        .where("name", ">=", trimmedSearch)
+        .where("name", "<=", trimmedSearch + "\uf8ff")
+        .limit(limitCount)
+        .get(),
+    ]);
+
+    const docMap = new Map<string, FirebaseFirestore.QueryDocumentSnapshot>();
+    rollSnap.docs.forEach((d) => docMap.set(d.id, d));
+    nameSnap.docs.forEach((d) => docMap.set(d.id, d));
+
+    const docs = Array.from(docMap.values()).slice(0, limitCount);
+    const users = docs.map((doc) => mapUserDoc(doc));
+    users.sort((a, b) => a.name.localeCompare(b.name));
+    return users;
+  }
+
+  if (startAfterId) {
+    const startDoc = await adminDb.collection("users").doc(startAfterId).get();
+    if (startDoc.exists) {
+      query = query.startAfter(startDoc);
+    }
+  }
+
+  query = query.limit(limitCount);
 
   const snapshot = await query.get();
-  let users = snapshot.docs.map((doc: any) => {
-    const data = doc.data();
-    return {
-      id: doc.id,
-      name: data.name || "",
-      email: data.email || "",
-      rollNumber: data.rollNumber || null,
-      phoneNumber: data.phoneNumber || null,
-      department: data.department || null,
-      programType: data.programType || null,
-      degree: data.degree || null,
-      yearOfStudy: data.yearOfStudy || null,
-      role: (data.role as Role) || "STUDENT",
-      onboardingCompleted: data.onboardingCompleted ?? false,
-      createdAt: data.createdAt || new Date().toISOString(),
-      updatedAt: data.updatedAt || null,
-      mustChangePassword: data.mustChangePassword || false,
-    };
-  });
-
-  if (search) {
-    const lowerSearch = search.toLowerCase();
-    users = users.filter(
-      (u: any) =>
-        u.name.toLowerCase().includes(lowerSearch) ||
-        u.email.toLowerCase().includes(lowerSearch) ||
-        (u.rollNumber && u.rollNumber.toLowerCase().includes(lowerSearch)) ||
-        (u.department && u.department.toLowerCase().includes(lowerSearch)) ||
-        (u.degree && u.degree.toLowerCase().includes(lowerSearch))
-    );
-  }
-
+  const users = snapshot.docs.map((doc) => mapUserDoc(doc));
   users.sort((a: any, b: any) => a.name.localeCompare(b.name));
   return users;
 }
@@ -235,4 +267,88 @@ export async function forceSetNewPasswordAction(newPassword: string) {
   });
 
   return { success: true };
+}
+
+// ─── Google SSO User Provisioning ───────────────────────────────────────────
+
+function extractKarunyaDetails(displayName: string, email: string): { name: string; rollNumber: string | null } {
+  if (!email.toLowerCase().endsWith("@karunya.edu.in")) {
+    return { name: displayName, rollNumber: null };
+  }
+
+  const regex = /URK[A-Za-z0-9]+/i;
+  const match = displayName.match(regex);
+
+  if (match) {
+    const rollNumber = match[0].toUpperCase();
+    const newName = displayName.replace(regex, "").trim().replace(/\s+/g, " ");
+    return { name: newName, rollNumber };
+  }
+
+  return { name: displayName, rollNumber: null };
+}
+
+export interface SyncGoogleUserInput {
+  uid: string;
+  email: string;
+  displayName?: string | null;
+  idToken: string;
+}
+
+export async function syncGoogleUserAction(input: SyncGoogleUserInput) {
+  const { uid, email, displayName, idToken } = input;
+  
+  let verifiedUid = uid;
+  try {
+    const decoded = await adminAuth.verifyIdToken(idToken);
+    verifiedUid = decoded.uid;
+  } catch (err) {
+    console.warn("syncGoogleUserAction token verification warning:", err);
+  }
+
+  const lowerEmail = (email || "").toLowerCase();
+  const allowedAdmins = ["matrixkarunya@gmail.com", "bennymanuel2020@gmail.com"];
+  const isStudentEmail = lowerEmail.endsWith("@karunya.edu.in");
+  const isFacultyEmail = lowerEmail.endsWith("@karunya.edu");
+  const isAdminEmail = allowedAdmins.includes(lowerEmail);
+
+  if (!isStudentEmail && !isFacultyEmail && !isAdminEmail) {
+    throw new Error("Unauthorized email domain. Only Karunya Google accounts are permitted.");
+  }
+
+  let role: Role = "STUDENT";
+  if (isAdminEmail) role = "ADMIN";
+  else if (isFacultyEmail) role = "FACULTY";
+
+  const userRef = adminDb.collection("users").doc(verifiedUid);
+  const userSnap = await userRef.get();
+
+  if (!userSnap.exists) {
+    const rawName = displayName || email.split("@")[0];
+    const { name: finalName, rollNumber } = extractKarunyaDetails(rawName, lowerEmail);
+
+    const newUser = {
+      id: verifiedUid,
+      name: finalName,
+      email: lowerEmail,
+      rollNumber,
+      role,
+      onboardingCompleted: isAdminEmail ? true : false,
+      mustChangePassword: false,
+      createdAt: new Date().toISOString(),
+      updatedAt: new Date().toISOString(),
+    };
+
+    await userRef.set(newUser);
+    return { success: true, role, isNewUser: true };
+  } else {
+    const existingData = userSnap.data() as any;
+    if (isAdminEmail) {
+      await userRef.update({ role: "ADMIN", onboardingCompleted: true, updatedAt: new Date().toISOString() });
+      role = "ADMIN";
+    } else {
+      role = (existingData?.role as Role) || (isFacultyEmail ? "FACULTY" : "STUDENT");
+    }
+    return { success: true, role, isNewUser: false };
+  }
 }

@@ -1,8 +1,7 @@
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth-session";
-import OnboardingForm from "./onboarding-form";
-
-import PageFadeContainer from "@/components/page-fade-container";
+import OnboardingForm from "@/components/onboarding/onboarding-form";
+import PageFadeContainer from "@/components/layout/page-fade-container";
 
 export const dynamic = "force-dynamic";
 

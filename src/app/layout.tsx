@@ -2,9 +2,9 @@ import type { Metadata, Viewport } from "next";
 import Script from "next/script";
 import { Inter, Geist, JetBrains_Mono } from "next/font/google";
 import "./globals.css";
-import PWARegister from "@/components/pwa-register";
-import AuthListener from "@/components/auth-listener";
-import { ThemeProvider } from "@/components/theme-provider";
+import PWARegister from "@/components/layout/pwa-register";
+import AuthListener from "@/components/layout/auth-listener";
+import { ThemeProvider } from "@/components/layout/theme-provider";
 
 const inter = Inter({
   variable: "--font-inter",
@@ -49,6 +49,8 @@ export const metadata: Metadata = {
   },
 };
 
+import { SWRProvider } from "@/lib/swr-provider";
+
 export default function RootLayout({
   children,
 }: Readonly<{
@@ -79,9 +81,11 @@ export default function RootLayout({
       </head>
       <body className="min-h-full flex flex-col">
         <ThemeProvider>
-          <PWARegister />
-          <AuthListener />
-          {children}
+          <SWRProvider>
+            <PWARegister />
+            <AuthListener />
+            {children}
+          </SWRProvider>
         </ThemeProvider>
       </body>
     </html>

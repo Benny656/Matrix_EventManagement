@@ -38,10 +38,12 @@ interface EventsTableProps {
   role: "ADMIN" | "VOLUNTEER";
 }
 
+import { usePersistentUIState } from "@/lib/use-ui-state";
+
 export default function EventsTable({ initialEvents, role }: EventsTableProps) {
   const [events, setEvents] = useState<EventWithSessions[]>(initialEvents);
   const [search, setSearch] = useState("");
-  const [activeTab, setActiveTab] = useState<"ACTIVE" | "ARCHIVED">("ACTIVE");
+  const [activeTab, setActiveTab] = usePersistentUIState<"ACTIVE" | "ARCHIVED">("events_table_active_tab", "ACTIVE");
   const [isPending, startTransition] = useTransition();
   const [error, setError] = useState<string | null>(null);
 

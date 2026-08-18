@@ -13,10 +13,11 @@ export default async function StudentRegistrationsPage() {
     redirect("/login");
   }
 
-  // 1. Fetch only this student's registrations (already scoped by where clause).
+  // Fetch only this student's registrations (single read query)
   const regsSnapshot = await adminDb
     .collection("registrations")
     .where("studentId", "==", currentUser.id)
+    .orderBy("createdAt", "desc")
     .get();
 
   const regDocs = regsSnapshot.docs.map((doc) => ({
@@ -24,55 +25,48 @@ export default async function StudentRegistrationsPage() {
     data: doc.data() as any,
   }));
 
-  // 2. Collect only the distinct event IDs actually referenced — avoids
-  //    reading the entire events collection.
-  const eventIds = Array.from(
-    new Set(regDocs.map((r) => r.data.eventId).filter(Boolean))
+  // Backward compatibility: fetch events only for legacy records lacking denormalized titles
+  const missingEventIds = Array.from(
+    new Set(
+      regDocs
+        .filter((r) => !r.data.eventTitle)
+        .map((r) => r.data.eventId)
+        .filter(Boolean)
+    )
   );
 
-  const eventMap = new Map<string, any>();
-
-  if (eventIds.length > 0) {
-    // 3. Fetch exactly those event docs via getAll (parallel, no collection
-    //    scan). Chunked defensively in case of very large registration lists.
-    const CHUNK_SIZE = 300; // getAll has no hard cap, but keep batches sane
-    const chunks: string[][] = [];
-    for (let i = 0; i < eventIds.length; i += CHUNK_SIZE) {
-      chunks.push(eventIds.slice(i, i + CHUNK_SIZE));
-    }
-
-    const eventDocRefs = chunks.map((chunk) =>
-      chunk.map((id) => adminDb.collection("events").doc(id))
-    );
-
-    const eventSnapshots = await Promise.all(
-      eventDocRefs.map((refs) => (refs.length > 0 ? adminDb.getAll(...refs) : Promise.resolve([])))
-    );
-
-    eventSnapshots.flat().forEach((doc) => {
-      if (doc.exists) {
-        eventMap.set(doc.id, doc.data());
-      }
+  let eventMap = new Map<string, any>();
+  if (missingEventIds.length > 0) {
+    const eventDocRefs = missingEventIds.map((id) => adminDb.collection("events").doc(id));
+    const eventSnapshots = await adminDb.getAll(...eventDocRefs);
+    eventSnapshots.forEach((doc) => {
+      if (doc.exists) eventMap.set(doc.id, doc.data());
     });
   }
 
   const registrations = regDocs.map(({ id, data }) => {
-    const event = eventMap.get(data.eventId) || { title: "Unknown Event", venue: "", date: "" };
+    const legacyEvent = eventMap.get(data.eventId);
+    const title = data.eventTitle || legacyEvent?.title || "Event";
+    const dateVal = data.eventDate || legacyEvent?.date;
+    const category = data.eventCategory || legacyEvent?.category || "General";
+    const description = legacyEvent?.description || "";
     const isRegistered = data.status === "REGISTERED";
+    const whatsappInviteLink = isRegistered ? (data.whatsappInviteLink || legacyEvent?.whatsappInviteLink || null) : null;
+
     return {
       ...data,
       id,
       createdAt: data.createdAt ? new Date(data.createdAt) : new Date(),
       event: {
-        ...event,
         id: data.eventId,
-        date: event.date ? new Date(event.date) : new Date(),
-        whatsappInviteLink: isRegistered ? (event.whatsappInviteLink || null) : null,
+        title,
+        description,
+        category,
+        date: dateVal ? new Date(dateVal) : new Date(),
+        whatsappInviteLink,
       },
     };
   });
-
-  registrations.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
 
   return (
     <div className="space-y-6">

@@ -11,7 +11,7 @@ import { auth } from "@/lib/firebase";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { AtSign, MailCheck, AlertCircle, ArrowLeft, Loader2 } from "lucide-react";
-import ThemeToggle from "@/components/theme-toggle";
+import ThemeToggle from "@/components/layout/theme-toggle";
 
 const forgotPasswordSchema = z.object({
   email: z.string().email("Enter a valid email address"),

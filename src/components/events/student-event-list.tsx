@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import Link from "next/link";
 import { Input } from "@/components/ui/input";
 import { Search, CalendarDays, CheckCircle2 } from "lucide-react";
+import { usePersistentUIState } from "@/lib/use-ui-state";
 
 interface Session {
   id: string;
@@ -31,7 +32,7 @@ interface EventItem {
 
 export default function StudentEventList({ events }: { events: EventItem[] }) {
   const [search, setSearch] = useState("");
-  const [category, setCategory] = useState("ALL");
+  const [category, setCategory] = usePersistentUIState("student_events_category", "ALL");
 
   const filtered = events.filter((e) => {
     const matchesSearch =

@@ -2,8 +2,8 @@ import React from "react";
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth-session";
 import { adminDb } from "@/lib/firebase-admin";
-import DashboardLayout from "@/components/dashboard-layout";
-import ProfileForm from "./profile-form";
+import DashboardLayout from "@/components/layout/dashboard-layout";
+import ProfileForm from "@/components/profile/profile-form";
 
 export const dynamic = "force-dynamic";
 
