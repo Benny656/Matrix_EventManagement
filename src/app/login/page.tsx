@@ -8,8 +8,9 @@ import { GoogleAuthProvider, signInWithPopup, signOut } from "firebase/auth";
 import { doc, getDoc, setDoc, updateDoc } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
 import { AlertCircle, Loader2, ShieldCheck, ArrowLeft } from "lucide-react";
-import ThemeToggle from "@/components/theme-toggle";
+import ThemeToggle from "@/components/layout/theme-toggle";
 import { HARDCODED_ADMIN_EMAILS } from "@/lib/constants";
+import { syncGoogleUserAction } from "@/actions/user";
 
 function extractKarunyaDetails(displayName: string, email: string): { name: string; rollNumber: string | null } {
   if (!email.toLowerCase().endsWith("@karunya.edu.in")) {
@@ -67,39 +68,65 @@ function LoginContent() {
         return;
       }
 
-      const userRef = doc(db, "users", firebaseUser.uid);
-      const userSnap = await getDoc(userRef);
-      
+      const token = await firebaseUser.getIdToken();
+
       let role = "STUDENT";
-      if (isAdminEmail) role = "ADMIN";
-      else if (isFacultyEmail) role = "FACULTY";
 
-      if (!userSnap.exists()) {
-        const rawName = firebaseUser.displayName || email.split("@")[0];
-        const { name: finalName, rollNumber } = extractKarunyaDetails(rawName, email);
-
-        await setDoc(userRef, {
-          id: firebaseUser.uid,
-          name: finalName,
-          email: firebaseUser.email,
-          rollNumber,
-          role,
-          onboardingCompleted: isAdminEmail ? true : false,
-          mustChangePassword: false,
-          createdAt: new Date().toISOString(),
-          updatedAt: new Date().toISOString(),
+      try {
+        // Primary: Provision & sync user securely on server via Admin SDK
+        const syncResult = await syncGoogleUserAction({
+          uid: firebaseUser.uid,
+          email: firebaseUser.email || "",
+          displayName: firebaseUser.displayName,
+          idToken: token,
         });
-      } else {
-        const existingData = userSnap.data();
-        if (isAdminEmail) {
-          await updateDoc(userRef, { role: "ADMIN", onboardingCompleted: true });
-          role = "ADMIN";
-        } else {
-          role = existingData.role || (isFacultyEmail ? "FACULTY" : "STUDENT");
+        role = syncResult.role;
+      } catch (syncErr: any) {
+        console.warn("[GoogleAuthDebug] Server sync failed, attempting client fallback:", syncErr);
+        
+        // Fallback: Client SDK document fetch/creation with detailed error tracking
+        const userRef = doc(db, "users", firebaseUser.uid);
+        try {
+          const userSnap = await getDoc(userRef);
+          
+          if (isAdminEmail) role = "ADMIN";
+          else if (isFacultyEmail) role = "FACULTY";
+
+          if (!userSnap.exists()) {
+            const rawName = firebaseUser.displayName || email.split("@")[0];
+            const { name: finalName, rollNumber } = extractKarunyaDetails(rawName, email);
+
+            await setDoc(userRef, {
+              id: firebaseUser.uid,
+              name: finalName,
+              email: firebaseUser.email,
+              rollNumber,
+              role,
+              onboardingCompleted: isAdminEmail ? true : false,
+              mustChangePassword: false,
+              createdAt: new Date().toISOString(),
+              updatedAt: new Date().toISOString(),
+            });
+          } else {
+            const existingData = userSnap.data();
+            if (isAdminEmail) {
+              await updateDoc(userRef, { role: "ADMIN", onboardingCompleted: true });
+              role = "ADMIN";
+            } else {
+              role = existingData.role || (isFacultyEmail ? "FACULTY" : "STUDENT");
+            }
+          }
+        } catch (clientDocErr: any) {
+          console.error("[GoogleAuthDebug] Client Firestore error details:", {
+            code: clientDocErr?.code,
+            message: clientDocErr?.message,
+            path: `users/${firebaseUser.uid}`,
+            operation: "getDoc/setDoc",
+          });
+          throw clientDocErr;
         }
       }
 
-      const token = await firebaseUser.getIdToken();
       await fetch("/api/auth/session", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -110,7 +137,11 @@ function LoginContent() {
       else if (role === "FACULTY") router.push("/faculty");
       else router.push("/student");
     } catch (err: any) {
-      console.error("Google auth error:", err);
+      console.error("[GoogleAuthDebug] Google auth error:", {
+        code: err?.code,
+        message: err?.message,
+        stack: err?.stack,
+      });
       if (err.code === "auth/popup-closed-by-user") {
         setError("Sign-in popup closed before completion. Please try again.");
       } else if (err.code === "auth/internal-error" || err.code === "auth/operation-not-allowed") {

@@ -27,6 +27,19 @@ export interface UserProfile {
 
 export const getCurrentUser = cache(async (): Promise<UserProfile | null> => {
   try {
+    // 1. Check if user data was already verified and passed by proxy layer
+    try {
+      const reqHeaders = await headers();
+      const encodedUserData = reqHeaders.get("x-user-data");
+      if (encodedUserData) {
+        const decodedJson = Buffer.from(encodedUserData, "base64").toString("utf-8");
+        const cachedUser = JSON.parse(decodedJson);
+        if (cachedUser && cachedUser.id) {
+          return cachedUser as UserProfile;
+        }
+      }
+    } catch {}
+
     const cookieStore = await cookies();
     const token = cookieStore.get("__session")?.value || cookieStore.get("token")?.value;
     

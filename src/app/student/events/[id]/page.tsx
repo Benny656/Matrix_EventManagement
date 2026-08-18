@@ -44,8 +44,7 @@ export default async function StudentEventDetailsPage({ params }: PageProps) {
   }
 
   // Independent reads — no data dependency between them — run in parallel.
-  // NOTE: parallelizing here only helps latency, not read cost.
-  const [sessionsSnapshot, userRegSnapshot, activeCountSnapshot] = await Promise.all([
+  const [sessionsSnapshot, userRegSnapshot] = await Promise.all([
     // Sort at the query level instead of in JS (requires composite index:
     // sessions: eventId ASC, startTime ASC)
     adminDb
@@ -63,22 +62,12 @@ export default async function StudentEventDetailsPage({ params }: PageProps) {
       .where("studentId", "==", currentUser.id)
       .limit(1)
       .get(),
-
-    // Only the count of active registrations is needed — use an aggregation
-    // count query instead of pulling full docs just to read .length.
-    // (requires composite index: registrations: eventId ASC, status ASC)
-    adminDb
-      .collection("registrations")
-      .where("eventId", "==", id)
-      .where("status", "==", "REGISTERED")
-      .count()
-      .get(),
   ]);
 
   const sessions = sessionsSnapshot.docs.map((d) => ({ id: d.id, ...d.data() })) as any[];
 
   const userRegistration = userRegSnapshot.empty ? null : userRegSnapshot.docs[0].data();
-  const activeRegistrationsCount = activeCountSnapshot.data().count;
+  const activeRegistrationsCount = typeof event.registrationCount === "number" ? event.registrationCount : 0;
 
   const isFull = event.maxParticipants ? activeRegistrationsCount >= event.maxParticipants : false;
   const isRegistrationOpen = event.registrationOpen ?? true;

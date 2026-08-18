@@ -12,7 +12,7 @@ import { auth } from "@/lib/firebase";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Lock, AlertCircle, ArrowLeft, Loader2, CheckCircle2 } from "lucide-react";
-import ThemeToggle from "@/components/theme-toggle";
+import ThemeToggle from "@/components/layout/theme-toggle";
 
 const resetPasswordSchema = z.object({
   password: z.string().min(6, "Password must be at least 6 characters"),

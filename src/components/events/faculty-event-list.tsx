@@ -27,9 +27,11 @@ interface EventWithCount {
   };
 }
 
+import { usePersistentUIState } from "@/lib/use-ui-state";
+
 export default function FacultyEventList({ events }: { events: EventWithCount[] }) {
   const [search, setSearch] = useState("");
-  const [category, setCategory] = useState("ALL");
+  const [category, setCategory] = usePersistentUIState("faculty_events_category", "ALL");
 
   const filtered = events.filter((e) => {
     const matchesSearch = e.title.toLowerCase().includes(search.toLowerCase()) || 

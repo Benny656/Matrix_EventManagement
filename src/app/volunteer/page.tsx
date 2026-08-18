@@ -4,7 +4,7 @@ import { redirect } from "next/navigation";
 import { verifyStaff } from "@/lib/auth-session";
 import { adminDb } from "@/lib/firebase-admin";
 import { Megaphone } from "lucide-react";
-import VolunteerClock from "@/components/volunteer-clock";
+import VolunteerClock from "@/components/volunteer/volunteer-clock";
 
 export const dynamic = "force-dynamic";
 

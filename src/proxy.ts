@@ -117,7 +117,16 @@ export default async function proxy(request: NextRequest) {
     return NextResponse.redirect(new URL("/unauthorized", request.url));
   }
 
-  return NextResponse.next();
+  const requestHeaders = new Headers(request.headers);
+  if (user) {
+    requestHeaders.set("x-user-data", Buffer.from(JSON.stringify(user)).toString("base64"));
+  }
+
+  return NextResponse.next({
+    request: {
+      headers: requestHeaders,
+    },
+  });
 }
 
 export const config = {

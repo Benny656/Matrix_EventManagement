@@ -1,0 +1,125 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+
+    // ─── Helper Functions ───────────────────────────────────────────────────
+    function isAuthenticated() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return isAuthenticated() && request.auth.uid == userId;
+    }
+
+    // Safely check if current user has an existing user doc before reading properties
+    function getUserData() {
+      return exists(/databases/$(database)/documents/users/$(request.auth.uid))
+        ? get(/databases/$(database)/documents/users/$(request.auth.uid)).data
+        : null;
+    }
+
+    function isAdmin() {
+      return isAuthenticated() && (
+        (getUserData() != null && (getUserData().role == 'ADMIN' || getUserData().role == 'FACULTY_ADMIN')) ||
+        (request.auth.token.email != null && request.auth.token.email in ['admin@karunya.edu.in', 'matrixadmin@karunya.edu.in'])
+      );
+    }
+
+    function isFaculty() {
+      return isAuthenticated() && (
+        (getUserData() != null && (getUserData().role == 'FACULTY' || getUserData().role == 'FACULTY_ADMIN')) ||
+        isAdmin()
+      );
+    }
+
+    function isVolunteer() {
+      return isAuthenticated() && (
+        (getUserData() != null && getUserData().role == 'VOLUNTEER') ||
+        isAdmin()
+      );
+    }
+
+    // ─── Users Collection ───────────────────────────────────────────────────
+    // FIX: Allow `get` for owner EVEN IF document does not exist yet (resource == null)
+    // Avoid evaluating `resource.data` without checking `resource != null`
+    match /users/{userId} {
+      allow get: if isOwner(userId) || isAdmin() || isFaculty() || isVolunteer();
+      allow list: if isAdmin() || isFaculty() || isVolunteer();
+      
+      // Allow new user creation on first Google sign-in
+      allow create: if isOwner(userId);
+      
+      // Allow user update for self or admin
+      allow update: if isOwner(userId) || isAdmin();
+      allow delete: if isAdmin();
+    }
+
+    // ─── Events Collection ──────────────────────────────────────────────────
+    match /events/{eventId} {
+      allow read: if isAuthenticated();
+      allow create, delete: if isAdmin() || isFaculty();
+      
+      // Allow admin/faculty full update
+      // Allow regular authenticated users (students/volunteers) to update ONLY counter fields (registrationCount, volunteerCount)
+      allow update: if isAdmin() || isFaculty() || (
+        isAuthenticated() && 
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['registrationCount', 'volunteerCount'])
+      );
+
+      // Nested Sessions subcollection
+      match /sessions/{sessionId} {
+        allow read: if isAuthenticated();
+        allow write: if isAdmin() || isFaculty();
+      }
+    }
+
+    // ─── Top-level Sessions Collection ──────────────────────────────────────
+    match /sessions/{sessionId} {
+      allow read: if isAuthenticated();
+      allow write: if isAdmin() || isFaculty();
+    }
+
+    // ─── Registrations Collection ───────────────────────────────────────────
+    match /registrations/{registrationId} {
+      allow read: if isAuthenticated() && (
+        resource == null ||
+        resource.data.studentId == request.auth.uid ||
+        isAdmin() ||
+        isFaculty() ||
+        isVolunteer()
+      );
+      allow create: if isAuthenticated() && request.resource.data.studentId == request.auth.uid;
+      allow update: if isAuthenticated() && (
+        (resource != null && resource.data.studentId == request.auth.uid) ||
+        isAdmin() ||
+        isFaculty() ||
+        isVolunteer()
+      );
+      allow delete: if isAdmin();
+    }
+
+    // ─── Attendances Collection ─────────────────────────────────────────────
+    match /attendances/{attendanceId} {
+      allow read: if isAuthenticated() && (
+        resource == null ||
+        resource.data.studentId == request.auth.uid ||
+        isAdmin() ||
+        isFaculty() ||
+        isVolunteer()
+      );
+      allow create, update: if isAdmin() || isFaculty() || isVolunteer();
+      allow delete: if isAdmin();
+    }
+
+    // ─── Volunteer Attendances Collection ───────────────────────────────────
+    match /volunteer_attendances/{volAttId} {
+      allow read: if isAuthenticated() && (
+        resource == null ||
+        resource.data.volunteerId == request.auth.uid ||
+        isAdmin() ||
+        isFaculty()
+      );
+      allow write: if isAdmin() || isFaculty();
+    }
+  }
+}

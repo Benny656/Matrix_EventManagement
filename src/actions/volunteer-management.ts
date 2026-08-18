@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { adminDb } from "@/lib/firebase-admin";
+import { FieldValue } from "firebase-admin/firestore";
 import { getCurrentUser, verifyAdmin, verifyStaff } from "@/lib/auth-session";
 
 export interface VolunteerMember {
@@ -42,12 +43,30 @@ export async function toggleVolunteerStatusAction(params: {
   }
 
   const regDoc = regSnapshot.docs[0];
+  const currentRole = regDoc.data().eventRole || "participant";
   const newRole = isVolunteer ? "volunteer" : "participant";
 
-  await regDoc.ref.update({
-    eventRole: newRole,
-    updatedAt: new Date().toISOString(),
-  });
+  if (currentRole !== newRole) {
+    await regDoc.ref.update({
+      eventRole: newRole,
+      updatedAt: new Date().toISOString(),
+    });
+
+    // Update event volunteer and registration counts atomically
+    if (isVolunteer) {
+      await adminDb.collection("events").doc(eventId).update({
+        volunteerCount: FieldValue.increment(1),
+        registrationCount: FieldValue.increment(-1),
+        updatedAt: new Date().toISOString(),
+      });
+    } else {
+      await adminDb.collection("events").doc(eventId).update({
+        volunteerCount: FieldValue.increment(-1),
+        registrationCount: FieldValue.increment(1),
+        updatedAt: new Date().toISOString(),
+      });
+    }
+  }
 
   // Sync user's global system role in 'users' collection
   const userRef = adminDb.collection("users").doc(studentId);

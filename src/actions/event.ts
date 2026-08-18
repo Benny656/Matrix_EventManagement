@@ -131,6 +131,10 @@ export async function createEventAction(input: EventInput) {
     eligibility: eligibilityToStore,
     createdById: user.id,
     status: "UPCOMING",
+    registrationCount: 0,
+    volunteerCount: 0,
+    attendanceRate: 0,
+    sessions: sessionList,
     archivedAt: null,
     createdAt: new Date().toISOString(),
     updatedAt: new Date().toISOString(),
@@ -326,62 +330,119 @@ export async function archiveEventAction(id: string) {
   return { success: true };
 }
 
+function chunk<T>(arr: T[], size: number): T[][] {
+  const out: T[][] = [];
+  for (let i = 0; i < arr.length; i += size) {
+    out.push(arr.slice(i, i + size));
+  }
+  return out;
+}
+
+export interface GetEventsOptions {
+  limit?: number;
+  cursor?: string | FirebaseFirestore.DocumentSnapshot | null;
+}
+
 export async function getEventsAction(
   includeArchived = false,
-  requestingUser?: UserProfile | null
+  requestingUser?: UserProfile | null,
+  options?: GetEventsOptions | number
 ) {
+  const queryLimit =
+    typeof options === "number"
+      ? options
+      : typeof options?.limit === "number"
+      ? options.limit
+      : 5;
+
+  const cursor = typeof options === "object" && options !== null ? options.cursor : null;
+
   // Push the archived filter into the query itself instead of fetching
   // every event (including archived ones) and filtering in memory.
-  const eventsQuery = includeArchived
+  let eventsQuery: FirebaseFirestore.Query = includeArchived
     ? adminDb.collection("events")
     : adminDb.collection("events").where("status", "!=", "ARCHIVED");
 
-  const [snapshot, sessionsSnapshot, registrationsSnapshot] = await Promise.all([
-    eventsQuery.get(),
-    adminDb.collection("sessions").get(),
-    adminDb.collection("registrations").get(),
+  if (cursor) {
+    let startAfterDoc: FirebaseFirestore.DocumentSnapshot | null = null;
+    if (typeof cursor === "string") {
+      const docSnap = await adminDb.collection("events").doc(cursor).get();
+      if (docSnap.exists) {
+        startAfterDoc = docSnap;
+      }
+    } else if (typeof cursor === "object" && "exists" in cursor && cursor.exists) {
+      startAfterDoc = cursor;
+    }
+
+    if (startAfterDoc) {
+      eventsQuery = eventsQuery.startAfter(startAfterDoc);
+    }
+  }
+
+  if (queryLimit > 0) {
+    eventsQuery = eventsQuery.limit(queryLimit);
+  }
+
+  const snapshot = await eventsQuery.get();
+  if (snapshot.empty) {
+    return [];
+  }
+
+  // Check if any legacy events lack embedded sessions
+  const eventsNeedingSessions = snapshot.docs.filter((d) => !Array.isArray(d.data()?.sessions));
+  const missingSessionEventIds = eventsNeedingSessions.map((d) => d.id);
+
+  // If requestingUser is present, do a single targeted query for their registrations only
+  const userRegsPromise = requestingUser?.id
+    ? adminDb
+        .collection("registrations")
+        .where("studentId", "==", requestingUser.id)
+        .where("status", "==", "REGISTERED")
+        .get()
+    : Promise.resolve(null);
+
+  // Only query sessions for events that do not have denormalized sessions
+  const sessionSnapshotsPromise =
+    missingSessionEventIds.length > 0
+      ? Promise.all(
+          chunk(missingSessionEventIds, 30).map((idsChunk) =>
+            adminDb.collection("sessions").where("eventId", "in", idsChunk).get()
+          )
+        )
+      : Promise.resolve([]);
+
+  const [userRegsSnapshot, sessionSnapshots] = await Promise.all([
+    userRegsPromise,
+    sessionSnapshotsPromise,
   ]);
 
-  const now = new Date();
+  const registeredEventIds = new Set<string>();
+  if (userRegsSnapshot) {
+    userRegsSnapshot.docs.forEach((doc) => {
+      const data = doc.data();
+      if (data.eventId) registeredEventIds.add(data.eventId);
+    });
+  }
 
-  // Group sessions by eventId once (O(N)) instead of re-filtering the full
-  // sessions array for every event (O(events * sessions)).
+  // Group fallback sessions by eventId
   const sessionsByEvent = new Map<string, any[]>();
-  sessionsSnapshot.docs.forEach((d: any) => {
-    const s = { id: d.id, ...d.data() };
-    const list = sessionsByEvent.get(s.eventId) ?? [];
-    list.push(s);
-    sessionsByEvent.set(s.eventId, list);
-  });
-
-  // Group registrations by eventId once, and precompute counts/flags per
-  // event in the same pass instead of scanning the full array per event.
-  const regCountByEvent = new Map<string, number>();
-  const volCountByEvent = new Map<string, number>();
-  const registeredUserEventPairs = new Set<string>();
-
-  registrationsSnapshot.docs.forEach((d: any) => {
-    const r = d.data();
-    if (r.status !== "REGISTERED") return;
-
-    if (r.eventRole === "volunteer") {
-      volCountByEvent.set(r.eventId, (volCountByEvent.get(r.eventId) ?? 0) + 1);
-    } else {
-      regCountByEvent.set(r.eventId, (regCountByEvent.get(r.eventId) ?? 0) + 1);
-    }
-
-    const uid = r.studentId ?? r.FacultyId ?? r.userId;
-    if (uid) {
-      registeredUserEventPairs.add(`${r.eventId}::${uid}`);
-    }
+  sessionSnapshots.forEach((sSnap: any) => {
+    sSnap.docs.forEach((d: any) => {
+      const s = { id: d.id, ...d.data() };
+      const list = sessionsByEvent.get(s.eventId) ?? [];
+      list.push(s);
+      sessionsByEvent.set(s.eventId, list);
+    });
   });
 
   let events = snapshot.docs.map((doc: any) => {
     const data = doc.data() as any;
-    const eventSessions = sessionsByEvent.get(doc.id) ?? [];
+    const eventSessions = Array.isArray(data.sessions)
+      ? data.sessions
+      : sessionsByEvent.get(doc.id) ?? [];
 
     const isUserRegistered = requestingUser
-      ? registeredUserEventPairs.has(`${doc.id}::${requestingUser.id}`)
+      ? registeredEventIds.has(doc.id)
       : false;
 
     const dateStr =
@@ -412,8 +473,8 @@ export async function getEventsAction(
           : null,
       })),
       _count: {
-        registrations: regCountByEvent.get(doc.id) ?? 0,
-        volunteers: volCountByEvent.get(doc.id) ?? 0,
+        registrations: data.registrationCount ?? 0,
+        volunteers: data.volunteerCount ?? 0,
       },
     };
   });
@@ -422,6 +483,8 @@ export async function getEventsAction(
   if (requestingUser) {
     events = events.filter((e: any) => isEligible(e, requestingUser));
   }
+
+  const now = new Date();
 
   // Dynamically update status based on current time (non-blocking async updates)
   const updatedEvents = events.map((event: any) => {
@@ -448,15 +511,48 @@ export async function getEventsAction(
     }
 
     if (newStatus !== event.status) {
-      // Async non-blocking Firestore update
-      adminDb
-        .collection("events")
-        .doc(event.id)
-        .update({
-          status: newStatus,
-          updatedAt: new Date().toISOString(),
-        })
-        .catch((err) => console.error("Error updating event status asynchronously:", err));
+      if (newStatus === "COMPLETED") {
+        const sessionIds = event.sessions.map((s: any) => s.id);
+        const rsvps = typeof event.registrationCount === "number" ? event.registrationCount : (event._count?.registrations ?? 0);
+        
+        // Asynchronously calculate final attendance stats and persist on doc
+        (async () => {
+          try {
+            let uniqueCheckIns = 0;
+            if (sessionIds.length > 0) {
+              const attSnapshots = await Promise.all(
+                sessionIds.map((sid: string) => adminDb.collection("attendances").where("sessionId", "==", sid).get())
+              );
+              const studentIds = new Set<string>();
+              attSnapshots.forEach((snap: any) => snap.docs.forEach((d: any) => {
+                const a = d.data();
+                if (a.studentId) studentIds.add(a.studentId);
+              }));
+              uniqueCheckIns = studentIds.size;
+            }
+            const rate = rsvps > 0 ? Number(((uniqueCheckIns / rsvps) * 100).toFixed(1)) : 0;
+            await adminDb.collection("events").doc(event.id).update({
+              status: "COMPLETED",
+              attendanceRate: rate,
+              uniqueCheckIns,
+              rsvps,
+              updatedAt: new Date().toISOString(),
+            });
+          } catch (err) {
+            console.error("Error persisting completed event stats:", err);
+          }
+        })();
+      } else {
+        // Async non-blocking Firestore update
+        adminDb
+          .collection("events")
+          .doc(event.id)
+          .update({
+            status: newStatus,
+            updatedAt: new Date().toISOString(),
+          })
+          .catch((err) => console.error("Error updating event status asynchronously:", err));
+      }
       event.status = newStatus;
     }
 
