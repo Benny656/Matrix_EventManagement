@@ -120,7 +120,10 @@ export default function AttendanceViewer({ initialEventId }: AttendanceViewerPro
       att.department || "N/A",
       att.yearOfStudy || "N/A",
       att.checkInTime
-        ? new Date(att.checkInTime).toLocaleTimeString("en-US", {
+        ? new Date(att.checkInTime).toLocaleString("en-US", {
+            year: "numeric",
+            month: "2-digit",
+            day: "2-digit",
             hour: "numeric",
             minute: "2-digit",
             second: "2-digit",
@@ -132,7 +135,7 @@ export default function AttendanceViewer({ initialEventId }: AttendanceViewerPro
 
     autoTable(doc, {
       startY: 32,
-      head: [["Name", "URK", "Dept", "Year", "Check-in Time", "Method"]],
+      head: [["Name", "URK", "Dept", "Year", "Check-in Date & Time", "Method"]],
       body: tableRows,
       theme: "grid",
       headStyles: { fillColor: [30, 41, 59], textColor: [255, 255, 255], fontStyle: "bold" },
@@ -143,7 +146,7 @@ export default function AttendanceViewer({ initialEventId }: AttendanceViewerPro
     doc.save(`${eventSlug}_${sessionSlug}_Attendance.pdf`);
   };
 
-  // Export Excel Handler (Name, URK, Dept, Year, Check-in Time, Method)
+  // Export Excel Handler (Name, URK, Dept, Year, Check-in Date & Time, Method)
   const exportExcel = () => {
     if (filteredAttendances.length === 0) return;
     const currentEvt = events.find((e) => e.id === selectedEventId);
@@ -154,8 +157,11 @@ export default function AttendanceViewer({ initialEventId }: AttendanceViewerPro
       URK: att.rollNumber || "N/A",
       Dept: att.department || "N/A",
       Year: att.yearOfStudy || "N/A",
-      "Check-in Time": att.checkInTime
-        ? new Date(att.checkInTime).toLocaleTimeString("en-US", {
+      "Check-in Date & Time": att.checkInTime
+        ? new Date(att.checkInTime).toLocaleString("en-US", {
+            year: "numeric",
+            month: "2-digit",
+            day: "2-digit",
             hour: "numeric",
             minute: "2-digit",
             second: "2-digit",
