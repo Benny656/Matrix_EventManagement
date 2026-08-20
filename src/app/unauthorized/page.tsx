@@ -2,8 +2,8 @@
 
 import { useRouter } from "next/navigation";
 import { ArrowLeft, ShieldAlert } from "lucide-react";
-import ThemeToggle from "@/components/theme-toggle";
-import ShootingStarsGrid from "@/components/shooting-stars-grid";
+import ThemeToggle from "@/components/layout/theme-toggle";
+import ShootingStarsGrid from "@/components/landing/shooting-stars-grid";
 
 export default function UnauthorizedPage() {
   const router = useRouter();

@@ -10,14 +10,14 @@ import {
   Users,
   Mail,
 } from "lucide-react";
-import LandingAnimations from "@/components/landing-animations";
-import MockTerminal from "@/components/mock-terminal";
-import ThemeToggle from "@/components/theme-toggle";
-import ShootingStarsGrid from "@/components/shooting-stars-grid";
+import LandingAnimations from "@/components/landing/landing-animations";
+import MockTerminal from "@/components/landing/mock-terminal";
+import ThemeToggle from "@/components/layout/theme-toggle";
+import ShootingStarsGrid from "@/components/landing/shooting-stars-grid";
 import { MATRIX_SOCIALS } from "@/lib/constants";
-import { LinkedInIcon, InstagramIcon, GitHubIcon } from "@/components/ui/brand-icons";
-import LandingFadeContainer from "@/components/landing-fade-container";
-import WhatsOnMatrixSection from "@/components/whats-on-matrix-section";
+import { LinkedInIcon, InstagramIcon } from "@/components/ui/brand-icons";
+import LandingFadeContainer from "@/components/landing/landing-fade-container";
+import WhatsOnMatrixSection from "@/components/landing/whats-on-matrix-section";
 
 export const dynamic = "force-dynamic";
 
@@ -39,15 +39,6 @@ const socialLinks = [
     bgColor: "hover:bg-primary/5 hover:border-primary/30",
     iconColor: "text-primary",
     tag: "@matrixkarunya",
-  },
-  {
-    name: "GitHub",
-    href: MATRIX_SOCIALS.github,
-    icon: GitHubIcon,
-    description: "Explore repositories, student projects & open-source code.",
-    bgColor: "hover:bg-primary/5 hover:border-primary/30",
-    iconColor: "text-primary",
-    tag: "matrix-aiml-karunya",
   },
   {
     name: "Email Contact",
@@ -182,7 +173,7 @@ export default async function Home() {
               </p>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
               {socialLinks.map((social) => {
                 const Icon = social.icon;
                 return (

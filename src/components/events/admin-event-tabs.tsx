@@ -6,6 +6,7 @@ import VolunteerList from "@/components/events/volunteer-list";
 import VolunteerAttendancePanel from "@/components/events/volunteer-attendance-panel";
 import { VolunteerMember } from "@/actions/volunteer-management";
 import { Users, Heart, ClipboardCheck } from "lucide-react";
+import { usePersistentUIState } from "@/lib/use-ui-state";
 
 interface AdminEventTabsProps {
   eventId: string;
@@ -31,7 +32,10 @@ export default function AdminEventTabs({
   allRegistrationsForVolunteerAssignment,
   isAdmin,
 }: AdminEventTabsProps) {
-  const [activeTab, setActiveTab] = useState<"PARTICIPANTS" | "VOLUNTEERS" | "VOLUNTEER_ATTENDANCE">("PARTICIPANTS");
+  const [activeTab, setActiveTab] = usePersistentUIState<"PARTICIPANTS" | "VOLUNTEERS" | "VOLUNTEER_ATTENDANCE">(
+    `admin_event_tab_${eventId}`,
+    "PARTICIPANTS"
+  );
 
   return (
     <div className="space-y-6">

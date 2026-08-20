@@ -154,47 +154,14 @@ export async function GET(req: NextRequest) {
         return new NextResponse("Forbidden", { status: 403 });
       }
 
-      const eventsSnapshot = await adminDb.collection("events").get();
+      // Read bounded event docs and use pre-aggregated summary counters directly off the event documents
+      const eventsSnapshot = await adminDb
+        .collection("events")
+        .orderBy("date", "desc")
+        .limit(100)
+        .get();
+
       const events = eventsSnapshot.docs.map((d: any) => ({ id: d.id, ...d.data() })) as any[];
-
-      const sessionsSnapshot = await adminDb.collection("sessions").get();
-      const allSessions = sessionsSnapshot.docs.map((d: any) => ({ id: d.id, ...d.data() })) as any[];
-
-      const regsSnapshot = await adminDb.collection("registrations").get();
-      const allRegs = regsSnapshot.docs.map((d: any) => d.data()) as any[];
-
-      const attsSnapshot = await adminDb.collection("attendances").get();
-      const allAtts = attsSnapshot.docs.map((d: any) => d.data()) as any[];
-
-      // Pre-group everything by eventId once (O(N)) instead of re-filtering
-      // the full arrays for every event inside the loop below (O(events*N)).
-      const regsByEvent = new Map<string, any[]>();
-      allRegs.forEach((r: any) => {
-        const list = regsByEvent.get(r.eventId) ?? [];
-        list.push(r);
-        regsByEvent.set(r.eventId, list);
-      });
-
-      const sessionIdsByEvent = new Map<string, Set<string>>();
-      allSessions.forEach((s: any) => {
-        const set = sessionIdsByEvent.get(s.eventId) ?? new Set<string>();
-        set.add(s.id);
-        sessionIdsByEvent.set(s.eventId, set);
-      });
-
-      // Map sessionId -> eventId once, so attendance records can be grouped
-      // by event in a single pass instead of a nested membership check.
-      const eventIdBySessionId = new Map<string, string>();
-      allSessions.forEach((s: any) => eventIdBySessionId.set(s.id, s.eventId));
-
-      const checkedInStudentIdsByEvent = new Map<string, Set<string>>();
-      allAtts.forEach((att: any) => {
-        const eventId = eventIdBySessionId.get(att.sessionId);
-        if (!eventId) return;
-        const set = checkedInStudentIdsByEvent.get(eventId) ?? new Set<string>();
-        set.add(att.studentId);
-        checkedInStudentIdsByEvent.set(eventId, set);
-      });
 
       filename = "events_summary_report.csv";
 
@@ -207,33 +174,29 @@ export async function GET(req: NextRequest) {
         "Status",
         "Max Capacity",
         "Registered (RSVP)",
-        "Waitlisted",
-        "Cancelled",
         "Unique Check-ins",
         "Attendance Rate %",
       ];
       csvContent += headersList.map(escapeCSV).join(",") + "\n";
 
       events.forEach((evt: any) => {
-        const eventRegs = regsByEvent.get(evt.id) ?? [];
-        const rsvps = eventRegs.filter((r: any) => r.status === "REGISTERED").length;
-        const waitlisted = eventRegs.filter((r: any) => r.status === "WAITLISTED").length;
-        const cancelled = eventRegs.filter((r: any) => r.status === "CANCELLED").length;
-
-        const uniqueCheckIns = checkedInStudentIdsByEvent.get(evt.id)?.size ?? 0;
-        const rate = rsvps > 0 ? ((uniqueCheckIns / rsvps) * 100).toFixed(1) : "0.0";
+        const rsvps = typeof evt.registrationCount === "number" ? evt.registrationCount : (evt.rsvps ?? 0);
+        const uniqueCheckIns = typeof evt.uniqueCheckIns === "number" ? evt.uniqueCheckIns : 0;
+        const rate = typeof evt.attendanceRate === "number"
+          ? evt.attendanceRate.toFixed(1)
+          : rsvps > 0
+          ? ((uniqueCheckIns / rsvps) * 100).toFixed(1)
+          : "0.0";
 
         const row = [
           evt.id,
-          evt.title,
-          evt.category,
-          evt.date,
-          evt.coordinatorName,
-          evt.status,
-          evt.maxParticipants,
+          evt.title || "Untitled",
+          evt.category || "General",
+          evt.date || "",
+          evt.coordinatorName || "N/A",
+          evt.status || "UPCOMING",
+          evt.maxParticipants ?? "Unlimited",
           rsvps,
-          waitlisted,
-          cancelled,
           uniqueCheckIns,
           rate,
         ];
@@ -247,19 +210,25 @@ export async function GET(req: NextRequest) {
       const usersSnapshot = await adminDb
         .collection("users")
         .where("role", "==", "VOLUNTEER")
+        .limit(100)
         .get();
 
       const volunteers = usersSnapshot.docs.map((d: any) => ({ id: d.id, ...d.data() })) as any[];
-      const attsSnapshot = await adminDb.collection("attendances").get();
-      const allAtts = attsSnapshot.docs.map((d: any) => d.data()) as any[];
 
-      // Pre-count validations per volunteer once, instead of filtering the
-      // full attendance array inside the volunteers.forEach loop below.
-      const validatedCountByMarker = new Map<string, number>();
-      allAtts.forEach((a: any) => {
-        if (!a.markedById) return;
-        validatedCountByMarker.set(a.markedById, (validatedCountByMarker.get(a.markedById) ?? 0) + 1);
-      });
+      // Run parallel aggregation counts per volunteer instead of scanning all attendances
+      const countPromises = volunteers.map((v: any) =>
+        adminDb
+          .collection("attendances")
+          .where("markedById", "==", v.id)
+          .count()
+          .get()
+          .then((snap) => ({ id: v.id, count: snap.data().count }))
+          .catch(() => ({ id: v.id, count: 0 }))
+      );
+
+      const countResults = await Promise.all(countPromises);
+      const countMap = new Map<string, number>();
+      countResults.forEach((c) => countMap.set(c.id, c.count));
 
       filename = "volunteers_performance_report.csv";
 
@@ -272,7 +241,7 @@ export async function GET(req: NextRequest) {
       csvContent += headersList.map(escapeCSV).join(",") + "\n";
 
       volunteers.forEach((v: any) => {
-        const validatedCount = validatedCountByMarker.get(v.id) ?? 0;
+        const validatedCount = countMap.get(v.id) ?? 0;
         const row = [
           v.name || "Volunteer",
           v.email || "",
@@ -286,14 +255,29 @@ export async function GET(req: NextRequest) {
         return new NextResponse("Forbidden", { status: 403 });
       }
 
-      const regsSnapshot = await adminDb.collection("registrations").get();
+      const regsSnapshot = await adminDb
+        .collection("registrations")
+        .orderBy("createdAt", "desc")
+        .limit(200)
+        .get();
+
       const registrations = regsSnapshot.docs.map((d: any) => d.data()) as any[];
 
-      // Only fetch the specific users and events referenced by these
-      // registrations, instead of scanning both entire collections.
+      // Identify any legacy registrations missing denormalized event fields
+      const missingEventIds = Array.from(
+        new Set(
+          registrations
+            .filter((r) => !r.eventTitle)
+            .map((r) => r.eventId)
+            .filter(Boolean)
+        )
+      );
+
       const [userMap, eventMap] = await Promise.all([
         fetchDocsAsMap("users", registrations.map((r) => r.studentId)),
-        fetchDocsAsMap("events", registrations.map((r) => r.eventId)),
+        missingEventIds.length > 0
+          ? fetchDocsAsMap("events", missingEventIds)
+          : Promise.resolve(new Map<string, any>()),
       ]);
 
       filename = "students_registration_log.csv";
@@ -312,15 +296,18 @@ export async function GET(req: NextRequest) {
 
       registrations.forEach((reg: any) => {
         const student = userMap.get(reg.studentId) || { name: "Unknown", email: "" };
-        const event = eventMap.get(reg.eventId) || { title: "Unknown", category: "", date: "" };
+        const legacyEvent = eventMap.get(reg.eventId);
+        const eventTitle = reg.eventTitle || legacyEvent?.title || "Unknown";
+        const eventCategory = reg.eventCategory || legacyEvent?.category || "";
+        const eventDate = reg.eventDate || legacyEvent?.date || "";
 
         const row = [
           student.name || "Unknown",
           student.rollNumber || "N/A",
           student.email || "",
-          event.title || "",
-          event.category || "",
-          event.date || "",
+          eventTitle,
+          eventCategory,
+          eventDate,
           reg.status || "REGISTERED",
           reg.createdAt || "",
         ];

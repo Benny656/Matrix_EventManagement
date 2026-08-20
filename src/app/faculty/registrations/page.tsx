@@ -15,29 +15,43 @@ export default async function FacultyRegistrationsPage() {
 
   const regsSnapshot = await adminDb
     .collection("registrations")
-    .where("FacultyId", "==", currentUser.id)
+    .where("studentId", "==", currentUser.id)
+    .where("status", "==", "REGISTERED")
     .get();
 
-  const eventsSnapshot = await adminDb.collection("events").get();
-  const eventMap = new Map<string, any>();
-  eventsSnapshot.docs.forEach((d) => eventMap.set(d.id, d.data()));
+  const regDocs = regsSnapshot.docs.map((doc) => ({
+    id: doc.id,
+    data: doc.data() as any,
+  }));
 
-  const registrations = regsSnapshot.docs.map((doc) => {
-    const data = doc.data() as any;
-    const event = eventMap.get(data.eventId) || { title: "Unknown Event", date: "" };
-    const isRegistered = data.status === "REGISTERED";
-    return {
-      ...data,
-      id: doc.id,
-      createdAt: data.createdAt ? new Date(data.createdAt) : new Date(),
-      event: {
-        ...event,
-        id: data.eventId,
-        date: event.date ? new Date(event.date) : new Date(),
-        whatsappInviteLink: isRegistered ? (event.whatsappInviteLink || null) : null,
-      },
-    };
-  });
+  const eventIds = Array.from(new Set(regDocs.map((r) => r.data.eventId).filter(Boolean)));
+
+  let eventMap = new Map<string, any>();
+  if (eventIds.length > 0) {
+    const eventDocRefs = eventIds.map((id) => adminDb.collection("events").doc(id));
+    const eventSnapshots = await adminDb.getAll(...eventDocRefs);
+    eventSnapshots.forEach((doc) => {
+      if (doc.exists) eventMap.set(doc.id, doc.data());
+    });
+  }
+
+  const registrations = regDocs
+    .map(({ id, data }) => {
+      const event = eventMap.get(data.eventId) || { title: data.eventTitle || "Unknown Event", date: data.eventDate || "" };
+      const isRegistered = data.status === "REGISTERED";
+      return {
+        ...data,
+        id,
+        createdAt: data.createdAt ? new Date(data.createdAt) : new Date(),
+        event: {
+          ...event,
+          id: data.eventId,
+          date: event.date ? new Date(event.date) : new Date(),
+          whatsappInviteLink: isRegistered ? (event.whatsappInviteLink || null) : null,
+        },
+      };
+    })
+    .filter(Boolean) as any[];
 
   registrations.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
 

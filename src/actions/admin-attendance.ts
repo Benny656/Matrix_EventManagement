@@ -59,13 +59,9 @@ export async function getAdminSessionsAction(eventId: string) {
   return sessions;
 }
 
-/**
- * Fetches all attendance records for a specific session, joining with user data.
- */
 export async function getSessionAttendanceAction(sessionId: string) {
   await verifyAdmin();
 
-  // 1. Fetch attendance records
   const attSnapshot = await adminDb
     .collection("attendances")
     .where("sessionId", "==", sessionId)
@@ -73,45 +69,42 @@ export async function getSessionAttendanceAction(sessionId: string) {
 
   if (attSnapshot.empty) return [];
 
-  const attendances = attSnapshot.docs.map((d) => {
-    const data = d.data();
-    return {
-      id: d.id,
-      studentId: data.studentId,
-      checkInTime: data.checkInTime,
-      checkInMethod: data.checkInMethod, // "SCANNED" | "MANUAL"
-      markedById: data.markedById,
-    };
-  });
+  const rawAttendances = attSnapshot.docs.map((doc) => ({
+    id: doc.id,
+    data: doc.data(),
+  }));
 
-  // 2. Fetch all student profiles who checked in (deduped, batched via getAll
-  // for a single RPC instead of N parallel single-doc gets).
-  const studentIds = Array.from(new Set(attendances.map((a) => a.studentId)));
+  // Identify any legacy records missing denormalized names
+  const missingUserIds = Array.from(
+    new Set(
+      rawAttendances
+        .filter((a) => !a.data.studentName)
+        .map((a) => a.data.studentId)
+        .filter(Boolean)
+    )
+  );
 
-  const userMap = new Map<string, any>();
-  if (studentIds.length > 0) {
-    const userRefs = studentIds.map((id) => adminDb.collection("users").doc(id));
+  let userMap = new Map<string, any>();
+  if (missingUserIds.length > 0) {
+    const userRefs = missingUserIds.map((id) => adminDb.collection("users").doc(id));
     const userDocs = await adminDb.getAll(...userRefs);
     userDocs.forEach((doc) => {
-      if (doc.exists) {
-        userMap.set(doc.id, doc.data());
-      }
+      if (doc.exists) userMap.set(doc.id, doc.data());
     });
   }
 
-  // 3. Map records
-  const result = attendances.map((att) => {
-    const user = userMap.get(att.studentId);
+  const result = rawAttendances.map(({ id, data }) => {
+    const legacyUser = userMap.get(data.studentId);
     return {
-      id: att.id,
-      studentId: att.studentId,
-      name: user?.name || "Unknown Student",
-      rollNumber: user?.rollNumber || "N/A",
-      department: user?.department || "N/A",
-      yearOfStudy: user?.yearOfStudy || "N/A",
-      programType: user?.programType || "N/A",
-      checkInTime: att.checkInTime,
-      checkInMethod: att.checkInMethod,
+      id,
+      studentId: data.studentId,
+      name: data.studentName || legacyUser?.name || "Unknown Student",
+      rollNumber: data.rollNumber || legacyUser?.rollNumber || "N/A",
+      department: data.department || legacyUser?.department || "N/A",
+      yearOfStudy: data.yearOfStudy || legacyUser?.yearOfStudy || "N/A",
+      programType: data.programType || legacyUser?.programType || "N/A",
+      checkInTime: data.checkInTime,
+      checkInMethod: data.checkInMethod || "MANUAL",
     };
   });
 

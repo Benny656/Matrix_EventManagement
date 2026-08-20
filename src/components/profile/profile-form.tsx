@@ -9,6 +9,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import { updatePassword, updateProfile, signOut as firebaseSignOut, EmailAuthProvider, reauthenticateWithCredential } from "firebase/auth";
 import { doc, updateDoc } from "firebase/firestore";
 import { auth, db } from "@/lib/firebase";
+import { clearPersistentCache } from "@/lib/swr-cache";
+import { clearAllUIState } from "@/lib/use-ui-state";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
@@ -151,6 +153,8 @@ export default function ProfileForm({ user, stats }: ProfileFormProps) {
     try {
       await firebaseSignOut(auth);
     } catch (e) {}
+    clearPersistentCache();
+    clearAllUIState();
     await fetch("/api/auth/session", { method: "DELETE" });
     router.push("/login");
     router.refresh();

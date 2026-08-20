@@ -184,9 +184,6 @@ export default function AttendanceScanner({ sessions }: AttendanceScannerProps) 
             studentName: result.student.name,
           });
           setCheckedInCount((c) => c + 1);
-          const updated = await getRegisteredStudentsAction(selectedSessionId);
-          setRegisteredStudents(updated);
-          router.refresh();
         } else if (result.status === "already_checked_in") {
           setScanResult({
             type: "SUCCESS",
@@ -529,9 +526,6 @@ export default function AttendanceScanner({ sessions }: AttendanceScannerProps) 
           });
           setManualRollNumber("");
           setCheckedInCount((c) => c + 1);
-          const updated = await getRegisteredStudentsAction(selectedSessionId);
-          setRegisteredStudents(updated);
-          router.refresh();
         } else if (result.status === "already_checked_in") {
           setScanResult({
             type: "SUCCESS",
@@ -571,9 +565,6 @@ export default function AttendanceScanner({ sessions }: AttendanceScannerProps) 
           });
           setSearchQuery("");
           setCheckedInCount((c) => c + 1);
-          const updated = await getRegisteredStudentsAction(selectedSessionId);
-          setRegisteredStudents(updated);
-          router.refresh();
         } else if (result.status === "already_checked_in") {
           setScanResult({
             type: "SUCCESS",
@@ -619,9 +610,6 @@ export default function AttendanceScanner({ sessions }: AttendanceScannerProps) 
           });
           setManualRollNumber("");
           setCheckedInCount((c) => c + 1);
-          const updated = await getRegisteredStudentsAction(selectedSessionId);
-          setRegisteredStudents(updated);
-          router.refresh();
         }
       } catch (err: any) {
         setScanResult({ type: "ERROR", message: err.message || "Waitlist override failed." });

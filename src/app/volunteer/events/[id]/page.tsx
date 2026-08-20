@@ -53,23 +53,33 @@ export default async function VolunteerEventDetailsPage({ params }: PageProps) {
     .map((d: any) => d.data())
     .filter((r: any) => r.status !== "CANCELLED");
 
-  const studentIds = [...new Set(activeRegistrations.map((r: any) => r.studentId))];
+  // Fallback ONLY for legacy registrations missing denormalized names
+  const missingStudentIds = Array.from(
+    new Set(
+      activeRegistrations
+        .filter((r: any) => !r.studentName)
+        .map((r: any) => r.studentId)
+        .filter(Boolean)
+    )
+  );
+
   const sessionIds = sessions.map((s: any) => s.id);
 
-  // Fetch only the specific users referenced by this event's registrations
-  // (via getAll on known refs), instead of scanning the entire `users`
-  // collection. Fetch only attendances belonging to this event's sessions
-  // (via chunked `in` queries), instead of scanning the entire
-  // `attendances` collection. Both depend on knowing IDs from the reads
-  // above, so they run after those resolve.
-  const [userDocs, attSnapshots] = await Promise.all([
-    studentIds.length > 0
-      ? adminDb.getAll(...studentIds.map((studentId) => adminDb.collection("users").doc(studentId)))
+  // Parallel fetch: legacy users fallback (if any) and lightweight session attendance counts (count queries)
+  const [userDocs, sessionCounts] = await Promise.all([
+    missingStudentIds.length > 0
+      ? adminDb.getAll(...missingStudentIds.map((studentId) => adminDb.collection("users").doc(studentId)))
       : Promise.resolve([]),
     sessionIds.length > 0
       ? Promise.all(
-          chunk(sessionIds, 30).map((idsChunk) =>
-            adminDb.collection("attendances").where("sessionId", "in", idsChunk).get()
+          sessionIds.map((sid) =>
+            adminDb
+              .collection("attendances")
+              .where("sessionId", "==", sid)
+              .count()
+              .get()
+              .then((snap) => ({ sessionId: sid, count: snap.data().count }))
+              .catch(() => ({ sessionId: sid, count: 0 }))
           )
         )
       : Promise.resolve([]),
@@ -80,38 +90,33 @@ export default async function VolunteerEventDetailsPage({ params }: PageProps) {
     if (doc.exists) userMap.set(doc.id, doc.data());
   });
 
+  const sessionAttCountMap = new Map<string, number>();
+  sessionCounts.forEach((sc) => {
+    sessionAttCountMap.set(sc.sessionId, sc.count);
+  });
+
   const registrations = activeRegistrations.map((r: any) => {
-    const student = userMap.get(r.studentId) || { name: "Unknown", email: "" };
+    const fallbackUser = userMap.get(r.studentId);
     return {
       ...r,
       student: {
         id: r.studentId,
-        name: student.name,
-        email: student.email,
-        rollNumber: student.rollNumber || null,
+        name: r.studentName || fallbackUser?.name || "Unknown",
+        email: r.email || fallbackUser?.email || "",
+        rollNumber: r.rollNumber || fallbackUser?.rollNumber || null,
       },
     };
   });
 
-  const attendances: any[] = [];
-  attSnapshots.forEach((snapshot) => {
-    snapshot.docs.forEach((d) => attendances.push(d.data()));
-  });
-
-  const sessionAttMap = new Map<string, number>();
-  attendances.forEach((a: any) => {
-    sessionAttMap.set(a.sessionId, (sessionAttMap.get(a.sessionId) || 0) + 1);
-  });
-
-  const checkedInStudentIds = new Set(attendances.map((a: any) => a.studentId));
-
   const confirmedCount = registrations.filter((r: any) => r.status === "REGISTERED").length;
   const waitlistedCount = registrations.filter((r: any) => r.status === "WAITLISTED").length;
-  const checkedInCount = checkedInStudentIds.size;
+  const checkedInCount = typeof event.uniqueCheckIns === "number"
+    ? event.uniqueCheckIns
+    : Math.max(...Array.from(sessionAttCountMap.values()), 0);
 
   const sessionsWithCount = sessions.map((s: any) => ({
     ...s,
-    attendances: Array(sessionAttMap.get(s.id) || 0).fill(true),
+    attendances: Array(sessionAttCountMap.get(s.id) || 0).fill(true),
   }));
 
   return (

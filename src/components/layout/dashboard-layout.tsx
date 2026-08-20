@@ -6,8 +6,10 @@ import { usePathname, useRouter } from "next/navigation";
 import { motion, AnimatePresence } from "framer-motion";
 import { signOut as firebaseSignOut } from "firebase/auth";
 import { auth } from "@/lib/firebase";
+import { clearPersistentCache } from "@/lib/swr-cache";
+import { clearAllUIState } from "@/lib/use-ui-state";
 
-import ThemeToggle from "@/components/theme-toggle";
+import ThemeToggle from "@/components/layout/theme-toggle";
 
 import {
   BarChart2,
@@ -59,27 +61,28 @@ export default function DashboardLayout({ user, children }: DashboardLayoutProps
       case "ADMIN":
       case "FACULTY_ADMIN":
         return [
-          { label: "Overview", href: "/admin", icon: BarChart2 },
-          { label: "All Events", href: "/admin/events", icon: CalendarDays },
-          { label: "Reports", href: "/admin/reports", icon: FileText },
+          { label: "Dashboard", href: "/admin", icon: Home },
+          { label: "Events", href: "/admin/events", icon: CalendarDays },
+          { label: "Attendance", href: "/admin/attendance", icon: ScanLine },
           { label: "Users", href: "/admin/users", icon: Users },
+          { label: "Reports", href: "/admin/reports", icon: FileText },
         ];
       case "VOLUNTEER":
         return [
-          { label: "Overview", href: "/volunteer", icon: Home },
-          { label: "Events", href: "/volunteer/events", icon: CalendarCheck },
+          { label: "Dashboard", href: "/volunteer", icon: Home },
+          { label: "Events", href: "/volunteer/events", icon: CalendarDays },
           { label: "Attendance", href: "/volunteer/attendance", icon: ScanLine },
         ];
       case "FACULTY":
         return [
-          { label: "Home", href: "/faculty", icon: Home },
+          { label: "Dashboard", href: "/faculty", icon: Home },
           { label: "Events", href: "/faculty/events", icon: CalendarDays },
           { label: "Registrations", href: "/faculty/registrations", icon: CalendarCheck },
         ];
       case "STUDENT":
       default:
         return [
-          { label: "Home", href: "/student", icon: Home },
+          { label: "Dashboard", href: "/student", icon: Home },
           { label: "Events", href: "/student/events", icon: CalendarDays },
           { label: "Registrations", href: "/student/registrations", icon: CalendarCheck },
         ];
@@ -96,6 +99,8 @@ export default function DashboardLayout({ user, children }: DashboardLayoutProps
     } catch (e) {
       console.error("Sign out error", e);
     }
+    clearPersistentCache();
+    clearAllUIState();
     await fetch("/api/auth/session", { method: "DELETE" });
     router.push("/login");
     router.refresh();

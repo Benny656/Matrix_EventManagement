@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { getCurrentUser } from "@/lib/auth-session";
-import DashboardLayout from "@/components/dashboard-layout";
+import DashboardLayout from "@/components/layout/dashboard-layout";
 
 export default async function AdminLayout({
   children,

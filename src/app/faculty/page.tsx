@@ -51,43 +51,47 @@ async function FacultyDashboardData({ currentUser }: { currentUser: any }) {
   // Fetch registrations
   const regsSnapshot = await adminDb
     .collection("registrations")
-    .where("FacultyId", "==", currentUser.id)
+    .where("studentId", "==", currentUser.id)
+    .where("status", "==", "REGISTERED")
     .get();
 
-  const eventsSnapshot = await adminDb.collection("events").get();
-  const eventMap = new Map<string, any>();
-  eventsSnapshot.docs.forEach((d) => eventMap.set(d.id, d.data()));
+  const regDocs = regsSnapshot.docs.map((doc) => ({
+    id: doc.id,
+    data: doc.data() as any,
+  }));
 
-  const sessionsSnapshot = await adminDb.collection("sessions").get();
-  const allSessions = sessionsSnapshot.docs.map((d) => ({ id: d.id, ...d.data() })) as any[];
+  const eventIds = Array.from(new Set(regDocs.map((r) => r.data.eventId).filter(Boolean)));
 
-  const registrations = regsSnapshot.docs
-    .map((doc) => {
-      const data = doc.data() as any;
+  let eventMap = new Map<string, any>();
+  if (eventIds.length > 0) {
+    const eventDocRefs = eventIds.map((id) => adminDb.collection("events").doc(id));
+    const eventSnapshots = await adminDb.getAll(...eventDocRefs);
+    eventSnapshots.forEach((doc) => {
+      if (doc.exists) eventMap.set(doc.id, doc.data());
+    });
+  }
+
+  const registrations = regDocs
+    .map(({ id, data }) => {
       const eventData = eventMap.get(data.eventId);
       if (!eventData) return null;
-
-      const eventSessions = allSessions
-        .filter((s) => s.eventId === data.eventId)
-        .sort((a, b) => (a.startTime || "").localeCompare(b.startTime || ""));
-
       return {
         ...data,
-        id: doc.id,
+        id,
         createdAt: data.createdAt ? new Date(data.createdAt) : new Date(),
         event: {
           ...eventData,
           id: data.eventId,
-          sessions: eventSessions,
+          sessions: eventData.sessions || [],
         },
       };
     })
-    .filter((r) => r && r.status !== "CANCELLED");
+    .filter(Boolean) as any[];
 
   registrations.sort((a, b) => b.createdAt.getTime() - a.createdAt.getTime());
 
   // Fetch all available eligible events
-  const availableEvents = await getEventsAction(false, currentUser);
+  const availableEvents = await getEventsAction(false, currentUser, { limit: 10 });
 
   return (
     <div className="space-y-8">

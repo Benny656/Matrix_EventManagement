@@ -2,6 +2,7 @@
 
 import { revalidatePath } from "next/cache";
 import { adminDb } from "@/lib/firebase-admin";
+import { FieldValue } from "firebase-admin/firestore";
 import { getCurrentUser } from "@/lib/auth-session";
 import { isEligible } from "@/lib/eligibility";
 
@@ -33,15 +34,19 @@ export async function registerForEventAction(eventId: string) {
     throw new Error("Registration is closed.");
   }
 
-  // Cheap aggregate count for capacity check — reads zero documents,
-  // instead of pulling every registration for the event just to count them.
-  const activeCountSnapshot = await adminDb
-    .collection("registrations")
-    .where("eventId", "==", eventId)
-    .where("status", "==", "REGISTERED")
-    .count()
-    .get();
-  const activeCount = activeCountSnapshot.data().count;
+  // Capacity check using stored counter (or fallback to aggregate count)
+  let activeCount: number;
+  if (typeof event.registrationCount === "number") {
+    activeCount = event.registrationCount;
+  } else {
+    const activeCountSnapshot = await adminDb
+      .collection("registrations")
+      .where("eventId", "==", eventId)
+      .where("status", "==", "REGISTERED")
+      .count()
+      .get();
+    activeCount = activeCountSnapshot.data().count;
+  }
 
   // Targeted lookup for this user's own registration only, instead of
   // fetching every registration for the event to find it.
@@ -62,26 +67,52 @@ export async function registerForEventAction(eventId: string) {
   }
   const newStatus = "REGISTERED";
 
+  const batch = adminDb.batch();
+
   if (existingRegDoc) {
     const existingData = existingRegDoc.data();
-    await existingRegDoc.ref.update({
+    batch.update(existingRegDoc.ref, {
       status: newStatus,
       participantRole: user.role,
       eventRole: existingData.eventRole || "participant",
+      studentName: user.name,
+      email: user.email,
+      rollNumber: user.rollNumber || null,
+      department: user.department || null,
+      eventTitle: event.title,
+      eventDate: event.date,
+      eventCategory: event.category,
+      whatsappInviteLink: event.whatsappInviteLink || null,
       createdAt: new Date().toISOString(),
     });
   } else {
     const newRef = adminDb.collection("registrations").doc();
-    await newRef.set({
+    batch.set(newRef, {
       id: newRef.id,
       studentId: user.id, // Keeping studentId for backward compatibility
+      studentName: user.name,
+      email: user.email,
+      rollNumber: user.rollNumber || null,
+      department: user.department || null,
       participantRole: user.role,
       eventRole: "participant",
       eventId: eventId,
+      eventTitle: event.title,
+      eventDate: event.date,
+      eventCategory: event.category,
+      whatsappInviteLink: event.whatsappInviteLink || null,
       status: newStatus,
       createdAt: new Date().toISOString(),
     });
   }
+
+  // Atomically increment registrationCount on the event document
+  batch.update(adminDb.collection("events").doc(eventId), {
+    registrationCount: FieldValue.increment(1),
+    updatedAt: new Date().toISOString(),
+  });
+
+  await batch.commit();
 
   revalidatePath("/student");
   revalidatePath(`/student/events/${eventId}`);
