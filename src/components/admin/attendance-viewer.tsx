@@ -97,7 +97,7 @@ export default function AttendanceViewer({ initialEventId }: AttendanceViewerPro
     return true;
   });
 
-  // Export PDF Handler (Name, URK, Dept, Year)
+  // Export PDF Handler (Name, URK, Dept, Year, Check-in Time, Method)
   const exportPDF = () => {
     if (filteredAttendances.length === 0) return;
     const doc = new jsPDF();
@@ -119,11 +119,20 @@ export default function AttendanceViewer({ initialEventId }: AttendanceViewerPro
       att.rollNumber || "N/A",
       att.department || "N/A",
       att.yearOfStudy || "N/A",
+      att.checkInTime
+        ? new Date(att.checkInTime).toLocaleTimeString("en-US", {
+            hour: "numeric",
+            minute: "2-digit",
+            second: "2-digit",
+            hour12: true,
+          })
+        : "N/A",
+      att.checkInMethod || "N/A",
     ]);
 
     autoTable(doc, {
       startY: 32,
-      head: [["Name", "URK", "Dept", "Year"]],
+      head: [["Name", "URK", "Dept", "Year", "Check-in Time", "Method"]],
       body: tableRows,
       theme: "grid",
       headStyles: { fillColor: [30, 41, 59], textColor: [255, 255, 255], fontStyle: "bold" },
@@ -134,7 +143,7 @@ export default function AttendanceViewer({ initialEventId }: AttendanceViewerPro
     doc.save(`${eventSlug}_${sessionSlug}_Attendance.pdf`);
   };
 
-  // Export Excel Handler (Name, URK, Dept, Year)
+  // Export Excel Handler (Name, URK, Dept, Year, Check-in Time, Method)
   const exportExcel = () => {
     if (filteredAttendances.length === 0) return;
     const currentEvt = events.find((e) => e.id === selectedEventId);
@@ -145,6 +154,15 @@ export default function AttendanceViewer({ initialEventId }: AttendanceViewerPro
       URK: att.rollNumber || "N/A",
       Dept: att.department || "N/A",
       Year: att.yearOfStudy || "N/A",
+      "Check-in Time": att.checkInTime
+        ? new Date(att.checkInTime).toLocaleTimeString("en-US", {
+            hour: "numeric",
+            minute: "2-digit",
+            second: "2-digit",
+            hour12: true,
+          })
+        : "N/A",
+      Method: att.checkInMethod || "N/A",
     }));
 
     const worksheet = XLSX.utils.json_to_sheet(excelData);
